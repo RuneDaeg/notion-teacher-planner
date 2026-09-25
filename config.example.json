@@ -1,0 +1,25 @@
+{
+  "title": "나의 미니 교무수첩",
+  "academic_year": 2026,
+  "timezone": "Asia/Seoul",
+  "teacher": "교사",
+  "school_level": "미설정",
+  "subjects": [
+    "영어"
+  ],
+  "classes": [
+    {
+      "name": "1학년 1반",
+      "grade": 1,
+      "class_name": "1",
+      "homeroom": true
+    }
+  ],
+  "modules": {
+    "attendance": true,
+    "assessment": true,
+    "contact": true,
+    "meeting": true
+  },
+  "demo": false
+}

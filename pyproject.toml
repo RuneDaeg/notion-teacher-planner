@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "notion-teacher-planner"
+version = "0.1.0"
+description = "AI와 함께 만드는 한국 교사용 Notion 미니 교무수첩"
+requires-python = ">=3.10"
+license = "MIT"
+dependencies = []
+
+[project.scripts]
+teacher-planner = "teacher_planner.cli:main"
+
+[tool.setuptools.package-data]
+teacher_planner = ["blueprint.json"]
+
+[tool.setuptools.packages.find]
+include = ["teacher_planner*"]
