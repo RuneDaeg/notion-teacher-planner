@@ -58,8 +58,13 @@ def main(argv=None):
             ds, vs = selected(c)
             if args.command == 'plan' or not args.apply:
                 report = {'title': c['title'], 'academic_year': c['academic_year'], 'modules': c['modules'], 'database_count': len(ds), 'view_count': len(vs) + len(dashboard_views(c)), 'databases': ds if getattr(args, 'full', False) else [d['title'] for d in ds], 'applied': False}
+                instances = dashboard_views(c)
+                report.update(semester=c.get('semester', 1), workspace_page_count=4,
+                              workspace_view_count=len(instances),
+                              workspace_database_block_count=len({(v['workspace_page'], v['section']) for v in instances}))
                 if getattr(args, 'full', False):
                     report['views'] = vs
+                    report['workspace_views'] = instances
                     from .dashboard import layout_spec
                     report['dashboard'] = layout_spec()
                 print(json.dumps(report, ensure_ascii=False, indent=2))
@@ -253,6 +258,7 @@ def validate_recovery(pending, obj):
 def verify_remote(client, state):
     issues = []
     ds, vs = selected(state['config'])
+    instances = dashboard_views(state['config']) if state.get('dashboard', {}).get('version', 0) >= 3 else None
     for d in ds:
         ref = state['databases'][d['key']]
         actual = client.request('GET', '/data_sources/' + ref['data_source_id'])
@@ -264,7 +270,9 @@ def verify_remote(client, state):
                 issues.append(f"{d['title']}: {name} 관계 대상 불일치")
         for v in (v for v in vs if v['source'] == d['key']):
             keys = ['view:' + v['key']]
-            if v['key'] in blueprint()['dashboard_views']:
+            if instances is not None:
+                keys.extend(row['instance_key'] for row in instances if row['key'] == v['key'])
+            elif v['key'] in blueprint()['dashboard_views']:
                 keys.append('home:' + v['key'])
             for key in keys:
                 if key not in state['objects']:

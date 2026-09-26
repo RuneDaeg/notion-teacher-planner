@@ -1,6 +1,7 @@
 {
-  "title": "나의 미니 교무수첩",
+  "title": "교무수첩 데스크",
   "academic_year": 2026,
+  "semester": 1,
   "timezone": "Asia/Seoul",
   "teacher": "교사",
   "school_level": "미설정",
@@ -46,7 +47,9 @@
     ],
     "links": {
       "shared_page": "",
-      "survey": ""
+      "survey": "",
+      "neis": "",
+      "edufine": ""
     }
   }
 }

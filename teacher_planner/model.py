@@ -20,6 +20,8 @@ def config(path):
             raise ValueError(f'{key}: 1~100자 문자열이어야 합니다.')
     if type(c['academic_year']) is not int or not 2000 <= c['academic_year'] <= 2200:
         raise ValueError('academic_year는 2000~2200 정수여야 합니다.')
+    if type(c.get('semester', 1)) is not int or c.get('semester', 1) not in (1, 2):
+        raise ValueError('semester는 1 또는 2여야 합니다.')
     if not isinstance(c['timezone'], str):
         raise ValueError('timezone은 IANA 시간대 문자열이어야 합니다.')
     ZoneInfo(c['timezone'])
@@ -59,6 +61,13 @@ def selected(c):
 
 
 def dashboard_views(c):
+    from .dashboard import layout_spec
+    if 'workspace' in layout_spec():
+        views = {v['key']: v for v in selected(c)[1]}
+        return [dict(views[key], instance_key=page['key'] + ':' + key,
+                     workspace_page=page['key'], section=section['key'])
+                for page in layout_spec()['workspace']['pages']
+                for section in page['sections'] for key in section['views'] if key in views]
     keys = set(blueprint()['dashboard_views'])
     return [v for v in selected(c)[1] if v['key'] in keys]
 
@@ -123,8 +132,10 @@ def view_payload(v, db, actual_properties, academic_year, parent=None, after=Non
             group['group_by'] = 'exact'
         conf['group_by'] = group
     if 'show' in v:
-        conf['properties'] = [{'property_id': prop['id'], 'visible': name in v['show']} for name, prop in actual_properties.items()]
-    filters = [v['filter'], {'property': '학년도', 'number': {'equals': academic_year}}]
+        ordered = list(v['show']) + [name for name in actual_properties if name not in v['show']]
+        conf['properties'] = [{'property_id': pid(name), 'visible': name in v['show']} for name in ordered]
+    filters = list(v['filter'].get('and', [v['filter']]))
+    filters.append({'property': '학년도', 'number': {'equals': academic_year}})
     payload = {'data_source_id': db['data_source_id'], 'name': v['name'], 'type': v['type'], 'configuration': conf, 'filter': {'and': filters}}
     if 'sorts' in v:
         payload['sorts'] = v['sorts']

@@ -56,21 +56,18 @@ class HomeTests(unittest.TestCase):
         row = self.api.objects['/blocks/' + self.state()['dashboard']['caption_id']]
         return plain(row['paragraph']['rich_text'])
 
-    def test_home_section_order_and_linked_views_are_direct_page_children(self):
-        keys = ['layout:top', 'layout:things', 'home:inbox', 'home:todo',
-                'layout:meetings', 'home:active_meetings', 'layout:middle',
-                'layout:students', 'home:active_students', 'layout:schedule',
-                'home:weekly', 'home:teacher_week',
-                'layout:archive', 'home:archive_agenda']
-        expected = [self.obj(key)['parent']['database_id'] if key.startswith('home:') else self.obj(key)['id'] for key in keys]
-        actual = children(self.api, self.obj('root')['id'])
-        self.assertEqual(expected, [row['id'] for row in actual[:len(expected)]])
-        for key in (key for key in keys if key.startswith('home:')):
-            linked = self.api.objects['/blocks/' + self.obj(key)['parent']['database_id']]
-            self.assertEqual(self.obj('root')['id'], linked['parent']['page_id'])
-        # Source database pages remain behind the new dashboard, not reordered
-        # into it or replaced with imported attachment identifiers.
-        self.assertGreater([row['id'] for row in actual].index(self.obj('section:운영 자료')['id']), len(expected))
+    def test_four_pages_keep_views_as_direct_page_children(self):
+        state = self.state()
+        self.assertEqual({'home', 'classroom', 'teaching', 'planning'}, set(state['dashboard']['pages']))
+        for key, parent in state['dashboard']['pages'].items():
+            actual = children(self.api, parent)
+            expected = state['dashboard']['page_order'][key]
+            self.assertEqual(expected, [row['id'] for row in actual[:len(expected)]])
+            for group in state['dashboard']['view_groups']:
+                if group['page'] == key:
+                    linked = self.api.objects['/blocks/' + group['container_id']]
+                    self.assertEqual(parent, linked['parent']['page_id'])
+        self.assertEqual([], verify_dashboard(self.api, state))
 
     def test_week_and_month_are_tabs_in_one_home_calendar(self):
         weekly = self.api.objects['/views/' + self.obj('home:weekly')['id']]
@@ -87,21 +84,53 @@ class HomeTests(unittest.TestCase):
         self.assertEqual(weekly['parent']['database_id'], monthly['database_id'])
         # The saved source database and separate teacher timetable keep their identities.
         self.assertNotEqual(self.state()['databases']['agenda']['id'], monthly['database_id'])
-        self.assertNotEqual(self.obj('home:teacher_week')['parent'], monthly['parent'])
+        self.assertNotEqual(self.obj('teaching:teacher_week')['parent'], monthly['parent'])
         self.assertEqual([], verify_remote(self.api, self.state()))
 
     def test_verification_detects_monthly_tab_moved_to_another_database(self):
         monthly = self.api.objects['/views/' + self.obj('home:monthly')['id']]
-        monthly['parent'] = self.obj('home:teacher_week')['parent']
+        monthly['parent'] = self.obj('teaching:teacher_week')['parent']
         self.api.calls.clear()
         self.assertIn('home:monthly: 뷰가 속한 데이터베이스 불일치', verify_remote(self.api, self.state()))
         self.assertEqual([], [call for call in self.api.calls if call[0] in ('POST', 'PATCH')])
 
+    def test_both_calendar_pages_share_source_and_each_has_one_tab_container(self):
+        state = self.state()
+        containers = []
+        for page in ('home', 'planning'):
+            keys = [page + ':weekly', page + ':monthly']
+            if page == 'planning':
+                keys.append('planning:deadlines')
+            views = [self.api.objects['/views/' + self.obj(key)['id']] for key in keys]
+            self.assertEqual(1, len({view['parent']['database_id'] for view in views}))
+            self.assertEqual({state['databases']['agenda']['data_source_id']}, {view['data_source_id'] for view in views})
+            containers.append(views[0]['parent']['database_id'])
+        self.assertNotEqual(*containers)
+
+    def test_navigation_accepts_notion_null_links_and_detects_missing_page_link(self):
+        for key in self.state()['dashboard']['pages']:
+            nav = self.api.objects['/blocks/' + self.obj(f'layout:{key}:nav')['id']]
+            for item in nav['paragraph']['rich_text']:
+                item['text'].setdefault('link', None)
+        self.assertEqual([], verify_remote(self.api, self.state()))
+        nav['paragraph']['rich_text'][0]['text']['link'] = None
+        self.assertTrue(any('탐색 링크' in issue for issue in verify_dashboard(self.api, self.state())))
+
+    def test_shared_native_tabs_preserve_student_and_progress_sources(self):
+        for keys, source in ((['classroom:active_students', 'classroom:students_gallery', 'classroom:students_observation'], 'students'),
+                             (['teaching:progress_class', 'teaching:progress_subject', 'teaching:semester_1', 'teaching:semester_2'], 'lessons')):
+            views = [self.api.objects['/views/' + self.obj(key)['id']] for key in keys]
+            self.assertEqual(1, len({view['parent']['database_id'] for view in views}))
+            self.assertEqual({self.state()['databases'][source]['data_source_id']}, {view['data_source_id'] for view in views})
+
+    def test_verification_detects_subpage_moved_outside_the_notebook(self):
+        page = self.api.objects['/pages/' + self.state()['dashboard']['pages']['classroom']]
+        page['parent']['page_id'] = self.api.parent
+        self.assertTrue(any('classroom: 하위 페이지' in issue for issue in verify_dashboard(self.api, self.state())))
+
     def test_top_matrix_and_column_widths_match_notebook_layout(self):
         top = children(self.api, self.obj('layout:top')['id'])
-        middle = children(self.api, self.obj('layout:middle')['id'])
         self.assertEqual([.625, .375], [row['column']['width_ratio'] for row in top])
-        self.assertEqual([.21, .58, .21], [row['column']['width_ratio'] for row in middle])
         table = self.api.objects['/blocks/' + self.state()['dashboard']['matrix_id']]
         self.assertEqual(top[0]['id'], table['parent']['block_id'])
         self.assertEqual(7, table['table']['table_width'])
@@ -112,7 +141,7 @@ class HomeTests(unittest.TestCase):
         state = self.state()
         self.assertEqual([], verify_dashboard(self.api, state))
         root = self.obj('root')['id']
-        linked_id = self.obj('home:active_students')['parent']['database_id']
+        linked_id = self.obj('home:weekly')['parent']['database_id']
         self.api.block_children[root].remove(linked_id)
         self.api.block_children[root].append(linked_id)
         self.api.calls.clear()
@@ -121,6 +150,7 @@ class HomeTests(unittest.TestCase):
 
     def test_home_links_reference_created_database_and_view_ids(self):
         database_ids = {record['id'].replace('-', '') for record in self.state()['databases'].values()}
+        database_ids.update(identifier.replace('-', '') for identifier in self.state()['dashboard']['pages'].values())
         view_ids = {record['id'].replace('-', '') for key, record in self.state()['objects'].items() if key.startswith('view:')}
         seen = []
 
@@ -159,7 +189,10 @@ class HomeTests(unittest.TestCase):
         self.assertNotIn('staff', state['databases'])
         self.assertNotIn('accounts', state['databases'])
         self.assertNotIn('meetings', state['databases'])
-        self.assertNotIn('layout:meetings', state['objects'])
+        self.assertNotIn('teaching:active_meetings', state['objects'])
+        self.assertNotIn('home:attendance_today', state['objects'])
+        self.assertNotIn('classroom:active_contacts', state['objects'])
+        self.assertNotIn('home:assessments_upcoming', state['objects'])
         serialized_blocks = json.dumps({key: value for key, value in api.objects.items() if key.startswith('/blocks/')}, ensure_ascii=False)
         self.assertNotIn('교직원 연락처', serialized_blocks)
         self.assertNotIn('학교 업무 계정 안내', serialized_blocks)

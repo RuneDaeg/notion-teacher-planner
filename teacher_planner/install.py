@@ -106,7 +106,7 @@ def install(client, c, parent, state_path):
     root = j.create('root', '/pages', {
         'parent': {'type': 'page_id', 'page_id': parent},
         'icon': {'type': 'emoji', 'emoji': '📒'},
-        'properties': {'title': {'title': rich(f"{c['academic_year']} · {c['title']}")}},
+        'properties': {'title': {'title': rich(f"{c['academic_year']}학년도 {c.get('semester', 1)}학기 · {c['title']}")}},
         'children': [block('paragraph', '오늘의 수업과 꼭 해야 할 일을 한곳에. 작은 기록으로 가볍게 시작하세요.')]})
     sections = {}
     for name in ('운영 자료', '학생 기록'):

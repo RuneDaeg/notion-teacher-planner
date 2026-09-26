@@ -1,5 +1,5 @@
 {
-  "version": 3,
+  "version": 4,
   "notion_version": "2026-03-11",
   "databases": [
     {
@@ -73,6 +73,19 @@
         },
         "메모": {
           "type": "rich_text"
+        },
+        "관찰 태그": {
+          "type": "multi_select",
+          "options": [
+            "학습",
+            "관계",
+            "생활",
+            "출결",
+            "후속 확인"
+          ]
+        },
+        "집중 관찰": {
+          "type": "checkbox"
         }
       }
     },
@@ -288,6 +301,18 @@
         },
         "외부 ID": {
           "type": "rich_text"
+        },
+        "마감 남은 일": {
+          "type": "formula",
+          "expression": "if(or(empty(prop(\"마감\")), or(prop(\"상태\") == \"완료\", prop(\"상태\") == \"취소\")), 0, dateBetween(parseDate(formatDate(dateStart(prop(\"마감\")), \"YYYY-MM-DD\")), today(), \"days\"))"
+        },
+        "마감 임박": {
+          "type": "formula",
+          "expression": "if(or(empty(prop(\"마감\")), or(prop(\"상태\") == \"완료\", prop(\"상태\") == \"취소\")), false, and(prop(\"마감 남은 일\") >= 0, prop(\"마감 남은 일\") <= 7))"
+        },
+        "D-Day": {
+          "type": "formula",
+          "expression": "if(or(empty(prop(\"마감\")), or(prop(\"상태\") == \"완료\", prop(\"상태\") == \"취소\")), \"\", if(prop(\"마감 남은 일\") == 0, \"D-Day\", if(prop(\"마감 남은 일\") > 0, \"D-\" + format(prop(\"마감 남은 일\")), \"D+\" + format(abs(prop(\"마감 남은 일\"))))))"
         }
       }
     },
@@ -351,6 +376,10 @@
         "업무·일정": {
           "type": "relation",
           "target": "agenda"
+        },
+        "오늘 수업": {
+          "type": "formula",
+          "expression": "if(empty(prop(\"수업일\")), false, formatDate(dateStart(prop(\"수업일\")), \"YYYY-MM-DD\") == formatDate(today(), \"YYYY-MM-DD\"))"
         }
       }
     },
@@ -478,6 +507,10 @@
             "추적",
             "종결"
           ]
+        },
+        "오늘 상담": {
+          "type": "formula",
+          "expression": "if(empty(prop(\"상담일\")), false, formatDate(dateStart(prop(\"상담일\")), \"YYYY-MM-DD\") == formatDate(today(), \"YYYY-MM-DD\"))"
         }
       }
     },
@@ -525,6 +558,10 @@
         },
         "메모": {
           "type": "rich_text"
+        },
+        "오늘 출결": {
+          "type": "formula",
+          "expression": "if(empty(prop(\"날짜\")), false, formatDate(dateStart(prop(\"날짜\")), \"YYYY-MM-DD\") == formatDate(today(), \"YYYY-MM-DD\"))"
         }
       }
     },
@@ -628,7 +665,8 @@
             "실시",
             "채점",
             "피드백",
-            "완료"
+            "완료",
+            "취소"
           ]
         },
         "업무·일정": {
@@ -638,6 +676,18 @@
         "기준표": {
           "type": "relation",
           "target": "resources"
+        },
+        "평가 남은 일": {
+          "type": "formula",
+          "expression": "if(or(empty(prop(\"평가일\")), or(prop(\"상태\") == \"완료\", prop(\"상태\") == \"취소\")), 0, dateBetween(parseDate(formatDate(dateStart(prop(\"평가일\")), \"YYYY-MM-DD\")), today(), \"days\"))"
+        },
+        "평가 예정": {
+          "type": "formula",
+          "expression": "if(or(empty(prop(\"평가일\")), or(prop(\"상태\") == \"완료\", prop(\"상태\") == \"취소\")), false, and(prop(\"평가 남은 일\") >= 0, prop(\"평가 남은 일\") <= 30))"
+        },
+        "평가 D-Day": {
+          "type": "formula",
+          "expression": "if(or(empty(prop(\"평가일\")), or(prop(\"상태\") == \"완료\", prop(\"상태\") == \"취소\")), \"\", if(prop(\"평가 남은 일\") == 0, \"D-Day\", if(prop(\"평가 남은 일\") > 0, \"D-\" + format(prop(\"평가 남은 일\")), \"D+\" + format(abs(prop(\"평가 남은 일\"))))))"
         }
       }
     },
@@ -1092,12 +1142,16 @@
       },
       "show": [
         "이름",
+        "학급",
         "교과",
-        "단원",
-        "계획 차시",
-        "완료 차시",
         "진도율",
-        "다음 수업"
+        "상태",
+        "다음 수업",
+        "단원",
+        "학기",
+        "계획일",
+        "계획 차시",
+        "완료 차시"
       ]
     },
     {
@@ -1147,7 +1201,16 @@
         "checkbox": {
           "equals": false
         }
-      }
+      },
+      "show": [
+        "이름",
+        "학급",
+        "번호",
+        "재적",
+        "관찰 태그",
+        "집중 관찰",
+        "메모"
+      ]
     },
     {
       "key": "archive_students",
@@ -1315,7 +1378,16 @@
         "checkbox": {
           "equals": false
         }
-      }
+      },
+      "show": [
+        "이름",
+        "학생",
+        "상담일",
+        "대상",
+        "주제",
+        "상태",
+        "후속 확인일"
+      ]
     },
     {
       "key": "archive_counseling",
@@ -1387,7 +1459,18 @@
         "checkbox": {
           "equals": false
         }
-      }
+      },
+      "show": [
+        "이름",
+        "학급",
+        "교과",
+        "유형",
+        "평가일",
+        "평가 D-Day",
+        "채점 마감",
+        "채점률",
+        "상태"
+      ]
     },
     {
       "key": "archive_assessments",
@@ -1555,6 +1638,525 @@
           }
         ]
       }
+    },
+    {
+      "key": "teacher_today",
+      "source": "timetable",
+      "name": "오늘 수업",
+      "type": "table",
+      "filter": {
+        "and": [
+          {
+            "property": "보관",
+            "checkbox": {
+              "equals": false
+            }
+          },
+          {
+            "property": "오늘 수업",
+            "formula": {
+              "checkbox": {
+                "equals": true
+              }
+            }
+          }
+        ]
+      },
+      "show": [
+        "이름",
+        "교시",
+        "수업일",
+        "학급",
+        "교실",
+        "상태",
+        "교과",
+        "동기화 시각"
+      ],
+      "sorts": [
+        {
+          "property": "교시",
+          "direction": "ascending"
+        }
+      ]
+    },
+    {
+      "key": "teacher_changes",
+      "source": "timetable",
+      "name": "변경·휴강 수업",
+      "type": "table",
+      "filter": {
+        "and": [
+          {
+            "property": "보관",
+            "checkbox": {
+              "equals": false
+            }
+          },
+          {
+            "or": [
+              {
+                "property": "상태",
+                "select": {
+                  "equals": "변경"
+                }
+              },
+              {
+                "property": "상태",
+                "select": {
+                  "equals": "휴강"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "show": [
+        "이름",
+        "수업일",
+        "교시",
+        "학급",
+        "교과",
+        "교실",
+        "상태",
+        "동기화 시각"
+      ],
+      "sorts": [
+        {
+          "property": "수업일",
+          "direction": "descending"
+        },
+        {
+          "property": "교시",
+          "direction": "ascending"
+        }
+      ]
+    },
+    {
+      "key": "counseling_today",
+      "source": "counseling",
+      "name": "오늘 상담",
+      "type": "table",
+      "filter": {
+        "and": [
+          {
+            "property": "보관",
+            "checkbox": {
+              "equals": false
+            }
+          },
+          {
+            "property": "오늘 상담",
+            "formula": {
+              "checkbox": {
+                "equals": true
+              }
+            }
+          }
+        ]
+      },
+      "show": [
+        "이름",
+        "학생",
+        "상담일",
+        "대상",
+        "주제",
+        "상태",
+        "후속 확인일"
+      ],
+      "sorts": [
+        {
+          "property": "상담일",
+          "direction": "ascending"
+        }
+      ]
+    },
+    {
+      "key": "attendance_today",
+      "source": "attendance",
+      "name": "오늘 출결",
+      "type": "table",
+      "filter": {
+        "and": [
+          {
+            "property": "보관",
+            "checkbox": {
+              "equals": false
+            }
+          },
+          {
+            "property": "오늘 출결",
+            "formula": {
+              "checkbox": {
+                "equals": true
+              }
+            }
+          }
+        ]
+      },
+      "show": [
+        "이름",
+        "학생",
+        "학급",
+        "교시",
+        "상태",
+        "확인",
+        "메모"
+      ],
+      "sorts": [
+        {
+          "property": "교시",
+          "direction": "ascending"
+        }
+      ]
+    },
+    {
+      "key": "attendance_unconfirmed",
+      "source": "attendance",
+      "name": "출결 확인 필요",
+      "type": "table",
+      "filter": {
+        "and": [
+          {
+            "property": "보관",
+            "checkbox": {
+              "equals": false
+            }
+          },
+          {
+            "property": "오늘 출결",
+            "formula": {
+              "checkbox": {
+                "equals": true
+              }
+            }
+          },
+          {
+            "property": "확인",
+            "checkbox": {
+              "equals": false
+            }
+          }
+        ]
+      },
+      "show": [
+        "이름",
+        "학생",
+        "학급",
+        "교시",
+        "상태",
+        "확인",
+        "메모"
+      ],
+      "sorts": [
+        {
+          "property": "교시",
+          "direction": "ascending"
+        }
+      ]
+    },
+    {
+      "key": "students_gallery",
+      "source": "students",
+      "name": "학생 카드",
+      "type": "gallery",
+      "filter": {
+        "property": "보관",
+        "checkbox": {
+          "equals": false
+        }
+      },
+      "show": [
+        "이름",
+        "학급",
+        "번호",
+        "관찰 태그",
+        "집중 관찰"
+      ],
+      "sorts": [
+        {
+          "property": "번호",
+          "direction": "ascending"
+        }
+      ]
+    },
+    {
+      "key": "students_observation",
+      "source": "students",
+      "name": "관찰 학생",
+      "type": "table",
+      "filter": {
+        "and": [
+          {
+            "property": "보관",
+            "checkbox": {
+              "equals": false
+            }
+          },
+          {
+            "or": [
+              {
+                "property": "집중 관찰",
+                "checkbox": {
+                  "equals": true
+                }
+              },
+              {
+                "property": "관찰 태그",
+                "multi_select": {
+                  "is_not_empty": true
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "show": [
+        "이름",
+        "학급",
+        "번호",
+        "재적",
+        "관찰 태그",
+        "집중 관찰",
+        "메모"
+      ],
+      "sorts": [
+        {
+          "property": "번호",
+          "direction": "ascending"
+        }
+      ]
+    },
+    {
+      "key": "todo_p1",
+      "source": "agenda",
+      "name": "P1 · 지금 할 일",
+      "type": "table",
+      "filter": {
+        "and": [
+          {
+            "property": "보관",
+            "checkbox": {
+              "equals": false
+            }
+          },
+          {
+            "property": "우선순위",
+            "select": {
+              "equals": "P1 지금"
+            }
+          },
+          {
+            "property": "상태",
+            "select": {
+              "does_not_equal": "완료"
+            }
+          },
+          {
+            "property": "상태",
+            "select": {
+              "does_not_equal": "취소"
+            }
+          }
+        ]
+      },
+      "show": [
+        "이름",
+        "우선순위",
+        "마감",
+        "D-Day",
+        "업무 분류",
+        "상태",
+        "다음 행동"
+      ],
+      "sorts": [
+        {
+          "property": "마감",
+          "direction": "ascending"
+        }
+      ]
+    },
+    {
+      "key": "todo_done",
+      "source": "agenda",
+      "name": "완료한 업무",
+      "type": "table",
+      "filter": {
+        "and": [
+          {
+            "property": "보관",
+            "checkbox": {
+              "equals": false
+            }
+          },
+          {
+            "property": "상태",
+            "select": {
+              "equals": "완료"
+            }
+          }
+        ]
+      },
+      "show": [
+        "이름",
+        "우선순위",
+        "마감",
+        "D-Day",
+        "업무 분류",
+        "상태",
+        "다음 행동"
+      ],
+      "sorts": [
+        {
+          "property": "일정",
+          "direction": "descending"
+        }
+      ]
+    },
+    {
+      "key": "due_soon",
+      "source": "agenda",
+      "name": "7일 안에 마감",
+      "type": "table",
+      "filter": {
+        "and": [
+          {
+            "property": "보관",
+            "checkbox": {
+              "equals": false
+            }
+          },
+          {
+            "property": "마감 임박",
+            "formula": {
+              "checkbox": {
+                "equals": true
+              }
+            }
+          }
+        ]
+      },
+      "show": [
+        "이름",
+        "우선순위",
+        "마감",
+        "D-Day",
+        "업무 분류",
+        "상태",
+        "다음 행동"
+      ],
+      "sorts": [
+        {
+          "property": "마감 남은 일",
+          "direction": "ascending"
+        },
+        {
+          "property": "우선순위 순서",
+          "direction": "ascending"
+        }
+      ]
+    },
+    {
+      "key": "progress_attention",
+      "source": "lessons",
+      "name": "보강이 필요한 수업",
+      "type": "table",
+      "filter": {
+        "and": [
+          {
+            "property": "보관",
+            "checkbox": {
+              "equals": false
+            }
+          },
+          {
+            "property": "상태",
+            "select": {
+              "equals": "보강 필요"
+            }
+          }
+        ]
+      },
+      "show": [
+        "이름",
+        "학급",
+        "교과",
+        "단원",
+        "학기",
+        "계획일",
+        "계획 차시",
+        "완료 차시",
+        "진도율",
+        "상태",
+        "다음 수업"
+      ],
+      "sorts": [
+        {
+          "property": "계획일",
+          "direction": "ascending"
+        }
+      ],
+      "group": "학급"
+    },
+    {
+      "key": "assessments_upcoming",
+      "source": "assessments",
+      "name": "30일 안에 평가",
+      "type": "table",
+      "filter": {
+        "and": [
+          {
+            "property": "보관",
+            "checkbox": {
+              "equals": false
+            }
+          },
+          {
+            "property": "평가 예정",
+            "formula": {
+              "checkbox": {
+                "equals": true
+              }
+            }
+          }
+        ]
+      },
+      "show": [
+        "이름",
+        "학급",
+        "교과",
+        "유형",
+        "평가일",
+        "평가 D-Day",
+        "채점 마감",
+        "채점률",
+        "상태"
+      ],
+      "sorts": [
+        {
+          "property": "평가 남은 일",
+          "direction": "ascending"
+        }
+      ]
+    },
+    {
+      "key": "projects_board",
+      "source": "projects",
+      "name": "프로젝트 진행 보드",
+      "type": "board",
+      "filter": {
+        "property": "보관",
+        "checkbox": {
+          "equals": false
+        }
+      },
+      "show": [
+        "이름",
+        "영역",
+        "기간",
+        "목표",
+        "완료 기준"
+      ],
+      "group": "상태"
     }
   ],
   "dashboard_views": [

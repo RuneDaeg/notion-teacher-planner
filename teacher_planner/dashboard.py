@@ -73,10 +73,10 @@ def dashboard_config(c):
                            'url': _url(bookmark['url'], '즐겨찾기', blank=True)})
     result['bookmarks'] = normalized
     links = result['links']
-    if not isinstance(links, dict) or set(links) - {'shared_page', 'survey'}:
-        raise ValueError('dashboard.links에는 shared_page와 survey만 사용할 수 있습니다.')
+    if not isinstance(links, dict) or set(links) - {'shared_page', 'survey', 'neis', 'edufine'}:
+        raise ValueError('dashboard.links에는 shared_page, survey, neis, edufine만 사용할 수 있습니다.')
     result['links'] = {key: _url(links.get(key, ''), key, blank=True)
-                       for key in ('shared_page', 'survey')}
+                       for key in ('shared_page', 'survey', 'neis', 'edufine')}
     return result
 
 

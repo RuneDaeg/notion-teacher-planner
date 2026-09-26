@@ -168,7 +168,7 @@ class PlannerTests(unittest.TestCase):
         self.install()
         state = json.loads(self.path.read_text())
         self.assertEqual(16, len(state['databases']))
-        self.assertEqual(54, sum(1 for k in state['objects'] if k.startswith(('view:', 'home:'))))
+        self.assertEqual(105, sum(1 for v in state['objects'].values() if v.get('object') == 'view'))
         student_ds = state['databases']['students']['data_source_id']
         props = self.api.objects['/data_sources/' + student_ds]['properties']
         self.assertEqual(state['databases']['classes']['data_source_id'], props['학급']['relation']['data_source_id'])

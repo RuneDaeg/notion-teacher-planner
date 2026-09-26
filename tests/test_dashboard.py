@@ -76,7 +76,7 @@ class DashboardConfigTests(unittest.TestCase):
         self.assertEqual([], dashboard_config({'dashboard': {'bookmarks': []}})['bookmarks'])
 
     def test_shared_links_apply_same_url_validation(self):
-        for key in ('shared_page', 'survey'):
+        for key in ('shared_page', 'survey', 'neis', 'edufine'):
             with self.subTest(key=key), self.assertRaises(ValueError):
                 dashboard_config({'dashboard': {'links': {key: 'https://user:secret@example.org'}}})
 
@@ -84,7 +84,7 @@ class DashboardConfigTests(unittest.TestCase):
 class DashboardBlockTests(unittest.TestCase):
     def test_manifest_identity_and_section_styles_are_shared(self):
         spec = layout_spec()
-        self.assertEqual(('teacher-notebook', '교무수첩 기본 템플릿', 2),
+        self.assertEqual(('teacher-notebook', '교무수첩 데스크', 3),
                          (spec['id'], spec['name'], spec['version']))
         for key in ('things', 'meetings', 'students', 'schedule', 'archive'):
             self.assertTrue(spec['sections'][key]['title'])

@@ -3,11 +3,8 @@ from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
 
 from .blocks import BlockJournal, children
-from .dashboard import (dashboard_config, layout_spec, matrix_table, matrix_title,
-                        middle_columns, middle_content, quick_links, section_heading,
-                        top_columns)
+from .dashboard import dashboard_config, layout_spec, matrix_table, matrix_title
 from .install import Journal, compact
-from .model import dashboard_views, rich, selected, view_payload
 from .timetable import text_property
 
 
@@ -31,81 +28,8 @@ def _column_ids(j, block, key, count):
 
 
 def install_dashboard(j, c, root, databases, actual_props):
-    writer = BlockJournal(j)
-    links = {key: notion_link(obj) for key, obj in databases.items()}
-    for key, source in (('semester_1', 'lessons'), ('semester_2', 'lessons'),
-                        ('resource_archive', 'resources')):
-        view_key = 'archive_resources' if key == 'resource_archive' else key
-        links[key] = notion_link(databases[source], j.data['objects']['view:' + view_key])
-    links['todo'] = notion_link(databases['agenda'], j.data['objects']['view:todo'])
-    links['archive'] = notion_link(databases['agenda'], j.data['objects']['view:archive_agenda'])
-    links['timetable'] = notion_link(databases['timetable'])
-
-    # First create shallow column scaffolds; append tables/children separately to
-    # remain within Notion's two-level nesting limit for one append request.
-    top = writer.append('layout:top', root, top_columns(c, links), position={'type': 'start'})
-    left, right = _column_ids(j, top, 'top', 2)
-    caption = writer.append('layout:matrix-caption', left, matrix_title(None))
-    table = writer.append('layout:matrix', left, matrix_table(c))
-    for i, block in enumerate(quick_links(c, links)):
-        writer.append(f'layout:quick:{i}', right, block)
-
-    anchors = {}
-    previous = top['id']
-    headings = layout_spec()['sections']
-    for key in ('things', 'meetings', 'middle', 'students', 'schedule', 'archive'):
-        if key == 'meetings' and 'meetings' not in databases:
-            continue
-        if key == 'middle':
-            block = middle_columns(c, links)
-        else:
-            spec = headings[key]
-            block = section_heading(spec['title'], spec['color'])
-        anchor = writer.append('layout:' + key, root, block,
-                               position={'type': 'after_block', 'after_block': {'id': previous}})
-        previous = anchor['id']
-        anchors[key] = previous
-        if key == 'middle':
-            columns = _column_ids(j, anchor, 'middle', 3)
-            for i, blocks in enumerate(middle_content(c, links)):
-                for k, child in enumerate(blocks):
-                    writer.append(f'layout:middle:{i}:{k}', columns[i], child)
-
-    slots = {'inbox': 'things', 'todo': 'things', 'active_meetings': 'meetings',
-             'active_students': 'students', 'weekly': 'schedule', 'monthly': 'schedule',
-             'teacher_week': 'schedule', 'archive_agenda': 'archive'}
-    view_anchors = dict(anchors)
-    shared_tabs = {key: group[0] for group in layout_spec()['shared_view_groups']
-                   for key in group[1:]}
-    for v in dashboard_views(c):
-        section = slots[v['key']]
-        source = databases[v['source']]
-        if v['key'] in shared_tabs:
-            # Add a tab to the first view's linked block, retaining its data source.
-            first = j.data['objects']['home:' + shared_tabs[v['key']]]
-            linked = {**source, 'id': first['parent']['database_id']}
-            payload = view_payload(v, linked, actual_props[v['source']], c['academic_year'])
-        else:
-            payload = view_payload(v, source, actual_props[v['source']], c['academic_year'],
-                                   root, after=view_anchors[section])
-        obj = j.create('home:' + v['key'], '/views', payload)
-        view_anchors[section] = obj['parent']['database_id']
-    archive_links = []
-    for d in selected(c)[0]:
-        url = notion_link(databases[d['key']], j.data['objects']['view:archive_' + d['key']])
-        block = {'object': 'block', 'type': 'paragraph', 'paragraph': {
-            'rich_text': [{'type': 'text', 'text': {'content': d['title'] + ' 보관함', 'link': {'url': url}}}]}}
-        archive_links.append(block)
-    writer.append('layout:archive-links', root, {'object': 'block', 'type': 'toggle',
-                  'toggle': {'rich_text': rich('표별 보관함'), 'children': archive_links}},
-                  position={'type': 'after_block', 'after_block': {'id': view_anchors['archive']}})
-    previous_layout = j.data.get('dashboard', {})
-    base_rows = previous_layout.get('matrix_row_ids') or [r['id'] for r in children(j.client, table['id'])]
-    j.data['dashboard'] = {**previous_layout, 'version': layout_spec()['version'], 'root_id': root,
-                           'matrix_id': table['id'], 'caption_id': caption['id'],
-                           'matrix_row_ids': base_rows,
-                           'anchors': anchors}
-    j.save()
+    from .workspace import install_workspace
+    return install_workspace(j, c, root, databases, actual_props)
 
 
 def _week_for(rows, explicit=None):
@@ -129,6 +53,9 @@ def verify_dashboard(client, state):
     layout = state.get('dashboard')
     if not layout:
         return []
+    if layout.get('version', 0) >= 3:
+        from .workspace import verify_workspace
+        return verify_workspace(client, state)
     issues = []
     actual = children(client, layout['root_id'])
     actual_ids = [item['id'] for item in actual]

@@ -1,39 +1,451 @@
 {
   "id": "teacher-notebook",
-  "name": "교무수첩 기본 템플릿",
-  "version": 2,
-  "shared_view_groups": [["weekly", "monthly"]],
+  "name": "교무수첩 데스크",
+  "version": 3,
+  "shared_view_groups": [
+    [
+      "weekly",
+      "monthly"
+    ]
+  ],
   "defaults": {
     "periods": 7,
     "bookmarks": [
-      {"label": "학교 홈페이지", "url": ""},
-      {"label": "업무 포털", "url": ""},
-      {"label": "수업 자료", "url": ""},
-      {"label": "학교 알림", "url": ""},
-      {"label": "자주 쓰는 사이트", "url": ""}
+      {
+        "label": "학교 홈페이지",
+        "url": ""
+      },
+      {
+        "label": "업무 포털",
+        "url": ""
+      },
+      {
+        "label": "수업 자료",
+        "url": ""
+      },
+      {
+        "label": "학교 알림",
+        "url": ""
+      },
+      {
+        "label": "자주 쓰는 사이트",
+        "url": ""
+      }
     ],
-    "links": {"shared_page": "", "survey": ""}
+    "links": {
+      "shared_page": "",
+      "survey": "",
+      "neis": "",
+      "edufine": ""
+    }
   },
   "top": [
-    {"key": "timetable", "title": "수업 시간표", "color": "green_background", "width_ratio": 0.625},
-    {"key": "quick_links", "title": "빠른 동작 / 즐겨찾기", "color": "purple_background", "width_ratio": 0.375}
+    {
+      "key": "timetable",
+      "title": "수업 시간표",
+      "color": "green_background",
+      "width_ratio": 0.625
+    },
+    {
+      "key": "quick_links",
+      "title": "빠른 동작 / 즐겨찾기",
+      "color": "purple_background",
+      "width_ratio": 0.375
+    }
   ],
   "middle": [
-    {"key": "class", "title": "Class", "color": "default", "width_ratio": 0.21},
-    {"key": "students", "title": "학생 명렬표", "color": "pink_background", "width_ratio": 0.58},
-    {"key": "school", "title": "School", "color": "default", "width_ratio": 0.21}
+    {
+      "key": "class",
+      "title": "Class",
+      "color": "default",
+      "width_ratio": 0.21
+    },
+    {
+      "key": "students",
+      "title": "학생 명렬표",
+      "color": "pink_background",
+      "width_ratio": 0.58
+    },
+    {
+      "key": "school",
+      "title": "School",
+      "color": "default",
+      "width_ratio": 0.21
+    }
   ],
   "sections": {
-    "things": {"title": "Things to do", "color": "orange_background"},
-    "meetings": {"title": "회의록", "color": "blue_background"},
-    "students": {"title": "학생 명렬표", "color": "pink_background"},
-    "schedule": {"title": "Schedule", "color": "pink_background"},
-    "archive": {"title": "Archive", "color": "blue_background"},
-    "quick_actions": {"title": "Quick Actions", "color": "default"},
-    "bookmarks": {"title": "Bookmarks", "color": "default"},
-    "share": {"title": "Share", "color": "default"},
-    "advice": {"title": "Advice", "color": "default"},
-    "etc": {"title": "ETC", "color": "default"}
+    "things": {
+      "title": "Things to do",
+      "color": "orange_background"
+    },
+    "meetings": {
+      "title": "회의록",
+      "color": "blue_background"
+    },
+    "students": {
+      "title": "학생 명렬표",
+      "color": "pink_background"
+    },
+    "schedule": {
+      "title": "Schedule",
+      "color": "pink_background"
+    },
+    "archive": {
+      "title": "Archive",
+      "color": "blue_background"
+    },
+    "quick_actions": {
+      "title": "Quick Actions",
+      "color": "default"
+    },
+    "bookmarks": {
+      "title": "Bookmarks",
+      "color": "default"
+    },
+    "share": {
+      "title": "Share",
+      "color": "default"
+    },
+    "advice": {
+      "title": "Advice",
+      "color": "default"
+    },
+    "etc": {
+      "title": "ETC",
+      "color": "default"
+    }
   },
-  "class_colors": ["blue_background", "orange_background", "pink_background", "green_background", "purple_background", "yellow_background", "brown_background", "red_background"]
+  "class_colors": [
+    "blue_background",
+    "orange_background",
+    "pink_background",
+    "green_background",
+    "purple_background",
+    "yellow_background",
+    "brown_background",
+    "red_background"
+  ],
+  "workspace": {
+    "pages": [
+      {
+        "key": "home",
+        "title": "대시보드 & 오늘 허브",
+        "icon": "📒",
+        "description": "오늘의 수업, 학생 기록, 마감 업무를 한눈에 확인합니다.",
+        "sections": [
+          {
+            "key": "briefing",
+            "title": "오늘의 교무실 브리핑",
+            "kind": "briefing",
+            "color": "gray_background",
+            "views": []
+          },
+          {
+            "key": "quick",
+            "title": "빠른 실행",
+            "kind": "quick",
+            "color": "gray_background",
+            "views": []
+          },
+          {
+            "key": "today",
+            "title": "오늘의 수업",
+            "kind": "views",
+            "color": "blue_background",
+            "views": [
+              "teacher_today",
+              "teacher_changes"
+            ]
+          },
+          {
+            "key": "tasks",
+            "title": "우선순위 To-Do",
+            "kind": "views",
+            "color": "gray_background",
+            "views": [
+              "todo",
+              "todo_p1",
+              "todo_done",
+              "inbox"
+            ]
+          },
+          {
+            "key": "attendance",
+            "title": "오늘 출결 확인",
+            "kind": "views",
+            "color": "green_background",
+            "views": [
+              "attendance_today",
+              "attendance_unconfirmed"
+            ]
+          },
+          {
+            "key": "counseling",
+            "title": "오늘 상담",
+            "kind": "views",
+            "color": "yellow_background",
+            "views": [
+              "counseling_today"
+            ]
+          },
+          {
+            "key": "progress",
+            "title": "반별 진도 현황",
+            "kind": "views",
+            "color": "blue_background",
+            "views": [
+              "progress_class",
+              "progress_attention"
+            ]
+          },
+          {
+            "key": "assessment",
+            "title": "다가오는 평가",
+            "kind": "views",
+            "color": "purple_background",
+            "views": [
+              "assessments_upcoming"
+            ]
+          },
+          {
+            "key": "schedule",
+            "title": "학사 캘린더",
+            "kind": "views",
+            "color": "gray_background",
+            "views": [
+              "weekly",
+              "monthly"
+            ]
+          },
+          {
+            "key": "deadlines",
+            "title": "7일 안에 마감 업무",
+            "kind": "views",
+            "color": "red_background",
+            "views": [
+              "due_soon"
+            ]
+          }
+        ]
+      },
+      {
+        "key": "classroom",
+        "title": "학급 경영 & 학생 상담",
+        "icon": "👥",
+        "description": "학생 명부부터 출결, 상담, 후속 관찰까지 한곳에서 이어갑니다.",
+        "sections": [
+          {
+            "key": "students",
+            "title": "학생 명부 & 관찰 기록",
+            "kind": "views",
+            "color": "gray_background",
+            "views": [
+              "active_students",
+              "students_gallery",
+              "students_observation"
+            ]
+          },
+          {
+            "key": "attendance",
+            "title": "출결 확인",
+            "kind": "views",
+            "color": "green_background",
+            "views": [
+              "attendance_today",
+              "attendance_unconfirmed",
+              "active_attendance"
+            ]
+          },
+          {
+            "key": "counseling",
+            "title": "상담 기록 & 후속 조치",
+            "kind": "views",
+            "color": "yellow_background",
+            "views": [
+              "active_counseling",
+              "counseling_today"
+            ]
+          },
+          {
+            "key": "contacts",
+            "title": "학부모 연락",
+            "kind": "views",
+            "color": "gray_background",
+            "views": [
+              "active_contacts"
+            ]
+          },
+          {
+            "key": "submissions",
+            "title": "제출물 체크",
+            "kind": "views",
+            "color": "gray_background",
+            "views": [
+              "active_submissions"
+            ]
+          },
+          {
+            "key": "notes",
+            "title": "조회·종례 관찰 메모",
+            "kind": "notes",
+            "color": "gray_background",
+            "views": []
+          },
+          {
+            "key": "school",
+            "title": "학교 업무 바로가기",
+            "kind": "school",
+            "color": "gray_background",
+            "views": []
+          }
+        ]
+      },
+      {
+        "key": "teaching",
+        "title": "교과 진도표 & 시간표",
+        "icon": "📚",
+        "description": "주간 수업과 반별 진도를 확인하고 다음 수업을 준비합니다.",
+        "sections": [
+          {
+            "key": "matrix",
+            "title": "주간 수업 시간표",
+            "kind": "matrix",
+            "color": "blue_background",
+            "views": []
+          },
+          {
+            "key": "timetable",
+            "title": "시간표 기록",
+            "kind": "views",
+            "color": "blue_background",
+            "views": [
+              "teacher_week",
+              "teacher_changes"
+            ]
+          },
+          {
+            "key": "progress",
+            "title": "교과별·학급별 진도",
+            "kind": "views",
+            "color": "blue_background",
+            "views": [
+              "progress_class",
+              "progress_subject",
+              "semester_1",
+              "semester_2",
+              "progress_attention"
+            ]
+          },
+          {
+            "key": "assessment",
+            "title": "평가·채점 현황",
+            "kind": "views",
+            "color": "purple_background",
+            "views": [
+              "assessments_upcoming",
+              "active_assessments"
+            ]
+          },
+          {
+            "key": "meetings",
+            "title": "교과 협의 & 결정 사항",
+            "kind": "views",
+            "color": "gray_background",
+            "views": [
+              "active_meetings"
+            ]
+          },
+          {
+            "key": "resources",
+            "title": "수업 자료",
+            "kind": "views",
+            "color": "gray_background",
+            "views": [
+              "active_resources"
+            ]
+          }
+        ]
+      },
+      {
+        "key": "planning",
+        "title": "학사 캘린더 & PARA",
+        "icon": "🗂️",
+        "description": "학사 일정과 마감, 프로젝트·담당 영역·자료·보관을 연결합니다.",
+        "sections": [
+          {
+            "key": "schedule",
+            "title": "학사 캘린더",
+            "kind": "views",
+            "color": "gray_background",
+            "views": [
+              "weekly",
+              "monthly",
+              "deadlines"
+            ]
+          },
+          {
+            "key": "deadlines",
+            "title": "마감이 가까운 업무",
+            "kind": "views",
+            "color": "red_background",
+            "views": [
+              "due_soon",
+              "overdue"
+            ]
+          },
+          {
+            "key": "para",
+            "title": "PARA 교직 업무",
+            "kind": "para",
+            "color": "gray_background",
+            "views": []
+          },
+          {
+            "key": "projects",
+            "title": "Projects · 프로젝트",
+            "kind": "views",
+            "color": "purple_background",
+            "views": [
+              "projects_board",
+              "active_projects"
+            ]
+          },
+          {
+            "key": "areas",
+            "title": "Areas · 담당 영역",
+            "kind": "views",
+            "color": "green_background",
+            "views": [
+              "active_areas"
+            ]
+          },
+          {
+            "key": "resources",
+            "title": "Resources · 자료",
+            "kind": "views",
+            "color": "blue_background",
+            "views": [
+              "active_resources"
+            ]
+          },
+          {
+            "key": "archive",
+            "title": "Archives · 보관",
+            "kind": "views",
+            "color": "gray_background",
+            "views": [
+              "archive_agenda"
+            ]
+          },
+          {
+            "key": "archive_links",
+            "title": "표별 보관함",
+            "kind": "archives",
+            "color": "gray_background",
+            "views": []
+          }
+        ]
+      }
+    ]
+  }
 }
