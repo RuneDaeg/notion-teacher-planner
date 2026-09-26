@@ -41,18 +41,26 @@ def config(path):
         if not isinstance(row.get('class_name'), str) or type(row.get('homeroom')) is not bool:
             raise ValueError('class_name 문자열과 homeroom 참/거짓이 필요합니다.')
         names.add(name)
-    if not isinstance(c['modules'], dict) or set(c['modules']) != {'attendance', 'assessment', 'contact', 'meeting'}:
-        raise ValueError('modules에는 attendance, assessment, contact, meeting이 필요합니다.')
+    required_modules = {'attendance', 'assessment', 'contact', 'meeting'}
+    if not isinstance(c['modules'], dict) or required_modules - set(c['modules']) or set(c['modules']) - (required_modules | {'staff', 'accounts'}):
+        raise ValueError('modules에는 attendance, assessment, contact, meeting이 필요하며 staff, accounts를 선택할 수 있습니다.')
     if any(type(x) is not bool for x in c['modules'].values()) or type(c['demo']) is not bool:
         raise ValueError('모듈 선택과 demo는 true/false여야 합니다.')
+    from .dashboard import dashboard_config
+    dashboard_config(c)
     return c
 
 
 def selected(c):
     b = blueprint()
-    dbs = [d for d in b['databases'] if d['module'] == 'core' or c['modules'][d['module']]]
+    dbs = [d for d in b['databases'] if d['module'] == 'core' or c['modules'].get(d['module'], False)]
     keys = {d['key'] for d in dbs}
     return dbs, [v for v in b['views'] if v['source'] in keys]
+
+
+def dashboard_views(c):
+    keys = set(blueprint()['dashboard_views'])
+    return [v for v in selected(c)[1] if v['key'] in keys]
 
 
 def rich(text):
@@ -102,7 +110,7 @@ def values(properties, definitions):
     return out
 
 
-def view_payload(v, db, actual_properties, academic_year, parent=None):
+def view_payload(v, db, actual_properties, academic_year, parent=None, after=None):
     pid = lambda name: actual_properties[name]['id']
     conf = {'type': v['type']}
     if 'date' in v:
@@ -122,6 +130,8 @@ def view_payload(v, db, actual_properties, academic_year, parent=None):
         payload['sorts'] = v['sorts']
     if parent:
         payload['create_database'] = {'parent': {'type': 'page_id', 'page_id': parent}}
+        if after:
+            payload['create_database']['position'] = {'type': 'after_block', 'block_id': after}
     else:
         payload['database_id'] = db['id']
     return payload

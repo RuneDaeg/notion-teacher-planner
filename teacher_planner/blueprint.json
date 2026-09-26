@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 3,
   "notion_version": "2026-03-11",
   "databases": [
     {
@@ -414,6 +414,13 @@
         "시간표": {
           "type": "relation",
           "target": "timetable"
+        },
+        "학기": {
+          "type": "select",
+          "options": [
+            "1학기",
+            "2학기"
+          ]
         }
       }
     },
@@ -732,6 +739,73 @@
         "프로젝트": {
           "type": "relation",
           "target": "projects"
+        }
+      }
+    },
+    {
+      "key": "staff",
+      "title": "교직원 연락망",
+      "module": "staff",
+      "section": "운영 자료",
+      "properties": {
+        "이름": {
+          "type": "title"
+        },
+        "학년도": {
+          "type": "number"
+        },
+        "보관": {
+          "type": "checkbox"
+        },
+        "부서": {
+          "type": "rich_text"
+        },
+        "직책": {
+          "type": "rich_text"
+        },
+        "교내연락처": {
+          "type": "phone_number"
+        },
+        "이메일": {
+          "type": "email"
+        },
+        "담당 업무": {
+          "type": "rich_text"
+        },
+        "메모": {
+          "type": "rich_text"
+        }
+      }
+    },
+    {
+      "key": "accounts",
+      "title": "학교 계정 관리",
+      "module": "accounts",
+      "section": "운영 자료",
+      "properties": {
+        "이름": {
+          "type": "title"
+        },
+        "학년도": {
+          "type": "number"
+        },
+        "보관": {
+          "type": "checkbox"
+        },
+        "접속 URL": {
+          "type": "url"
+        },
+        "계정 ID": {
+          "type": "rich_text"
+        },
+        "관리 담당": {
+          "type": "rich_text"
+        },
+        "보관 위치": {
+          "type": "url"
+        },
+        "메모": {
+          "type": "rich_text"
         }
       }
     }
@@ -1374,14 +1448,123 @@
           "equals": true
         }
       }
+    },
+    {
+      "key": "active_staff",
+      "source": "staff",
+      "name": "전체 · 현재 학년도",
+      "type": "table",
+      "filter": {
+        "property": "보관",
+        "checkbox": {
+          "equals": false
+        }
+      }
+    },
+    {
+      "key": "archive_staff",
+      "source": "staff",
+      "name": "보관함",
+      "type": "table",
+      "filter": {
+        "property": "보관",
+        "checkbox": {
+          "equals": true
+        }
+      }
+    },
+    {
+      "key": "active_accounts",
+      "source": "accounts",
+      "name": "전체 · 현재 학년도",
+      "type": "table",
+      "filter": {
+        "property": "보관",
+        "checkbox": {
+          "equals": false
+        }
+      }
+    },
+    {
+      "key": "archive_accounts",
+      "source": "accounts",
+      "name": "보관함",
+      "type": "table",
+      "filter": {
+        "property": "보관",
+        "checkbox": {
+          "equals": true
+        }
+      }
+    },
+    {
+      "key": "staff_department",
+      "source": "staff",
+      "name": "부서별 연락망",
+      "type": "table",
+      "group": "부서",
+      "filter": {
+        "property": "보관",
+        "checkbox": {
+          "equals": false
+        }
+      }
+    },
+    {
+      "key": "semester_1",
+      "source": "lessons",
+      "name": "1학기 진도",
+      "type": "table",
+      "group": "학급",
+      "filter": {
+        "and": [
+          {
+            "property": "보관",
+            "checkbox": {
+              "equals": false
+            }
+          },
+          {
+            "property": "학기",
+            "select": {
+              "equals": "1학기"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "key": "semester_2",
+      "source": "lessons",
+      "name": "2학기 진도",
+      "type": "table",
+      "group": "학급",
+      "filter": {
+        "and": [
+          {
+            "property": "보관",
+            "checkbox": {
+              "equals": false
+            }
+          },
+          {
+            "property": "학기",
+            "select": {
+              "equals": "2학기"
+            }
+          }
+        ]
+      }
     }
   ],
   "dashboard_views": [
     "inbox",
     "todo",
+    "active_meetings",
+    "active_students",
     "weekly",
     "monthly",
     "teacher_week",
-    "progress_class"
+    "archive_agenda"
   ]
 }

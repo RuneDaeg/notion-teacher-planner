@@ -1,0 +1,38 @@
+{
+  "id": "teacher-notebook",
+  "name": "교무수첩 기본 템플릿",
+  "version": 1,
+  "defaults": {
+    "periods": 7,
+    "bookmarks": [
+      {"label": "학교 홈페이지", "url": ""},
+      {"label": "업무 포털", "url": ""},
+      {"label": "수업 자료", "url": ""},
+      {"label": "학교 알림", "url": ""},
+      {"label": "자주 쓰는 사이트", "url": ""}
+    ],
+    "links": {"shared_page": "", "survey": ""}
+  },
+  "top": [
+    {"key": "timetable", "title": "수업 시간표", "color": "green_background", "width_ratio": 0.625},
+    {"key": "quick_links", "title": "빠른 동작 / 즐겨찾기", "color": "purple_background", "width_ratio": 0.375}
+  ],
+  "middle": [
+    {"key": "class", "title": "Class", "color": "default", "width_ratio": 0.21},
+    {"key": "students", "title": "학생 명렬표", "color": "pink_background", "width_ratio": 0.58},
+    {"key": "school", "title": "School", "color": "default", "width_ratio": 0.21}
+  ],
+  "sections": {
+    "things": {"title": "Things to do", "color": "orange_background"},
+    "meetings": {"title": "회의록", "color": "blue_background"},
+    "students": {"title": "학생 명렬표", "color": "pink_background"},
+    "schedule": {"title": "Schedule", "color": "pink_background"},
+    "archive": {"title": "Archive", "color": "blue_background"},
+    "quick_actions": {"title": "Quick Actions", "color": "default"},
+    "bookmarks": {"title": "Bookmarks", "color": "default"},
+    "share": {"title": "Share", "color": "default"},
+    "advice": {"title": "Advice", "color": "default"},
+    "etc": {"title": "ETC", "color": "default"}
+  },
+  "class_colors": ["blue_background", "orange_background", "pink_background", "green_background", "purple_background", "yellow_background", "brown_background", "red_background"]
+}

@@ -19,7 +19,34 @@
     "attendance": true,
     "assessment": true,
     "contact": true,
-    "meeting": true
+    "meeting": true,
+    "staff": true,
+    "accounts": true
   },
-  "demo": false
+  "demo": false,
+  "dashboard": {
+    "periods": 7,
+    "bookmarks": [
+      {
+        "label": "EVPN",
+        "url": ""
+      },
+      {
+        "label": "교육청 업무포털",
+        "url": ""
+      },
+      {
+        "label": "학교 온라인 교무실",
+        "url": ""
+      },
+      {
+        "label": "교과 자료실",
+        "url": ""
+      }
+    ],
+    "links": {
+      "shared_page": "",
+      "survey": ""
+    }
+  }
 }

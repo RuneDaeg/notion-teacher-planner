@@ -96,9 +96,10 @@ def install(client, c, parent, state_path):
     j = Journal(state_path, client)
     j.ready()
     identity = client.request('GET', '/users/me')['id']
-    signature = fingerprint({'config': c, 'blueprint': blueprint()})
+    from .dashboard import layout_spec
+    signature = fingerprint({'config': c, 'blueprint': blueprint(), 'dashboard': layout_spec()})
     if j.data.get('identity') and (j.data['identity'] != identity or j.data['parent'] != parent or j.data['signature'] != signature):
-        raise ValueError('기존 설치와 계정·상위 페이지·설정·설계가 다릅니다. 새 학년도에는 별도 state 경로를 사용하세요.')
+        raise ValueError('기존 설치와 계정·상위 페이지·설정·설계가 다릅니다. 새 기본 템플릿은 별도 state 경로로 새 수첩을 만드세요. 기존 수첩은 자동 변경하지 않습니다.')
     client.request('GET', '/pages/' + parent)
     j.data.update(identity=identity, parent=parent, signature=signature, config=c)
     j.save()
@@ -106,14 +107,7 @@ def install(client, c, parent, state_path):
         'parent': {'type': 'page_id', 'page_id': parent},
         'icon': {'type': 'emoji', 'emoji': '📒'},
         'properties': {'title': {'title': rich(f"{c['academic_year']} · {c['title']}")}},
-        'children': [block('paragraph', '오늘의 수업과 꼭 해야 할 일을 한곳에. 작은 기록으로 가볍게 시작하세요.'),
-                     block('heading_2', '사용 순서'),
-                     block('numbered_list_item', '수집함에 할 일을 적고 P1~P4와 업무 분류를 정합니다.'),
-                     block('numbered_list_item', '실행할 시간은 일정, 제출 기한은 마감에 입력합니다.'),
-                     block('numbered_list_item', '수업 후 진도와 다음 수업을 기록합니다. 금요일에는 완료 자료를 보관합니다.'),
-                     block('paragraph', 'P1 중요·긴급 / P2 중요·비긴급 / P3 비중요·긴급 / P4 비중요·비긴급. 캘린더는 업무·일정 원본을 함께 봅니다.'),
-                     block('paragraph', '학생 기록은 접근 권한을 확인한 공간에서 사용하세요. 하위 페이지 분류는 접근 권한 분리가 아닙니다.'),
-                     block('heading_2', '교무수첩 바로가기')]})
+        'children': [block('paragraph', '오늘의 수업과 꼭 해야 할 일을 한곳에. 작은 기록으로 가볍게 시작하세요.')]})
     sections = {}
     for name in ('운영 자료', '학생 기록'):
         sections[name] = j.create('section:' + name, '/pages', {
@@ -153,9 +147,8 @@ def install(client, c, parent, state_path):
         actual_props[d['key']] = client.request('GET', '/data_sources/' + ds)['properties']
     for v in views:
         j.create('view:' + v['key'], '/views', view_payload(v, databases[v['source']], actual_props[v['source']], c['academic_year']))
-    for key in blueprint()['dashboard_views']:
-        v = next(v for v in views if v['key'] == key)
-        j.create('home:' + key, '/views', view_payload(v, databases[v['source']], actual_props[v['source']], c['academic_year'], root['id']))
+    from .home import install_dashboard
+    install_dashboard(j, c, root['id'], databases, actual_props)
     seeds(j, c, definitions, databases)
     j.data['complete'] = True
     j.save()

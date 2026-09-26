@@ -10,7 +10,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from .client import Client, NotionError
 from .install import Journal, compact, fingerprint, install, locked, page_id
-from .model import blueprint, config, selected
+from .model import blueprint, config, dashboard_views, selected
 from .timetable import apply_changes, changes, read_rows
 
 
@@ -44,7 +44,7 @@ def main(argv=None):
     sync.add_argument('--apply', action='store_true')
     sync.add_argument('--watch', action='store_true', help='현재 터미널에서 주기적으로 확인; --apply 필요')
     sync.add_argument('--interval', type=int, default=600, help='확인 간격 초, 최소 300 (기본 600)')
-    verify = commands.add_parser('verify', help='설치된 원격 속성·관계·캘린더 확인')
+    verify = commands.add_parser('verify', help='설치된 원격 속성·관계·캘린더·홈 배치 확인')
     verify.add_argument('--state', default='.local/state.json')
     rec = commands.add_parser('recover', help='불확실한 생성 요청의 기존 Notion 객체 연결')
     rec.add_argument('--state', default='.local/state.json')
@@ -57,9 +57,11 @@ def main(argv=None):
             c = config(args.config)
             ds, vs = selected(c)
             if args.command == 'plan' or not args.apply:
-                report = {'title': c['title'], 'academic_year': c['academic_year'], 'modules': c['modules'], 'database_count': len(ds), 'view_count': len(vs) + len(blueprint()['dashboard_views']), 'databases': ds if getattr(args, 'full', False) else [d['title'] for d in ds], 'applied': False}
+                report = {'title': c['title'], 'academic_year': c['academic_year'], 'modules': c['modules'], 'database_count': len(ds), 'view_count': len(vs) + len(dashboard_views(c)), 'databases': ds if getattr(args, 'full', False) else [d['title'] for d in ds], 'applied': False}
                 if getattr(args, 'full', False):
                     report['views'] = vs
+                    from .dashboard import layout_spec
+                    report['dashboard'] = layout_spec()
                 print(json.dumps(report, ensure_ascii=False, indent=2))
                 return 0
             with locked(args.state):
@@ -82,7 +84,11 @@ def main(argv=None):
                     raise ValueError('설치 당시의 Notion 연결이 아닙니다.')
                 ops = changes(client, c, j.data, rows)
                 count = apply_changes(client, args.state, ops)
+                from .home import refresh_dashboard
+                matrix_count = refresh_dashboard(client, args.state, rows)
             print(f'{len(rows)}개 수업의 시간표·일정 {count}개 행을 반영했습니다.')
+            if matrix_count:
+                print('홈 주간 시간표도 갱신했습니다.')
         elif args.command == 'verify':
             client = Client(os.getenv('NOTION_TOKEN'))
             j = Journal(args.state, client)
@@ -95,7 +101,7 @@ def main(argv=None):
             if issues:
                 print('\n'.join(issues), file=sys.stderr)
                 return 1
-            print('원격 데이터베이스·속성·관계·뷰 설정 확인 완료. 실제 화면과 공유 권한은 docs/ACCEPTANCE.md로 확인하세요.')
+            print('원격 데이터베이스·속성·관계·뷰·홈 배치 확인 완료. 실제 화면과 공유 권한은 docs/ACCEPTANCE.md로 확인하세요.')
         elif args.command == 'recover':
             with locked(args.state):
                 client = Client(os.getenv('NOTION_TOKEN'))
@@ -105,8 +111,13 @@ def main(argv=None):
                     raise ValueError('복구할 pending 작업이 없습니다.')
                 if client.request('GET', '/users/me')['id'] != j.data.get('identity'):
                     raise ValueError('설치 당시의 연결이 아닙니다.')
-                obj = client.request('GET', pending['endpoint'] + '/' + page_id(args.id))
-                validate_recovery(pending, obj)
+                if pending.get('block_parent'):
+                    from .blocks import recover_block
+                    obj = client.request('GET', '/blocks/' + page_id(args.id))
+                    recover_block(client, pending, obj)
+                else:
+                    obj = client.request('GET', pending['endpoint'] + '/' + page_id(args.id))
+                    validate_recovery(pending, obj)
                 j.data['objects'][pending['key']] = compact(obj)
                 j.data.pop('pending')
                 j.save()
@@ -196,12 +207,16 @@ def run_comcigan(args):
                 j.data['comcigan_source'] = binding
                 j.save()
             count = apply_changes(client, args.state, ops)
+            from .home import refresh_dashboard
+            matrix_count = refresh_dashboard(client, args.state, rows, snapshot['week_start'])
             # apply_changes may have journaled newly created pages. Reload before
             # recording the successful poll so those IDs cannot be lost.
             latest = Journal(args.state, client)
             latest.data['comcigan_last_checked_at'] = datetime.now(ZoneInfo('Asia/Seoul')).isoformat()
             latest.save()
         print(f"{snapshot['week_start']} 주간 {len(rows)}개 수업 확인, 시간표·일정 {count}개 행 반영.", flush=True)
+        if matrix_count:
+            print('홈 주간 시간표도 갱신했습니다.', flush=True)
         if omissions:
             print(f"원본에서 누락된 {snapshot['omitted_slots']}개 교시는 삭제·휴강 처리하지 않았습니다.", flush=True)
         if not args.watch:
@@ -252,6 +267,9 @@ def verify_remote(client, state):
             if v['key'] in blueprint()['dashboard_views']:
                 keys.append('home:' + v['key'])
             for key in keys:
+                if key not in state['objects']:
+                    issues.append(f'{key}: 설치 기록 없음. 이전 버전 수첩은 새 템플릿으로 자동 변환하지 않습니다.')
+                    continue
                 actual_view = client.request('GET', '/views/' + state['objects'][key]['id'])
                 if actual_view.get('type') != v['type'] or actual_view.get('data_source_id') != ref['data_source_id']:
                     issues.append(f"{key}: 뷰 종류/원본 불일치")
@@ -259,4 +277,5 @@ def verify_remote(client, state):
                     conf = actual_view.get('configuration') or {}
                     if conf.get('view_range') != v['range'] or conf.get('date_property_id') != props[v['date']]['id']:
                         issues.append(f"{key}: 캘린더 날짜/주간·월간 범위 불일치")
-    return issues
+    from .home import verify_dashboard
+    return issues + verify_dashboard(client, state)

@@ -21,15 +21,36 @@ class FakeNotion:
     """Stateful remote boundary: databases and sources deliberately have different IDs."""
     def __init__(self):
         self.objects = {}
+        self.block_children = {}
         self.calls = []
         self.identity = str(uuid4())
         self.parent = str(uuid4())
         self.objects['/pages/' + self.parent] = {'id': self.parent}
 
     def request(self, method, path, payload=None):
+        from urllib.parse import parse_qs, urlsplit
         self.calls.append((method, path, copy.deepcopy(payload)))
         if path == '/users/me':
             return {'id': self.identity}
+        url = urlsplit(path)
+        if url.path.startswith('/blocks/') and url.path.endswith('/children'):
+            parent = url.path.split('/')[2]
+            if method == 'GET':
+                query = parse_qs(url.query)
+                offset = int(query.get('start_cursor', ['0'])[0])
+                limit = int(query.get('page_size', ['100'])[0])
+                ids = self.block_children.get(parent, [])
+                end = offset + limit
+                return {'object': 'list', 'results': [copy.deepcopy(self.objects['/blocks/' + id_]) for id_ in ids[offset:end]],
+                        'has_more': end < len(ids), 'next_cursor': str(end) if end < len(ids) else None}
+            if method == 'PATCH':
+                for block in payload['children']:
+                    self.validate_block_depth(block)
+                rows = self.add_blocks(parent, payload['children'], payload.get('position'))
+                return {'object': 'list', 'results': copy.deepcopy(rows), 'has_more': False, 'next_cursor': None}
+        if method == 'PATCH' and path.startswith('/blocks/'):
+            self.objects[path].update(copy.deepcopy(payload))
+            return copy.deepcopy(self.objects[path])
         if method == 'GET':
             return copy.deepcopy(self.objects[path])
         if method == 'POST':
@@ -40,14 +61,33 @@ class FakeNotion:
                 obj['data_sources'] = [{'id': ds}]
                 props = self.prop_schema(payload['initial_data_source']['properties'])
                 self.objects['/data_sources/' + ds] = {'id': ds, 'properties': props}
+                parent = payload.get('parent', {}).get('page_id')
+                if parent:
+                    self.add_reference(parent, obj_id, 'child_database', ''.join(x.get('text', {}).get('content', '') for x in payload.get('title', [])))
             if path == '/pages':
                 for prop in obj['properties'].values():
                     prop['type'] = next(iter(prop))
+                self.objects[path + '/' + obj_id] = obj
+                parent = payload.get('parent', {}).get('page_id')
+                if parent:
+                    title = next((p['title'] for p in payload['properties'].values() if 'title' in p), [])
+                    self.add_reference(parent, obj_id, 'child_page', ''.join(x.get('text', {}).get('content', '') for x in title))
+                self.add_blocks(obj_id, payload.get('children', []))
             if path == '/views':
                 if 'database_id' in payload:
-                    obj['parent'] = {'database_id': payload['database_id']}
+                    obj['parent'] = {'type': 'database_id', 'database_id': payload['database_id']}
                 else:
-                    obj['parent'] = {'database_id': str(uuid4())}
+                    linked_id = str(uuid4())
+                    obj['parent'] = {'type': 'database_id', 'database_id': linked_id}
+                    created = payload['create_database']
+                    parent = created['parent']['page_id']
+                    position = created.get('position')
+                    if position:
+                        assert position['type'] == 'after_block'
+                        position = {'type': 'after_block', 'after_block': {'id': position['block_id']}}
+                    self.objects['/databases/' + linked_id] = {'id': linked_id, 'object': 'database', 'parent': created['parent'],
+                                                              'data_sources': [{'id': payload['data_source_id']}]}
+                    self.add_reference(parent, linked_id, 'child_database', payload['name'], position)
             self.objects[path + '/' + obj_id] = obj
             return copy.deepcopy(obj)
         if method == 'PATCH':
@@ -61,6 +101,48 @@ class FakeNotion:
             obj['properties'].update(props)
             return copy.deepcopy(obj)
         raise AssertionError((method, path))
+
+    def validate_block_depth(self, block, depth=0):
+        if depth > 2:
+            raise NotionError('Too many nested block levels', 400)
+        for child in block.get(block['type'], {}).get('children', []):
+            self.validate_block_depth(child, depth + 1)
+
+    def add_reference(self, parent, id_, kind, title, position=None):
+        row = {'id': id_, 'object': 'block', 'type': kind, kind: {'title': title},
+               'parent': {'type': 'page_id', 'page_id': parent}, 'has_children': False, 'in_trash': False}
+        self.objects['/blocks/' + id_] = row
+        self.insert_block_ids(parent, [id_], position)
+
+    def insert_block_ids(self, parent, ids, position=None):
+        siblings = self.block_children.setdefault(parent, [])
+        mode = (position or {}).get('type', 'end')
+        index = len(siblings)
+        if mode == 'start':
+            index = 0
+        elif mode == 'after_block':
+            index = siblings.index(position['after_block']['id']) + 1
+        elif mode != 'end':
+            raise AssertionError('Invalid append position')
+        siblings[index:index] = ids
+        if siblings and '/blocks/' + parent in self.objects:
+            self.objects['/blocks/' + parent]['has_children'] = True
+
+    def add_blocks(self, parent, blocks, position=None):
+        rows = []
+        for block in blocks:
+            row = copy.deepcopy(block)
+            kind = row['type']
+            nested = row[kind].pop('children', [])
+            id_ = str(uuid4())
+            parent_kind = 'page_id' if '/pages/' + parent in self.objects else 'block_id'
+            row.update(id=id_, object='block', parent={'type': parent_kind, parent_kind: parent},
+                       has_children=bool(nested), in_trash=False)
+            self.objects['/blocks/' + id_] = row
+            self.add_blocks(id_, nested)
+            rows.append(row)
+        self.insert_block_ids(parent, [row['id'] for row in rows], position)
+        return rows
 
     def prop_schema(self, props):
         return {n: {'id': str(uuid4())[:8], 'type': next(iter(v)), **copy.deepcopy(v)} for n, v in props.items()}
@@ -85,8 +167,8 @@ class PlannerTests(unittest.TestCase):
     def test_complete_install_has_correct_relations_and_week_month(self):
         self.install()
         state = json.loads(self.path.read_text())
-        self.assertEqual(14, len(state['databases']))
-        self.assertEqual(45, sum(1 for k in state['objects'] if k.startswith(('view:', 'home:'))))
+        self.assertEqual(16, len(state['databases']))
+        self.assertEqual(54, sum(1 for k in state['objects'] if k.startswith(('view:', 'home:'))))
         student_ds = state['databases']['students']['data_source_id']
         props = self.api.objects['/data_sources/' + student_ds]['properties']
         self.assertEqual(state['databases']['classes']['data_source_id'], props['학급']['relation']['data_source_id'])
