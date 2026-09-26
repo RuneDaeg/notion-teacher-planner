@@ -9,7 +9,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from teacher_planner.blocks import BlockJournal, children
-from teacher_planner.cli import main
+from teacher_planner.cli import main, verify_remote
 from teacher_planner.client import NotionError
 from teacher_planner.home import refresh_dashboard, verify_dashboard
 from teacher_planner.install import Journal, block, install
@@ -60,7 +60,7 @@ class HomeTests(unittest.TestCase):
         keys = ['layout:top', 'layout:things', 'home:inbox', 'home:todo',
                 'layout:meetings', 'home:active_meetings', 'layout:middle',
                 'layout:students', 'home:active_students', 'layout:schedule',
-                'home:weekly', 'home:monthly', 'home:teacher_week',
+                'home:weekly', 'home:teacher_week',
                 'layout:archive', 'home:archive_agenda']
         expected = [self.obj(key)['parent']['database_id'] if key.startswith('home:') else self.obj(key)['id'] for key in keys]
         actual = children(self.api, self.obj('root')['id'])
@@ -71,6 +71,31 @@ class HomeTests(unittest.TestCase):
         # Source database pages remain behind the new dashboard, not reordered
         # into it or replaced with imported attachment identifiers.
         self.assertGreater([row['id'] for row in actual].index(self.obj('section:운영 자료')['id']), len(expected))
+
+    def test_week_and_month_are_tabs_in_one_home_calendar(self):
+        weekly = self.api.objects['/views/' + self.obj('home:weekly')['id']]
+        monthly = self.api.objects['/views/' + self.obj('home:monthly')['id']]
+        self.assertNotEqual(weekly['id'], monthly['id'])
+        self.assertEqual(weekly['parent'], monthly['parent'])
+        self.assertEqual(self.state()['databases']['agenda']['data_source_id'], weekly['data_source_id'])
+        self.assertEqual(weekly['data_source_id'], monthly['data_source_id'])
+        self.assertEqual(weekly['configuration']['date_property_id'], monthly['configuration']['date_property_id'])
+        self.assertEqual(('week', 'month'), (weekly['configuration']['view_range'], monthly['configuration']['view_range']))
+        self.assertEqual(weekly['filter'], monthly['filter'])
+        self.assertIn('create_database', weekly)
+        self.assertNotIn('create_database', monthly)
+        self.assertEqual(weekly['parent']['database_id'], monthly['database_id'])
+        # The saved source database and separate teacher timetable keep their identities.
+        self.assertNotEqual(self.state()['databases']['agenda']['id'], monthly['database_id'])
+        self.assertNotEqual(self.obj('home:teacher_week')['parent'], monthly['parent'])
+        self.assertEqual([], verify_remote(self.api, self.state()))
+
+    def test_verification_detects_monthly_tab_moved_to_another_database(self):
+        monthly = self.api.objects['/views/' + self.obj('home:monthly')['id']]
+        monthly['parent'] = self.obj('home:teacher_week')['parent']
+        self.api.calls.clear()
+        self.assertIn('home:monthly: 뷰가 속한 데이터베이스 불일치', verify_remote(self.api, self.state()))
+        self.assertEqual([], [call for call in self.api.calls if call[0] in ('POST', 'PATCH')])
 
     def test_top_matrix_and_column_widths_match_notebook_layout(self):
         top = children(self.api, self.obj('layout:top')['id'])

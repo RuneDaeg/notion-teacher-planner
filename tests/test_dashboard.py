@@ -84,7 +84,7 @@ class DashboardConfigTests(unittest.TestCase):
 class DashboardBlockTests(unittest.TestCase):
     def test_manifest_identity_and_section_styles_are_shared(self):
         spec = layout_spec()
-        self.assertEqual(('teacher-notebook', '교무수첩 기본 템플릿', 1),
+        self.assertEqual(('teacher-notebook', '교무수첩 기본 템플릿', 2),
                          (spec['id'], spec['name'], spec['version']))
         for key in ('things', 'meetings', 'students', 'schedule', 'archive'):
             self.assertTrue(spec['sections'][key]['title'])

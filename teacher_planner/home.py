@@ -75,11 +75,20 @@ def install_dashboard(j, c, root, databases, actual_props):
              'active_students': 'students', 'weekly': 'schedule', 'monthly': 'schedule',
              'teacher_week': 'schedule', 'archive_agenda': 'archive'}
     view_anchors = dict(anchors)
+    shared_tabs = {key: group[0] for group in layout_spec()['shared_view_groups']
+                   for key in group[1:]}
     for v in dashboard_views(c):
         section = slots[v['key']]
-        obj = j.create('home:' + v['key'], '/views', view_payload(
-            v, databases[v['source']], actual_props[v['source']], c['academic_year'],
-            root, after=view_anchors[section]))
+        source = databases[v['source']]
+        if v['key'] in shared_tabs:
+            # Add a tab to the first view's linked block, retaining its data source.
+            first = j.data['objects']['home:' + shared_tabs[v['key']]]
+            linked = {**source, 'id': first['parent']['database_id']}
+            payload = view_payload(v, linked, actual_props[v['source']], c['academic_year'])
+        else:
+            payload = view_payload(v, source, actual_props[v['source']], c['academic_year'],
+                                   root, after=view_anchors[section])
+        obj = j.create('home:' + v['key'], '/views', payload)
         view_anchors[section] = obj['parent']['database_id']
     archive_links = []
     for d in selected(c)[0]:
@@ -134,7 +143,15 @@ def verify_dashboard(client, state):
         expected.append(objects['layout:' + key]['id'])
         for view in views:
             if 'home:' + view in objects:
-                expected.append(objects['home:' + view]['parent']['database_id'])
+                container = objects['home:' + view]['parent']['database_id']
+                if container not in expected:
+                    expected.append(container)
+    if layout.get('version', 0) >= 2:
+        for views in layout_spec()['shared_view_groups']:
+            containers = {objects.get('home:' + view, {}).get('parent', {}).get('database_id')
+                          for view in views}
+            if None in containers or len(containers) != 1:
+                issues.append('홈: 주간·월간 캘린더가 같은 연결 데이터베이스의 보기 탭인지 확인하세요.')
     found = [identifier for identifier in actual_ids if identifier in expected]
     if found != expected:
         issues.append('홈: 구역 또는 연결 뷰의 위치·순서가 기본 템플릿과 다릅니다.')

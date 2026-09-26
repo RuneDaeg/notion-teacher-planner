@@ -273,6 +273,8 @@ def verify_remote(client, state):
                 actual_view = client.request('GET', '/views/' + state['objects'][key]['id'])
                 if actual_view.get('type') != v['type'] or actual_view.get('data_source_id') != ref['data_source_id']:
                     issues.append(f"{key}: 뷰 종류/원본 불일치")
+                if actual_view.get('parent', {}).get('database_id') != state['objects'][key].get('parent', {}).get('database_id'):
+                    issues.append(f"{key}: 뷰가 속한 데이터베이스 불일치")
                 if 'date' in v:
                     conf = actual_view.get('configuration') or {}
                     if conf.get('view_range') != v['range'] or conf.get('date_property_id') != props[v['date']]['id']:

@@ -24,7 +24,9 @@ python -m teacher_planner recover --id 실제_객체_UUID
 
 도구는 연결 계정과 제목·부모 또는 뷰 종류·원본을 검사한다. 홈 레이아웃 블록은 부모·유형·내용과 하위 블록 구조까지 검사한다. 완료 후 원래 명령을 재실행한다.
 
-**홈 linked view**는 새 데이터베이스 컨테이너까지 생성하기 때문에 자동 recover가 거부된다. AI는 뷰를 fetch하고 그 부모 데이터베이스의 부모 페이지가 `pending.payload.create_database.parent.page_id`와 일치하는지, 이름·종류·data source ID도 일치하는지 확인한다. 일치하면 state의 `objects[pending.key]`에 `{id, object, parent, type, name}`을 기록하고 `pending`만 제거한다. 다른 기록은 보존한다.
+**`create_database`로 만든 홈 연결 뷰**는 새 데이터베이스 컨테이너까지 생성하기 때문에 자동 recover가 거부된다. 주간 캘린더를 처음 만드는 요청도 여기에 해당한다. AI는 뷰를 fetch하고 그 부모 데이터베이스의 부모 페이지가 `pending.payload.create_database.parent.page_id`와 일치하는지, 이름·종류·data source ID도 일치하는지 확인한다. 일치하면 state의 `objects[pending.key]`에 `{id, object, parent, type, name}`을 기록하고 `pending`만 제거한다. 다른 기록은 보존한다.
+
+**기존 홈 캘린더 DB에 추가하는 월간 탭**은 `database_id`를 사용하는 뷰 생성 요청이다. 생성된 월간 뷰의 UUID로 `recover`를 실행하면 기존 부모 DB·원본·이름·종류를 검증한다. 주간 뷰까지 성공한 뒤 월간 탭에서 멈췄다면, 저장된 주간 뷰의 `parent.database_id`를 재사용한다. 주간 캘린더를 다시 만들거나 월간용 연결 DB를 추가하지 않는다. 두 탭의 부모 DB와 일정 원본이 같은지 확인한 뒤 원래 명령을 이어간다.
 
 **아무 객체도 생성되지 않았음이 확인된 경우에만** state를 비공개 위치에 백업하고 `pending` 필드만 지운 뒤 재실행한다. 확인되지 않으면 pending을 지우거나 state 전체를 초기화하지 않는다.
 

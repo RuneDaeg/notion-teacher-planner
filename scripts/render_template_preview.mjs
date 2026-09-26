@@ -142,6 +142,33 @@ function compactCalendar(key,x,y,width) {
   }
 }
 
+function sharedCalendar(keys,x,y,width) {
+  const views=keys.map(view);
+  if(views.length!==2 || views.some(v=>!v || v.source!==views[0].source)) {
+    throw new Error('The preview expects two calendar tabs sharing one data source.');
+  }
+  const height=144,selected=keys.indexOf('weekly');
+  if(selected<0) throw new Error('The weekly calendar tab must exist.');
+  ctx.fillStyle='#ffffff';ctx.fillRect(x,y,width,height);
+  ctx.strokeStyle=line;ctx.strokeRect(x+.5,y+.5,width,height);
+  rule(x,y+43,width);
+  let tabX=x+14;
+  views.forEach((v,i)=>{
+    const label='▦  '+v.name;
+    font(17,i===selected);const tabWidth=ctx.measureText(label).width+20;
+    text(label,tabX,y+12,17,i===selected?ink:muted,i===selected);
+    if(i===selected) {ctx.fillStyle=ink;ctx.fillRect(tabX,y+41,tabWidth-12,3);}
+    tabX+=tabWidth+20;
+  });
+  const sourceTitle=database(views[0].source).title;
+  font(14);text(sourceTitle,x+width-ctx.measureText(sourceTitle).width-14,y+14,14,muted);
+  const columnWidth=width/5;
+  ['월','화','수','목','금'].forEach((label,i)=>{
+    text(label,x+14+i*columnWidth,y+60,14,muted);
+    if(i) {ctx.strokeStyle=line;ctx.beginPath();ctx.moveTo(x+i*columnWidth+.5,y+52);ctx.lineTo(x+i*columnWidth+.5,y+height);ctx.stroke();}
+  });
+}
+
 // This is deliberately labelled as an illustration, never a live Notion capture.
 text('기본 템플릿 미리보기 · 예시',M,53,43,ink,true);
 text(data.spec.name+'  /  '+data.spec.id+' v'+data.spec.version,M,106,17,muted);
@@ -169,7 +196,10 @@ data.spec.middle.forEach((s,i)=>{
 
 y=1507;section('students',y);emptyTable('active_students',M,y+52,FULL);
 y=1664;section('schedule',y);
-['weekly','monthly','teacher_week'].forEach((key,i)=>compactCalendar(key,M,y+52+i*78,FULL));
+const calendarGroup=data.spec.shared_view_groups?.find(keys=>keys.includes('weekly') && keys.includes('monthly'));
+if(!calendarGroup) throw new Error('The layout manifest is missing the weekly/monthly shared view group.');
+sharedCalendar(calendarGroup,M,y+52,FULL);
+compactCalendar('teacher_week',M,y+208,FULL);
 
 y=1964;section('archive',y);
 emptyTable('archive_agenda',M,y+52,FULL,67,'보관한 업무·일정');

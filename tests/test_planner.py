@@ -186,6 +186,34 @@ class PlannerTests(unittest.TestCase):
         self.assertEqual(count, len(self.api.objects))
         self.assertEqual(first_posts, sum(c[0] == 'POST' for c in self.api.calls))
 
+    def test_retry_monthly_tab_reuses_saved_weekly_container(self):
+        request = self.api.request
+        monthly_name = next(v['name'] for v in blueprint()['views'] if v['key'] == 'monthly')
+
+        def reject_monthly_tab(method, path, payload=None):
+            if method == 'POST' and path == '/views' and payload['name'] == monthly_name:
+                state = json.loads(self.path.read_text())
+                if state['pending']['key'] == 'home:monthly':
+                    raise NotionError('Rejected monthly tab', 400)
+            return request(method, path, payload)
+
+        with patch.object(self.api, 'request', side_effect=reject_monthly_tab):
+            with self.assertRaisesRegex(NotionError, 'Rejected monthly tab'):
+                self.install()
+        partial = json.loads(self.path.read_text())
+        weekly = partial['objects']['home:weekly']
+        self.assertNotIn('home:monthly', partial['objects'])
+        self.api.calls.clear()
+        self.install()
+        state = json.loads(self.path.read_text())
+        self.assertEqual(weekly, state['objects']['home:weekly'])
+        self.assertEqual(weekly['parent'], state['objects']['home:monthly']['parent'])
+        writes = [payload for method, path, payload in self.api.calls if method == 'POST' and path == '/views']
+        monthly = next(payload for payload in writes if payload['name'] == monthly_name)
+        self.assertEqual(weekly['parent']['database_id'], monthly['database_id'])
+        self.assertNotIn('create_database', monthly)
+        self.assertEqual([], verify_remote(self.api, state))
+
     def test_optional_modules_are_not_installed_when_disabled(self):
         self.c['modules'] = dict.fromkeys(self.c['modules'], False)
         self.install()

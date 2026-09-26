@@ -1,7 +1,8 @@
 {
   "id": "teacher-notebook",
   "name": "교무수첩 기본 템플릿",
-  "version": 1,
+  "version": 2,
+  "shared_view_groups": [["weekly", "monthly"]],
   "defaults": {
     "periods": 7,
     "bookmarks": [
