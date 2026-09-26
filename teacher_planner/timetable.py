@@ -1,4 +1,4 @@
-"""Explicit dated timetable import; no unofficial scraping or inferred school days."""
+"""Dated timetable validation and idempotent Notion synchronization."""
 import csv
 import hashlib
 import json
@@ -22,6 +22,15 @@ def read_rows(path, c):
             if set(reader.fieldnames or []) != FIELDS:
                 raise ValueError('CSV 열은 ' + ', '.join(sorted(FIELDS)) + ' 이어야 합니다.')
             rows = list(reader)
+    return validate_rows(rows, c)
+
+
+def validate_rows(rows, c):
+    """Validate the strict file format and add stable IDs and dated ranges.
+
+    Providers with their own validated, dated format may construct normalized
+    rows directly. File imports always require the complete eight-column format.
+    """
     if not isinstance(rows, list):
         raise ValueError('JSON 최상위는 시간표 행 배열이어야 합니다.')
     zone = ZoneInfo(c['timezone'])
@@ -83,7 +92,43 @@ def unique_index(pages, name):
     return index
 
 
-def changes(client, c, state, rows):
+def _property_value(prop, kind):
+    """Compare managed values, ignoring Notion's response-only metadata."""
+    value = prop.get(kind)
+    if kind in ('title', 'rich_text'):
+        return ''.join(x.get('plain_text', x.get('text', {}).get('content', ''))
+                       for x in value or [] if isinstance(x, dict))
+    if kind == 'relation':
+        return sorted(x['id'].replace('-', '').lower() for x in value or [])
+    if kind == 'select':
+        return value.get('name') if value else None
+    if kind == 'date':
+        if value is None:
+            return None
+
+        def point(raw):
+            if raw is None:
+                return None
+            # Notion may return milliseconds or an equivalent UTC offset. Keep
+            # all-day dates distinct from timed events at midnight.
+            if len(raw) == 10:
+                return date.fromisoformat(raw)
+            return datetime.fromisoformat(raw.replace('Z', '+00:00'))
+
+        return point(value.get('start')), point(value.get('end'))
+    return value
+
+
+def _changed_properties(existing, desired):
+    if existing is None:
+        return dict(desired)
+    current = existing.get('properties', {})
+    return {name: prop for name, prop in desired.items()
+            if _property_value(current.get(name, {}), next(iter(prop)))
+            != _property_value(prop, next(iter(prop)))}
+
+
+def changes(client, c, state, rows, source='파일 가져오기'):
     """Resolve every class and both record sets before the first write."""
     dbs = state['databases']
     definitions = {d['key']: d['properties'] for d in selected(c)[0]}
@@ -97,15 +142,18 @@ def changes(client, c, state, rows):
         cls = classes[r['class_name']]['id']
         title = f"{r['period']}교시 · {r['subject']} · {r['class_name']}"
         common = {'이름': title, '학년도': c['academic_year'], '학급': [cls], '외부 ID': r['external_id']}
-        tt = {**common, '교사': c['teacher'], '수업일': r['date_range'], '교시': r['period'], '교과': r['subject'], '교실': r['room'], '상태': r['status'], '출처': '파일 가져오기'}
+        tt = {**common, '교사': c['teacher'], '수업일': r['date_range'], '교시': r['period'], '교과': r['subject'], '교실': r['room'], '상태': r['status'], '출처': source}
         agenda = {**common, '종류': '수업', '일정': r['date_range'], '업무 분류': '수업', '상태': {'휴강': '취소', '완료': '완료'}.get(r['status'], '예정')}
-        for source, props in (('agenda', agenda), ('timetable', tt)):
-            existing = old[source].get(r['external_id'])
+        for record_source, props in (('agenda', agenda), ('timetable', tt)):
+            existing = old[record_source].get(r['external_id'])
             # User-authored notes, priority and archive flag are not overwritten.
             if not existing:
                 props['보관'] = False
-            body = values(props, definitions[source])
-            ops.append({'source': source, 'external_id': r['external_id'], 'existing': existing['id'] if existing else None, 'properties': body})
+            body = values(props, definitions[record_source])
+            ops.append({'source': record_source, 'external_id': r['external_id'],
+                        'existing': existing['id'] if existing else None, 'properties': body,
+                        'changed_properties': _changed_properties(existing, body),
+                        'agenda_relation': (existing or {}).get('properties', {}).get('업무·일정', {})})
     return ops
 
 
@@ -113,14 +161,22 @@ def apply_changes(client, state_path, ops):
     j = Journal(state_path, client)
     j.ready()
     agenda_ids = {}
+    written = 0
     for op in ops:
         key, source = op['external_id'], op['source']
-        props = dict(op['properties'])
+        props = dict(op.get('changed_properties', op['properties']))
         if source == 'timetable':
-            props['업무·일정'] = {'relation': [{'id': agenda_ids[key]}]}
-            props['동기화 시각'] = {'date': {'start': datetime.now(ZoneInfo(j.data['config']['timezone'])).isoformat()}}
+            relation = {'relation': [{'id': agenda_ids[key]}]}
+            if _property_value(op.get('agenda_relation', {}), 'relation') != _property_value(relation, 'relation'):
+                props['업무·일정'] = relation
+            # This records the last applied timetable change, not the last poll.
+            # A successful unchanged poll must not generate a write by itself.
+            if props or not op['existing']:
+                props['동기화 시각'] = {'date': {'start': datetime.now(ZoneInfo(j.data['config']['timezone'])).isoformat()}}
         if op['existing']:
-            client.request('PATCH', '/pages/' + op['existing'], {'properties': props})
+            if props:
+                client.request('PATCH', '/pages/' + op['existing'], {'properties': props})
+                written += 1
             obj_id = op['existing']
         else:
             journal_key = 'import:' + source + ':' + key
@@ -128,6 +184,7 @@ def apply_changes(client, state_path, ops):
                 raise ValueError('이전에 가져온 행이 원본 표에서 사라졌습니다. 보관·휴지통 상태를 확인하세요.')
             obj = j.create(journal_key, '/pages', {'parent': {'type': 'data_source_id', 'data_source_id': j.data['databases'][source]['data_source_id']}, 'properties': props})
             obj_id = obj['id']
+            written += 1
         if source == 'agenda':
             agenda_ids[key] = obj_id
-    return len(ops)
+    return written

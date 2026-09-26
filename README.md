@@ -23,7 +23,7 @@ AI가 GitHub를 읽을 수 없다면 저장소를 ZIP으로 내려받아 첨부�
 | 상담 기록 | 학생 연결, 관찰 사실, 합의 사항, 후속 확인 |
 | To Do List | P1~P4, 업무 분류, 상태, 다음 행동, 마감 |
 | 주간·월간 캘린더 | 같은 업무·일정 원본의 두 가지 화면 + 마감 캘린더 |
-| 교사 시간표 | 날짜·교시·교과·반, 변경·휴강 관리, CSV/JSON 가져오기 |
+| 교사 시간표 | 날짜·교시·교과·반, CSV/JSON 가져오기, 선택형 컴시간 웹 조회·동기화 |
 | 수업 진도 | 교과별·반별 단원, 계획/완료 차시, 진도율, 다음 수업 |
 | 교사용 PARA | 프로젝트, 담당 영역, 자료, 보관 + 수집함 |
 | 선택: 출결·제출물 | 학생별 출결과 제출 상태 체크 |
@@ -93,7 +93,20 @@ python -m teacher_planner import-timetable examples/timetable.csv
 python -m teacher_planner import-timetable private/timetable.csv --config .local/config.json --apply
 ```
 
-컴시간의 **공식 공개 자동 연동 API는 이번 조사에서 확인하지 못했습니다.** 현재 구현은 컴시간 등에서 확보한 시간표를 지정 CSV/JSON 형식으로 정리해 가져오는 방식입니다. 교사용 로그인 자동화·비공식 서버 호출·주기적 자동 동기화는 포함하지 않습니다. [연동 범위와 어댑터 규약](docs/COMCIGAN.md)을 참고하세요.
+컴시간 웹에서 조회할 수 있는 학교라면 **학교 코드와 교사 번호로 해당 교사의 이번 주 시간표**를 가져올 수도 있습니다. 별도 앱 설치는 필요하지 않습니다.
+
+```bash
+# 컴시간 조회만 수행하며 Notion 토큰은 필요하지 않습니다.
+python -m teacher_planner comcigan-week --school-code 학교코드 --teacher-id 교사번호 --output .local/comcigan-week.json
+
+# 기존 Notion 설정에 맞는지 검토한 뒤 반영합니다.
+python -m teacher_planner comcigan-sync --school-code 학교코드 --teacher-id 교사번호 --config .local/config.json
+python -m teacher_planner comcigan-sync --school-code 학교코드 --teacher-id 교사번호 --config .local/config.json --apply
+```
+
+학교 코드·교사 번호는 `COMCIGAN_SCHOOL_CODE`, `COMCIGAN_TEACHER_ID` 환경 변수로 대신 제공할 수 있습니다. `--date YYYY-MM-DD`로 조회할 주를 지정하며, 생략하면 서울 기준 이번 주입니다. Notion 반영에는 기존 설치 상태·반·교과 설정이 필요합니다. 교시 시각을 설정하면 캘린더에 정확한 시각으로, 생략하면 날짜만 표시합니다. [설정과 동기화 사용법](docs/COMCIGAN.md)을 먼저 확인하세요.
+
+이 기능은 **공식 API가 아닌 선택형 웹 연동**입니다. `--watch --interval 600 --apply`로 실행 중인 프로세스에서 10분마다 갱신할 수 있으며, 자동 예약 작업은 설치하지 않습니다. 웹 구조 변경·접근 제한·해당 주 미제공 시 오류로 중단하며 로그인이나 접근 제한을 우회하지 않습니다.
 
 ## AI와 개발자를 위한 안내
 
@@ -111,7 +124,7 @@ python -m teacher_planner import-timetable private/timetable.csv --config .local
 
 ## 검증 상태
 
-오프라인 테스트는 API 요청 구성, 설치 재실행, 관계 연결, 주간·월간 뷰, 실패 후 중복 방지, 시간표 변경·휴강을 검증합니다. **이 저장소 제작 과정에서는 사용자 요청에 따라 실제 Notion에 생성하지 않았습니다.** 실제 연결에서는 설치 후 `verify`와 [화면 확인 기준](docs/ACCEPTANCE.md)을 수행하세요.
+오프라인 테스트는 API 요청 구성, 설치 재실행, 관계 연결, 주간·월간 뷰, 실패 후 중복 방지, 시간표 변경·휴강, 컴시간 응답 해석·날짜 검증을 검증합니다. **이 저장소 제작 과정에서는 사용자 요청에 따라 실제 Notion에 생성하지 않았으며, 실제 학교 코드·교사 번호로 시간표를 조회해 검증하지 않았습니다.** 실제 연결에서는 설치 후 `verify`와 [화면 확인 기준](docs/ACCEPTANCE.md)을 수행하세요.
 
 ```bash
 python -m unittest discover -s tests -v
