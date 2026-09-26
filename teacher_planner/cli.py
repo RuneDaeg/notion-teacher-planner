@@ -44,6 +44,8 @@ def main(argv=None):
     sync.add_argument('--apply', action='store_true')
     sync.add_argument('--watch', action='store_true', help='현재 터미널에서 주기적으로 확인; --apply 필요')
     sync.add_argument('--interval', type=int, default=600, help='확인 간격 초, 최소 300 (기본 600)')
+    from .school_calendar_cli import add_commands
+    add_commands(commands)
     verify = commands.add_parser('verify', help='설치된 원격 속성·관계·캘린더·홈 배치 확인')
     verify.add_argument('--state', default='.local/state.json')
     rec = commands.add_parser('recover', help='불확실한 생성 요청의 기존 Notion 객체 연결')
@@ -51,7 +53,10 @@ def main(argv=None):
     rec.add_argument('--id', required=True, help='Notion에서 확인한 생성 객체 ID')
     args = p.parse_args(argv)
     try:
-        if args.command in ('comcigan-week', 'comcigan-sync'):
+        if args.command in ('neis-calendar', 'neis-sync'):
+            from .school_calendar_cli import run
+            return run(args)
+        elif args.command in ('comcigan-week', 'comcigan-sync'):
             return run_comcigan(args)
         elif args.command in ('plan', 'install'):
             c = config(args.config)

@@ -24,7 +24,7 @@ AI가 GitHub를 읽을 수 없다면 저장소를 ZIP으로 내려받아 첨부�
 | 학생 명단 | 학급·번호·학생 ID로 명단 관리 |
 | 상담 기록 | 학생 연결, 관찰 사실, 합의 사항, 후속 확인 |
 | To Do List | P1~P4, 업무 분류, 상태, 다음 행동, 마감 |
-| 주간·월간 캘린더 | 대시보드의 주간·월간 탭, 학사 페이지의 주간·월간·마감 탭 |
+| 주간·월간 캘린더 | 주간·월간·마감 탭, 선택형 NEIS 공개 학사일정 가져오기 |
 | 교사 시간표 | 날짜·교시·교과·반, CSV/JSON 가져오기, 선택형 컴시간 웹 조회·동기화 |
 | 수업 진도 | 교과별·반별 단원, 계획/완료 차시, 진도율, 다음 수업 |
 | 교사용 PARA | 프로젝트, 담당 영역, 자료, 보관 + 수집함 |
@@ -48,7 +48,7 @@ AI가 GitHub를 읽을 수 없다면 저장소를 ZIP으로 내려받아 첨부�
 
 모든 페이지에 같은 이동 링크가 있습니다. 할 일·학생·진도는 보기 탭으로 전환하고, **주간·월간 캘린더도 한 연결 DB 안의 탭**으로 사용합니다. 대시보드와 학사 캘린더 페이지의 연결 블록은 같은 업무·일정 원본을 공유합니다. 마감 탭은 같은 원본의 `마감`, 주간·월간은 `일정` 속성을 사용합니다.
 
-교과 페이지의 시간표 격자는 처음에 빈 7교시와 공동 메모 행으로 시작하며, 파일·컴시간 동기화 결과로 갱신합니다. 조회·종례 관찰 메모는 수동으로 작성합니다. 요약 숫자나 실시간 연동 표시를 임의로 채우지 않습니다. NEIS 자동 반영·푸시 동기화·자동 메시지 발송은 제공하지 않습니다.
+교과 페이지의 시간표 격자는 처음에 빈 7교시와 공동 메모 행으로 시작하며, 파일·컴시간 동기화 결과로 갱신합니다. 조회·종례 관찰 메모는 수동으로 작성합니다. 요약 숫자나 실시간 연동 표시를 임의로 채우지 않습니다. 공개 학사일정은 NEIS API에서 가져올 수 있습니다. 공식 NEIS 출결·학적 쓰기, 푸시 동기화·자동 메시지 발송은 제공하지 않습니다.
 
 [디자인 기준](DESIGN.md)은 요청받은 색상·서체·화면 비율과 Notion 네이티브 구현 범위를 구분합니다. 정확한 1440px 화면·240px 사이드바·사용자 지정 CSS를 Notion에 고정하지 않습니다. 상세 배치와 교사별 설정은 [기본 템플릿 안내](docs/DEFAULT_TEMPLATE.md)를 참고하세요. 참고 이미지의 실제 이름·사진·전화번호·학교 링크는 기본값에 포함하지 않습니다.
 
@@ -73,7 +73,7 @@ cp config.example.json .local/config.json
 
 `.local/config.json`에 학년도·교사·반·교과·추가 모듈을 입력합니다. 선택 항목 `semester`는 1 또는 2이며 생략하면 1학기로 표시합니다. 학교급은 설명용 메타데이터입니다. 담임이 아니면 `homeroom`을 `false`로 설정합니다. 시연용 가상 기록을 원할 때만 `demo`를 `true`로 바꿉니다.
 
-선택적인 `dashboard` 설정으로 즐겨찾기·외부 자료 링크·표시 교시 수를 지정할 수 있습니다. 공유 페이지·설문·NEIS·에듀파인 주소를 선택적으로 입력합니다. 비어 있는 링크는 설정 안내로 표시하며, 페이지·설문 생성이나 자동 로그인·데이터 연동은 수행하지 않습니다. [설정 예시](docs/DEFAULT_TEMPLATE.md#교사별-설정)를 확인하세요.
+선택적인 `dashboard` 설정으로 즐겨찾기·외부 자료 링크·표시 교시 수를 지정할 수 있습니다. 공유 페이지·설문·NEIS·에듀파인 주소를 선택적으로 입력합니다. 비어 있는 링크는 설정 안내로 표시합니다. 이 바로가기 설정은 페이지·설문 생성이나 자동 로그인·데이터 연동을 수행하지 않으며, 학사일정 연동은 아래 별도 명령으로 실행합니다. [설정 예시](docs/DEFAULT_TEMPLATE.md#교사별-설정)를 확인하세요.
 
 ```bash
 # 토큰 없이 설계와 입력값 검토 — Notion에 쓰지 않습니다.
@@ -127,6 +127,21 @@ python -m teacher_planner comcigan-sync --school-code 학교코드 --teacher-id 
 
 이 기능은 **공식 API가 아닌 선택형 웹 연동**입니다. `--watch --interval 600 --apply`로 실행 중인 프로세스에서 10분마다 갱신할 수 있으며, 자동 예약 작업은 설치하지 않습니다. 웹 구조 변경·접근 제한·해당 주 미제공 시 오류로 중단하며 로그인이나 접근 제한을 우회하지 않습니다.
 
+## 학교 학사일정 가져오기
+
+**NEIS 공개 학사일정 API에서 학교 행사를 가져와 기존 Notion 캘린더에 추가할 수 있습니다.** NEIS 인증키를 `NEIS_API_KEY`에 설정하고 시도교육청 코드·표준학교코드를 사용합니다. 컴시간 학교 코드와는 다릅니다.
+
+```bash
+# 조회만 수행하고 비공개 JSON으로 검토한다.
+python -m teacher_planner neis-calendar --office-code 시도교육청코드 --school-code 표준학교코드 --year 2026 --output .local/neis-calendar.json
+
+# 기존 수첩 설정으로 검토한 뒤 --apply로 반영한다.
+python -m teacher_planner neis-sync --office-code 시도교육청코드 --school-code 표준학교코드 --config .local/config.json
+python -m teacher_planner neis-sync --office-code 시도교육청코드 --school-code 표준학교코드 --config .local/config.json --apply
+```
+
+같은 학교·과정·날짜·행사의 중복을 막고 설명 변경을 갱신합니다. 날짜나 행사명이 바뀌면 새 일정이 생기며 이전 일정은 남습니다. 누락된 행사를 자동 삭제·취소하지 않습니다. `--watch --interval 21600 --apply`로 실행 중인 프로세스에서 6시간마다 조회할 수 있습니다. [인증키·기간·반영 규칙](docs/SCHOOL_CALENDAR.md)을 확인하세요.
+
 ## AI와 개발자를 위한 안내
 
 - [START_HERE.md](START_HERE.md): AI가 읽을 첫 문서
@@ -135,6 +150,7 @@ python -m teacher_planner comcigan-sync --school-code 학교코드 --teacher-id 
 - [DESIGN.md](DESIGN.md): 요청 디자인과 Notion 네이티브 표현 기준
 - [DEFAULT_TEMPLATE.md](docs/DEFAULT_TEMPLATE.md): 네 페이지 배치·보기 탭·시간표 격자
 - [DATA_MODEL.md](docs/DATA_MODEL.md): 관계와 데이터 입력 규칙
+- [SCHOOL_CALENDAR.md](docs/SCHOOL_CALENDAR.md): NEIS 공개 학사일정 조회·중복 처리·주기 반영
 - [PARA.md](docs/PARA.md): 첨부 PARA를 교사 업무로 재설계한 근거
 - [DAILY_USE.md](docs/DAILY_USE.md): 매일·매주 사용 및 AI 요청 예시
 - [ACCEPTANCE.md](docs/ACCEPTANCE.md): 설치 확인 기준
@@ -145,7 +161,7 @@ python -m teacher_planner comcigan-sync --school-code 학교코드 --teacher-id 
 
 ## 검증 상태
 
-오프라인 테스트는 API 요청 구성, 설치 재실행, 관계 연결, 주간·월간 뷰, 실패 후 중복 방지, 시간표 변경·휴강, 컴시간 응답 해석·날짜 검증을 검증합니다. **이 저장소 제작 과정에서는 사용자 요청에 따라 실제 Notion에 생성하지 않았으며, 실제 학교 코드·교사 번호로 시간표를 조회해 검증하지 않았습니다.** 실제 연결에서는 설치 후 `verify`와 [화면 확인 기준](docs/ACCEPTANCE.md)을 수행하세요.
+오프라인 테스트는 API 요청 구성, 설치 재실행, 관계 연결, 주간·월간 뷰, 실패 후 중복 방지, 시간표 변경·휴강, 컴시간·NEIS 응답 해석, 날짜·전체 페이지 검증을 검증합니다. **이 저장소 제작 과정에서는 사용자 요청에 따라 실제 Notion에 생성하지 않았으며, 실제 학교의 시간표·학사일정을 조회해 검증하지 않았습니다.** 실제 연결에서는 설치 후 `verify`와 [화면 확인 기준](docs/ACCEPTANCE.md)을 수행하세요.
 
 ```bash
 python -m unittest discover -s tests -v
