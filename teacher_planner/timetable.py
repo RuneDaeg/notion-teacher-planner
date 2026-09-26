@@ -129,12 +129,13 @@ def _changed_properties(existing, desired):
 
 
 def changes(client, c, state, rows, source='파일 가져오기'):
-    """Resolve every class and both record sets before the first write."""
+    """Resolve classes and timetable rows without reading the agenda source."""
     dbs = state['databases']
     definitions = {d['key']: d['properties'] for d in selected(c)[0]}
     current_year = {'property': '학년도', 'number': {'equals': c['academic_year']}}
     classes = unique_index(client.pages(dbs['classes']['data_source_id'], {'and': [current_year, {'property': '보관', 'checkbox': {'equals': False}}]}), '이름')
-    old = {k: unique_index(client.pages(dbs[k]['data_source_id'], {'property': '외부 ID', 'rich_text': {'starts_with': 'tt:'}}), '외부 ID') for k in ('timetable', 'agenda')}
+    old = unique_index(client.pages(dbs['timetable']['data_source_id'],
+                                   {'property': '외부 ID', 'rich_text': {'starts_with': 'tt:'}}), '외부 ID')
     ops = []
     for r in rows:
         if r['class_name'] not in classes:
@@ -142,49 +143,46 @@ def changes(client, c, state, rows, source='파일 가져오기'):
         cls = classes[r['class_name']]['id']
         title = f"{r['period']}교시 · {r['subject']} · {r['class_name']}"
         common = {'이름': title, '학년도': c['academic_year'], '학급': [cls], '외부 ID': r['external_id']}
-        tt = {**common, '교사': c['teacher'], '수업일': r['date_range'], '교시': r['period'], '교과': r['subject'], '교실': r['room'], '상태': r['status'], '출처': source}
-        agenda = {**common, '종류': '수업', '일정': r['date_range'], '업무 분류': '수업', '상태': {'휴강': '취소', '완료': '완료'}.get(r['status'], '예정')}
-        for record_source, props in (('agenda', agenda), ('timetable', tt)):
-            existing = old[record_source].get(r['external_id'])
-            # User-authored notes, priority and archive flag are not overwritten.
-            if not existing:
-                props['보관'] = False
-            body = values(props, definitions[record_source])
-            ops.append({'source': record_source, 'external_id': r['external_id'],
-                        'existing': existing['id'] if existing else None, 'properties': body,
-                        'changed_properties': _changed_properties(existing, body),
-                        'agenda_relation': (existing or {}).get('properties', {}).get('업무·일정', {})})
+        props = {**common, '교사': c['teacher'], '수업일': r['date_range'], '교시': r['period'], '교과': r['subject'], '교실': r['room'], '상태': r['status'], '출처': source}
+        existing = old.get(r['external_id'])
+        # Manual notes, archive flags and existing 업무·일정 relations stay intact.
+        # Today's classes and the weekly matrix both read this timetable source.
+        if not existing:
+            props['보관'] = False
+        body = values(props, definitions['timetable'])
+        ops.append({'source': 'timetable', 'external_id': r['external_id'],
+                    'existing': existing['id'] if existing else None, 'properties': body,
+                    'changed_properties': _changed_properties(existing, body)})
     return ops
 
 
 def apply_changes(client, state_path, ops):
     j = Journal(state_path, client)
     j.ready()
-    agenda_ids = {}
+    ops = list(ops)
+    # Old plans contained agenda operations. Reject the entire plan before any
+    # write, even when an unsupported operation occurs after valid timetable rows.
+    if any(not isinstance(op, dict) or op.get('source') != 'timetable' for op in ops):
+        raise ValueError('시간표 가져오기는 교사 시간표만 변경합니다. 차이 확인부터 다시 실행하세요.')
+    if any('업무·일정' in op.get(name, {}) for op in ops
+           for name in ('properties', 'changed_properties')):
+        raise ValueError('시간표 가져오기는 수동 업무·일정 관계를 변경하지 않습니다.')
     written = 0
     for op in ops:
         key, source = op['external_id'], op['source']
         props = dict(op.get('changed_properties', op['properties']))
-        if source == 'timetable':
-            relation = {'relation': [{'id': agenda_ids[key]}]}
-            if _property_value(op.get('agenda_relation', {}), 'relation') != _property_value(relation, 'relation'):
-                props['업무·일정'] = relation
-            # This records the last applied timetable change, not the last poll.
-            # A successful unchanged poll must not generate a write by itself.
-            if props or not op['existing']:
-                props['동기화 시각'] = {'date': {'start': datetime.now(ZoneInfo(j.data['config']['timezone'])).isoformat()}}
+        # This records the last applied timetable change, not the last poll.
+        # A successful unchanged poll must not generate a write by itself.
+        if props or not op['existing']:
+            props['동기화 시각'] = {'date': {'start': datetime.now(ZoneInfo(j.data['config']['timezone'])).isoformat()}}
         if op['existing']:
             if props:
                 client.request('PATCH', '/pages/' + op['existing'], {'properties': props})
                 written += 1
-            obj_id = op['existing']
         else:
             journal_key = 'import:' + source + ':' + key
             if journal_key in j.data['objects']:
                 raise ValueError('이전에 가져온 행이 원본 표에서 사라졌습니다. 보관·휴지통 상태를 확인하세요.')
-            obj = j.create(journal_key, '/pages', {'parent': {'type': 'data_source_id', 'data_source_id': j.data['databases'][source]['data_source_id']}, 'properties': props})
-            obj_id = obj['id']
+            j.create(journal_key, '/pages', {'parent': {'type': 'data_source_id', 'data_source_id': j.data['databases'][source]['data_source_id']}, 'properties': props})
             written += 1
-        if source == 'agenda':
-            agenda_ids[key] = obj_id
     return written

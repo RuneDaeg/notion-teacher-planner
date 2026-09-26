@@ -82,7 +82,7 @@ def main(argv=None):
             c = config(args.config)
             rows = read_rows(args.file, c)
             if not args.apply:
-                print(json.dumps({'validated_rows': len(rows), 'applied': False, 'behavior': '날짜·교시 기준 추가/갱신. 빠진 행은 삭제하지 않습니다. 휴강은 명시해야 합니다.'}, ensure_ascii=False, indent=2))
+                print(json.dumps({'validated_rows': len(rows), 'applied': False, 'behavior': '교사 시간표만 날짜·교시 기준으로 추가/갱신합니다. 홈 오늘의 수업은 같은 원본을 표시하며 업무·일정·To-Do에는 수업을 추가하지 않습니다. 빠진 행은 삭제하지 않습니다. 휴강은 명시해야 합니다.'}, ensure_ascii=False, indent=2))
                 return 0
             with locked(args.state):
                 client = Client(os.getenv('NOTION_TOKEN'))
@@ -96,9 +96,9 @@ def main(argv=None):
                 count = apply_changes(client, args.state, ops)
                 from .home import refresh_dashboard
                 matrix_count = refresh_dashboard(client, args.state, rows)
-            print(f'{len(rows)}개 수업의 시간표·일정 {count}개 행을 반영했습니다.')
+            print(f'{len(rows)}개 수업 확인, 교사 시간표 {count}개 행을 반영했습니다.')
             if matrix_count:
-                print('홈 주간 시간표도 갱신했습니다.')
+                print('주간 수업 시간표도 갱신했습니다.')
         elif args.command == 'verify':
             client = Client(os.getenv('NOTION_TOKEN'))
             j = Journal(args.state, client)
@@ -197,7 +197,7 @@ def run_comcigan(args):
         if not args.apply:
             print(json.dumps({'week_start': snapshot['week_start'], 'validated_rows': len(rows),
                               'applied': False, **omissions,
-                              'behavior': '컴시간 조회와 형식 검증만 완료했습니다. Notion 반영은 --apply로 실행하세요. 누락 교시는 삭제하거나 휴강 처리하지 않습니다.'},
+                              'behavior': '컴시간 조회와 형식 검증만 완료했습니다. Notion 반영은 --apply로 실행하세요. 교사 시간표와 홈 오늘의 수업에 표시하며 업무·일정·To-Do에는 수업을 추가하지 않습니다. 누락 교시는 삭제하거나 휴강 처리하지 않습니다.'},
                              ensure_ascii=False, indent=2))
             return 0
         with locked(args.state):
@@ -224,9 +224,9 @@ def run_comcigan(args):
             latest = Journal(args.state, client)
             latest.data['comcigan_last_checked_at'] = datetime.now(ZoneInfo('Asia/Seoul')).isoformat()
             latest.save()
-        print(f"{snapshot['week_start']} 주간 {len(rows)}개 수업 확인, 시간표·일정 {count}개 행 반영.", flush=True)
+        print(f"{snapshot['week_start']} 주간 {len(rows)}개 수업 확인, 교사 시간표 {count}개 행 반영.", flush=True)
         if matrix_count:
-            print('홈 주간 시간표도 갱신했습니다.', flush=True)
+            print('주간 수업 시간표도 갱신했습니다.', flush=True)
         if omissions:
             print(f"원본에서 누락된 {snapshot['omitted_slots']}개 교시는 삭제·휴강 처리하지 않았습니다.", flush=True)
         if not args.watch:

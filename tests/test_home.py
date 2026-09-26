@@ -4,7 +4,7 @@ import json
 import re
 import tempfile
 import unittest
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from pathlib import Path
 from unittest.mock import patch
 
@@ -13,9 +13,10 @@ from teacher_planner.cli import main, verify_remote
 from teacher_planner.client import NotionError
 from teacher_planner.home import refresh_dashboard, verify_dashboard
 from teacher_planner.install import Journal, block, install
-from teacher_planner.model import config
+from teacher_planner.model import blueprint, config
 from teacher_planner.timetable import apply_changes, changes, read_rows, validate_rows
 from test_planner import FakeNotion
+from test_workspace_schema import filter_matches, formula_value
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -86,6 +87,35 @@ class HomeTests(unittest.TestCase):
         self.assertNotEqual(self.state()['databases']['agenda']['id'], monthly['database_id'])
         self.assertNotEqual(self.obj('teaching:teacher_week')['parent'], monthly['parent'])
         self.assertEqual([], verify_remote(self.api, self.state()))
+
+    def test_weekly_lessons_feed_today_at_home_without_agenda_copies(self):
+        self.synced()
+        refresh_dashboard(self.api, self.path, self.rows)
+        state = self.state()
+        today = self.api.objects['/views/' + self.obj('home:teacher_today')['id']]
+        week = self.api.objects['/views/' + self.obj('teaching:teacher_week')['id']]
+        self.assertEqual(week['data_source_id'], today['data_source_id'])
+        self.assertEqual(state['databases']['timetable']['data_source_id'], today['data_source_id'])
+        container = self.api.objects['/blocks/' + today['parent']['database_id']]
+        self.assertEqual(state['dashboard']['pages']['home'], container['parent']['page_id'])
+        properties = next(db['properties'] for db in blueprint()['databases'] if db['key'] == 'timetable')
+        lessons = self.api.pages(today['data_source_id'])
+        visible = []
+        with patch('test_workspace_schema.TODAY', date(2026, 9, 28)):
+            for lesson in lessons:
+                props = lesson['properties']
+                values = {'학년도': props['학년도']['number'], '보관': props['보관']['checkbox'],
+                          '수업일': props['수업일']['date']}
+                values['오늘 수업'] = formula_value(properties, values, '오늘 수업')
+                if filter_matches(today['filter'], values):
+                    visible.append(lesson)
+        self.assertEqual(1, len(visible))
+        self.assertEqual(1, visible[0]['properties']['교시']['number'])
+        self.assertIn(plain(visible[0]['properties']['교과']['rich_text']), self.matrix_text()[1][2])
+        for key in ('home:todo', 'home:weekly', 'home:monthly', 'planning:weekly', 'planning:monthly'):
+            view = self.api.objects['/views/' + self.obj(key)['id']]
+            self.assertEqual(state['databases']['agenda']['data_source_id'], view['data_source_id'])
+            self.assertEqual([], self.api.pages(view['data_source_id']))
 
     def test_verification_detects_monthly_tab_moved_to_another_database(self):
         monthly = self.api.objects['/views/' + self.obj('home:monthly')['id']]

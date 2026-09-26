@@ -117,12 +117,29 @@ class ComciganCliTests(unittest.TestCase):
         state = self.state()
         self.assertEqual(64, len(state['comcigan_source']))
         self.assertTrue(state['comcigan_last_checked_at'].endswith('+09:00'))
-        self.assertEqual(4, sum(key.startswith('import:') for key in state['objects']))
+        self.assertEqual(2, sum(key.startswith('import:timetable:') for key in state['objects']))
+        self.assertFalse(any(key.startswith('import:agenda:') for key in state['objects']))
+        self.assertEqual([], self.api.pages(state['databases']['agenda']['data_source_id']))
         ds = state['databases']['timetable']['data_source_id']
         self.assertTrue(all(row['properties']['출처']['select']['name'] == '컴시간 어댑터' for row in self.api.pages(ds)))
         self.api.calls.clear()
         self.assertEqual(0, self.run_apply())
         self.assertEqual([], [call for call in self.api.calls if call[0] in ('POST', 'PATCH')])
+
+    def test_file_import_also_keeps_lessons_out_of_agenda(self):
+        args = ['import-timetable', str(ROOT / 'examples/timetable.csv'),
+                '--config', str(self.config_path), '--state', str(self.state_path), '--apply']
+        with patch('teacher_planner.cli.Client', return_value=self.api):
+            self.assertEqual(0, main(args))
+        state = self.state()
+        timetable = state['databases']['timetable']['data_source_id']
+        self.assertEqual(2, len(self.api.pages(timetable)))
+        self.assertEqual([], self.api.pages(state['databases']['agenda']['data_source_id']))
+        pages = [payload for method, path, payload in self.api.calls if method == 'POST' and path == '/pages']
+        self.assertEqual(2, len(pages))
+        self.assertTrue(all(page['parent']['data_source_id'] == timetable for page in pages))
+        self.assertIn('교사 시간표 2개 행', self.out.getvalue())
+        self.provider.fetch_week.assert_not_called()
 
     def test_teacher_number_reassignment_fails_before_writes(self):
         self.assertEqual(0, self.run_apply())

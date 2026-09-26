@@ -282,8 +282,9 @@ class PlannerTests(unittest.TestCase):
         self.assertEqual(2, len(tt))
         self.assertEqual('202', text_property(tt[0], '교실'))
         agenda = self.api.pages(state['databases']['agenda']['data_source_id'])
-        self.assertEqual('취소', agenda[1]['properties']['상태']['select']['name'])
-        self.assertEqual(agenda[0]['id'], tt[0]['properties']['업무·일정']['relation'][0]['id'])
+        self.assertEqual('휴강', tt[1]['properties']['상태']['select']['name'])
+        self.assertEqual([], agenda)
+        self.assertTrue(all('업무·일정' not in page['properties'] for page in tt))
         apply_changes(self.api, self.path, changes(self.api, self.c, state, rows[:1]))
         self.assertEqual(2, len(self.api.pages(state['databases']['timetable']['data_source_id'])))
 
@@ -299,14 +300,14 @@ class PlannerTests(unittest.TestCase):
             changes(self.api, self.c, state, rows)
         self.assertEqual(calls_before, len(self.api.calls))
 
-    def test_partial_import_can_resume_existing_agenda(self):
+    def test_partial_import_can_resume_existing_timetable(self):
         self.install()
         rows = read_rows(ROOT / 'examples/timetable.csv', self.c)
         state = json.loads(self.path.read_text())
         ops = changes(self.api, self.c, state, rows)
         apply_changes(self.api, self.path, ops[:1])
         apply_changes(self.api, self.path, changes(self.api, self.c, state, rows))
-        self.assertEqual(2, len(self.api.pages(state['databases']['agenda']['data_source_id'])))
+        self.assertEqual([], self.api.pages(state['databases']['agenda']['data_source_id']))
         self.assertEqual(2, len(self.api.pages(state['databases']['timetable']['data_source_id'])))
 
     def test_import_preserves_manual_priority_and_archive_flag(self):
@@ -314,7 +315,9 @@ class PlannerTests(unittest.TestCase):
         rows = read_rows(ROOT / 'examples/timetable.csv', self.c)
         state = json.loads(self.path.read_text())
         apply_changes(self.api, self.path, changes(self.api, self.c, state, rows))
-        obj = self.api.pages(state['databases']['agenda']['data_source_id'])[0]
+        obj = self.api.request('POST', '/pages', {
+            'parent': {'type': 'data_source_id', 'data_source_id': state['databases']['agenda']['data_source_id']},
+            'properties': {'이름': {'title': [{'type': 'text', 'text': {'content': '수동 업무'}}]}}})
         props = self.api.objects['/pages/' + obj['id']]['properties']
         props['우선순위'] = {'type': 'select', 'select': {'name': 'P1 지금'}}
         props['보관'] = {'type': 'checkbox', 'checkbox': True}

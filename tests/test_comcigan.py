@@ -411,40 +411,41 @@ class ComciganNotionIntegrationTests(unittest.TestCase):
         return self.api.pages(self.state['databases'][source]['data_source_id'])
 
     def test_initial_import_then_second_poll_is_noop(self):
-        self.assertEqual(6, self.sync(payload()))
+        self.assertEqual(3, self.sync(payload()))
         self.assertEqual(3, len(self.pages('timetable')))
-        self.assertEqual(3, len(self.pages('agenda')))
+        self.assertEqual([], self.pages('agenda'))
         self.api.calls.clear()
         self.assertEqual(0, self.sync(payload()))
         self.assertEqual([], self.api.calls)
         self.assertTrue(all(p['properties']['출처']['select']['name'] == '컴시간 어댑터'
                             for p in self.pages('timetable')))
 
-    def test_changed_subject_updates_existing_records_and_keeps_links(self):
+    def test_changed_subject_updates_existing_timetable_without_creating_links(self):
         self.sync(payload())
         before = {source: {p['id'] for p in self.pages(source)}
                   for source in ('timetable', 'agenda')}
         data = payload()
         data['자료13'][1][1][1] = '>2101'
         self.api.calls.clear()
-        self.assertEqual(2, self.sync(data))
+        self.assertEqual(1, self.sync(data))
         self.assertTrue(all(method == 'PATCH' for method, _, _ in self.api.calls))
         for source in ('timetable', 'agenda'):
             self.assertEqual(before[source], {p['id'] for p in self.pages(source)})
         first = self.pages('timetable')[0]['properties']
         self.assertEqual('수학', text_property({'properties': first}, '교과'))
         self.assertEqual('변경', first['상태']['select']['name'])
-        self.assertIn(first['업무·일정']['relation'][0]['id'], before['agenda'])
+        self.assertNotIn('업무·일정', first)
+        self.assertEqual([], self.pages('agenda'))
         self.assertEqual(0, self.sync(data))
 
-    def test_explicit_zero_cancels_timetable_and_agenda_once(self):
+    def test_explicit_zero_cancels_only_timetable_once(self):
         self.sync(payload())
         data = payload()
         data['자료13'][1][1][1] = 0
         self.api.calls.clear()
-        self.assertEqual(2, self.sync(data))
+        self.assertEqual(1, self.sync(data))
         self.assertEqual('휴강', self.pages('timetable')[0]['properties']['상태']['select']['name'])
-        self.assertEqual('취소', self.pages('agenda')[0]['properties']['상태']['select']['name'])
+        self.assertEqual([], self.pages('agenda'))
         self.api.calls.clear()
         self.assertEqual(0, self.sync(data))
         self.assertEqual([], self.api.calls)
