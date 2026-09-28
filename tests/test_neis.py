@@ -104,6 +104,9 @@ class NeisProviderTests(unittest.TestCase):
             'ATPT_OFCDC_SC_CODE': [OFFICE], 'SD_SCHUL_CODE': [SCHOOL],
             'AA_FROM_YMD': ['20260301'], 'AA_TO_YMD': ['20270228'],
         })
+        # Real NEIS returns HTTP 500 with Accept: application/json even when
+        # Type=json is present. Keep JSON selection in the query instead.
+        self.assertEqual(request.get_header('Accept'), '*/*')
         self.assertEqual(timeout, TIMEOUT)
         self.assertEqual(opener.responses[0].read_limits, [MAX_BYTES + 1])
         self.assertNotIn(KEY, json.dumps(result))
@@ -247,10 +250,40 @@ class NeisProviderTests(unittest.TestCase):
         second = fetch(FakeOpener(page([event(EVENT_NM='  가상 행사  ', DGHT_CRSE_SC_NM=' 주간 ')])))['rows'][0]
         self.assertEqual(first['external_id'], second['external_id'])
 
-    def test_repeated_identity_is_rejected_even_if_exact_duplicate(self):
-        for second in (event(), event(EVENT_CNTNT='다른 설명')):
-            with self.subTest(second=second['EVENT_CNTNT']), self.assertRaises(NeisError):
+    def test_same_page_exact_duplicate_is_counted_and_emitted_once(self):
+        opener = FakeOpener(page([event(), copy.deepcopy(event())]))
+        result = fetch(opener)
+        self.assertEqual(len(result['rows']), 1)
+        self.assertEqual((result['source_row_count'], result['duplicate_row_count']), (2, 1))
+        self.assertEqual(result['rows'][0]['external_id'],
+                         event_id(OFFICE, SCHOOL, '2026-03-03', '가상 행사', '주간', '중학교'))
+        self.assertEqual(len(opener.calls), 1)
+
+    def test_pagination_counts_source_rows_before_deduplication(self):
+        opener = FakeOpener(page([event(), event()], 3), page([event('다음 행사')], 3))
+        with patch('teacher_planner.neis.PAGE_SIZE', 2):
+            result = fetch(opener)
+        self.assertEqual(len(result['rows']), 2)
+        self.assertEqual((result['source_row_count'], result['duplicate_row_count']), (3, 1))
+        self.assertEqual(len(opener.calls), 2)
+
+    def test_same_id_with_any_different_source_information_is_rejected(self):
+        differences = ({'EVENT_CNTNT': '다른 설명'}, {'ONE_GRADE_EVENT_YN': 'N'},
+                       {'LOAD_DTM': '20260926'}, {'EVENT_NM': ' 가상 행사 '},
+                       {'UNRECOGNIZED_FIELD': '보존해야 하는 원본 정보'})
+        for difference in differences:
+            second = event(**difference)
+            with self.subTest(difference=difference), self.assertRaises(NeisError):
                 fetch(FakeOpener(page([event(), second])))
+
+    def test_exact_duplicate_across_pages_is_rejected(self):
+        opener = FakeOpener(page([event()], 2), page([event()], 2))
+        with patch('teacher_planner.neis.PAGE_SIZE', 1), self.assertRaisesRegex(NeisError, '페이지 간 반복'):
+            fetch(opener)
+
+    def test_different_unknown_json_value_types_are_not_exact_duplicates(self):
+        with self.assertRaises(NeisError):
+            fetch(FakeOpener(page([event(UNKNOWN=1), event(UNKNOWN=True)])))
 
     def test_distinct_courses_and_daynight_stay_separate(self):
         rows = [event(), event(DGHT_CRSE_SC_NM='야간'), event(SCHUL_CRSE_SC_NM='고등학교')]

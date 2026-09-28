@@ -98,6 +98,8 @@ class NeisMealsTests(unittest.TestCase):
         self.assertEqual(parse_qs(url.query), {
             'KEY': [KEY], 'Type': ['json'], 'pSize': ['1000'], 'pIndex': ['1'],
             'ATPT_OFCDC_SC_CODE': [OFFICE], 'SD_SCHUL_CODE': [SCHOOL], 'MLSV_YMD': ['20260928']})
+        # Type=json selects the format; application/json Accept causes HTTP 500.
+        self.assertEqual(request.get_header('Accept'), '*/*')
         self.assertEqual(timeout, TIMEOUT)
         self.assertEqual(opener.responses[0].read_limits, [MAX_BYTES + 1])
 

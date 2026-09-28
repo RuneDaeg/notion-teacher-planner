@@ -6,7 +6,7 @@ import unittest
 from datetime import date, datetime, timedelta
 from pathlib import Path
 
-from teacher_planner.model import blueprint, config, schema, selected, view_payload
+from teacher_planner.model import blueprint, config, dashboard_views, schema, selected, view_payload
 
 ROOT = Path(__file__).resolve().parents[1]
 TODAY = date(2026, 9, 27)
@@ -99,6 +99,8 @@ def filter_matches(node, values):
         return actual == condition['equals']
     if 'does_not_equal' in condition:
         return actual != condition['does_not_equal']
+    if 'does_not_contain' in condition:
+        return condition['does_not_contain'] not in (actual or '')
     if 'is_not_empty' in condition:
         return bool(actual)
     raise AssertionError(condition)
@@ -224,6 +226,34 @@ class WorkspaceSchemaTests(unittest.TestCase):
                 if 'show' in view:
                     actual = {p['property_id'] for p in payload['configuration']['properties'] if p['visible']}
                     self.assertEqual(set(view['show']), actual)
+
+    def test_neis_calendar_events_stay_out_of_todo_but_manual_events_remain(self):
+        properties = self.dbs['agenda']['properties']
+        remote = {name: {**prop, 'id': name} for name, prop in properties.items()}
+        home = next(view for view in dashboard_views(config(ROOT / 'config.example.json'))
+                    if view['instance_key'] == 'home:todo')
+        fixtures = [
+            ('가져온 학교 행사', 'neis:fictional-event', '행사', False),
+            ('직접 입력한 행사', '', '행사', True),
+            ('외부 ID 없는 업무', None, '할 일', True),
+            ('다른 원본의 기록', 'manual:fictional-event', '행사', True),
+        ]
+        for view, parent in ((self.views['todo'], None), (home, 'home-page')):
+            payload = view_payload(view, {'id': 'db', 'data_source_id': 'ds'}, remote, 2026, parent)
+            for title, external_id, kind, expected in fixtures:
+                values = {'이름': title, '외부 ID': external_id, '종류': kind,
+                          '상태': '예정', '보관': False, '학년도': 2026}
+                with self.subTest(parent=parent, title=title):
+                    self.assertEqual(expected, filter_matches(payload['filter'], values))
+                    for override in ({'보관': True}, {'상태': '완료'}, {'상태': '취소'}, {'학년도': 2025}):
+                        self.assertFalse(filter_matches(payload['filter'], {**values, **override}))
+        imported = {'외부 ID': 'neis:fictional-event', '종류': '행사',
+                    '상태': '예정', '보관': False, '학년도': 2026}
+        for key in ('weekly', 'monthly'):
+            payload = view_payload(self.views[key], {'id': 'db', 'data_source_id': 'ds'}, remote, 2026)
+            with self.subTest(calendar=key):
+                self.assertTrue(filter_matches(payload['filter'], imported))
+                self.assertFalse(filter_matches(payload['filter'], {**imported, '상태': '취소'}))
 
     def test_native_gallery_board_and_existing_tables_expose_useful_properties(self):
         self.assertEqual('gallery', self.views['students_gallery']['type'])

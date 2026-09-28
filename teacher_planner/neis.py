@@ -86,9 +86,11 @@ def _key(api_key):
 def _read(url, opener):
     # An injected opener has urllib's (request, timeout=...) -> response contract.
     # Production always uses a fixed HTTPS endpoint and refuses every redirect.
+    # NEIS can return HTTP 500 for Accept: application/json; Type=json selects
+    # the response format, which is still validated strictly below.
     try:
         request = Request(url, headers={'User-Agent': 'notion-teacher-planner/0.5',
-                                        'Accept': 'application/json',
+                                        'Accept': '*/*',
                                         'Cache-Control': 'no-cache'})
         open_request = opener if opener is not None else build_opener(_NoRedirect).open
         with open_request(request, timeout=TIMEOUT) as response:
@@ -225,6 +227,8 @@ def fetch_schedule(office_code, school_code, academic_year, *, api_key,
 
     ``opener`` is an optional urllib-compatible callable for offline tests.
     Empty results are valid; they never imply deletion of previously imported rows.
+    Exact duplicate source rows within one page are counted, then emitted once.
+    Repeated IDs across pages or differing source rows still fail the snapshot.
     ``grades`` lists only explicitly reported Y values, not an all-school guess.
     """
     office_code, school_code, academic_year = _identifiers(office_code, school_code, academic_year)
@@ -233,7 +237,8 @@ def fetch_schedule(office_code, school_code, academic_year, *, api_key,
     query = {'KEY': key, 'Type': 'json', 'pSize': PAGE_SIZE,
              'ATPT_OFCDC_SC_CODE': office_code, 'SD_SCHUL_CODE': school_code,
              'AA_FROM_YMD': start.strftime('%Y%m%d'), 'AA_TO_YMD': end.strftime('%Y%m%d')}
-    rows, seen, expected, index, school_name = [], set(), None, 1, ''
+    rows, seen, expected, index, school_name = [], {}, None, 1, ''
+    received, duplicate_count = 0, 0
     while True:
         url = ENDPOINT + '?' + urlencode({**query, 'pIndex': index})
         total, page_rows = _page(_read(url, opener), index)
@@ -241,22 +246,30 @@ def fetch_schedule(office_code, school_code, academic_year, *, api_key,
             expected = total
         elif expected != total:
             raise NeisError('NEIS 조회 도중 전체 건수가 바뀌었습니다. 처음부터 다시 조회하세요.')
-        if len(page_rows) != min(PAGE_SIZE, expected - len(rows)):
+        if len(page_rows) != min(PAGE_SIZE, expected - received):
             raise NeisError('NEIS 페이지 행 수가 전체 건수와 다릅니다. 일부 자료만 가져오지 않습니다.')
         for raw in page_rows:
             row = _row(raw, office_code, school_code, academic_year, start, end)
             if school_name and school_name != row['school_name']:
                 raise NeisError('NEIS 응답에 서로 다른 학교명이 포함되어 있습니다.')
             school_name = row['school_name']
+            # Compare every source field and JSON type, including unknown fields.
+            raw_signature = json.dumps(raw, ensure_ascii=False, sort_keys=True, separators=(',', ':'))
             if row['external_id'] in seen:
-                raise NeisError('NEIS 일정 식별값이 중복됩니다. 원본 중복이나 조회 중 변경을 확인하세요.')
-            seen.add(row['external_id'])
+                first_page, first_signature = seen[row['external_id']]
+                if first_page == index and first_signature == raw_signature:
+                    duplicate_count += 1
+                    continue
+                raise NeisError('NEIS 일정 식별값이 중복됩니다. 원본 내용 차이나 페이지 간 반복을 확인하세요.')
+            seen[row['external_id']] = (index, raw_signature)
             rows.append(row)
-        if len(rows) == expected:
+        received += len(page_rows)
+        if received == expected:
             break
         index += 1
     rows.sort(key=lambda row: (row['date'], row['title'], row['course'], row['day_night']))
     return {'source': 'neis', 'source_url': SOURCE_URL, 'office_code': office_code,
             'school_code': school_code, 'school_name': school_name,
             'academic_year': academic_year, 'start': start.isoformat(), 'end': end.isoformat(),
+            'source_row_count': received, 'duplicate_row_count': duplicate_count,
             'fetched_at': datetime.now(timezone.utc).isoformat(timespec='seconds'), 'rows': rows}

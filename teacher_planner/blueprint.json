@@ -912,6 +912,12 @@
             "select": {
               "does_not_equal": "취소"
             }
+          },
+          {
+            "property": "외부 ID",
+            "rich_text": {
+              "does_not_contain": "neis:"
+            }
           }
         ]
       },

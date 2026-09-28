@@ -115,9 +115,11 @@ def _unique_object(pairs):
 
 
 def _read(url, opener):
+    # Type=json selects JSON without triggering NEIS's application/json Accept
+    # negotiation failure. The response must still pass JSON validation below.
     try:
         request = Request(url, headers={'User-Agent': 'notion-teacher-planner/0.6',
-                                        'Accept': 'application/json', 'Cache-Control': 'no-cache'})
+                                        'Accept': '*/*', 'Cache-Control': 'no-cache'})
         open_request = opener if opener is not None else build_opener(_NoRedirect).open
         with open_request(request, timeout=TIMEOUT) as response:
             final = urlsplit(response.geturl())
