@@ -1,7 +1,7 @@
 """Four native Notion pages sharing the original teacher-planner data sources."""
 from .blocks import BlockJournal, children
 from .dashboard import (dashboard_config, layout_spec, matrix_table, matrix_title,
-                        quick_links, section_heading, top_columns)
+                        quick_links, section_heading)
 from .model import dashboard_views, rich, selected, view_payload
 
 
@@ -44,8 +44,6 @@ def navigation(pages, current):
 
 
 def install_workspace(j, c, root, databases, actual_props):
-    from .home import _column_ids
-
     spec = layout_spec()
     pages = {'home': root}
     for page in spec['workspace']['pages']:
@@ -135,14 +133,12 @@ def install_workspace(j, c, root, databases, actual_props):
                     append('layout:' + instance + ':' + name,
                            paragraph(title + ('' if url else ' · 내 링크 설정'), url or None))
             elif kind == 'matrix':
-                top = append('layout:top', top_columns(c, links))
-                left, right = _column_ids(j, top, 'top', 2)
-                caption = writer.append('layout:matrix-caption', left, matrix_title(None))
-                matrix = writer.append('layout:matrix', left, matrix_table(c))
-                for i, block in enumerate(quick_links(c, links)):
-                    writer.append(f'layout:quick:{i}', right, block)
+                caption = append('layout:matrix-caption', matrix_title(None))
+                matrix = append('layout:matrix', matrix_table(c))
                 append('layout:' + instance + ':sync', callout(
-                    '컴시간에서 가져온 수업은 아래 기록의 동기화 시각에서 확인합니다. 변경·휴강은 시간표 기록의 탭에서 확인하세요.', '🔄', 'blue_background'))
+                    '시간표 파일·컴시간 동기화 후 해당 주 수업을 표시합니다. 확인되지 않은 교시 시각은 비워 둡니다. 수정·변경·휴강 기록은 아래 관리용 표에서 확인하세요.', '🔄', 'blue_background'))
+                append('layout:quick-links', {'object': 'block', 'type': 'toggle', 'toggle': {
+                    'rich_text': rich('빠른 동작 / 즐겨찾기'), 'children': quick_links(c, links)}})
             elif kind == 'para':
                 append('layout:' + instance + ':cards', cards([
                     callout(title, icon, color, links[name]) for name, title, icon, color in (
@@ -159,10 +155,11 @@ def install_workspace(j, c, root, databases, actual_props):
             else:
                 raise ValueError('알 수 없는 워크스페이스 구역: ' + kind)
     previous = j.data.get('dashboard', {})
-    rows = previous.get('matrix_row_ids') or [r['id'] for r in children(j.client, matrix['id'])]
     j.data['dashboard'] = {**previous, 'version': spec['version'], 'root_id': root,
-                           'matrix_id': matrix['id'], 'caption_id': caption['id'], 'matrix_row_ids': rows,
                            'pages': pages, 'page_order': ordered, 'view_groups': groups, 'anchors': anchors}
+    if matrix:
+        rows = previous.get('matrix_row_ids') or [r['id'] for r in children(j.client, matrix['id'])]
+        j.data['dashboard'].update(matrix_id=matrix['id'], caption_id=caption['id'], matrix_row_ids=rows)
     j.save()
 
 
@@ -189,12 +186,15 @@ def verify_workspace(client, state):
         if any(state['objects'].get(key, {}).get('parent', {}).get('database_id') != group['container_id']
                for key in group['view_keys']):
             issues.append(f"{group['page']}/{group['section']}: 같은 연결 데이터베이스의 보기 탭인지 확인하세요.")
-    top = children(client, state['objects']['layout:top']['id'])
-    if len(top) != 2 or any(row.get('type') != 'column' or
-            abs(row.get('column', {}).get('width_ratio', 0) - spec['width_ratio']) > .001
-            for row, spec in zip(top, layout_spec()['top'])):
-        issues.append('수업 시간표: 열 개수·비율을 확인하세요.')
-    table = client.request('GET', '/blocks/' + layout['matrix_id'])
-    if table.get('type') != 'table' or table.get('table', {}).get('table_width') != 7:
-        issues.append('수업 시간표: 교시·수업시간·월~금 7개 열을 확인하세요.')
+    if layout.get('matrix_id'):
+        # Keep checking older, owned column layouts without moving their blocks.
+        if state['objects'].get('layout:top'):
+            top = children(client, state['objects']['layout:top']['id'])
+            if len(top) != 2 or any(row.get('type') != 'column' or
+                    abs(row.get('column', {}).get('width_ratio', 0) - spec['width_ratio']) > .001
+                    for row, spec in zip(top, layout_spec()['top'])):
+                issues.append('수업 시간표: 열 개수·비율을 확인하세요.')
+        table = client.request('GET', '/blocks/' + layout['matrix_id'])
+        if table.get('type') != 'table' or table.get('table', {}).get('table_width') != 7:
+            issues.append('수업 시간표: 교시·수업시간·월~금 7개 열을 확인하세요.')
     return issues

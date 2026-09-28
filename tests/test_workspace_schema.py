@@ -229,7 +229,7 @@ class WorkspaceSchemaTests(unittest.TestCase):
         self.assertEqual('gallery', self.views['students_gallery']['type'])
         self.assertEqual(('board', '상태'), (self.views['projects_board']['type'], self.views['projects_board']['group']))
         self.assertEqual([{'property': '교시', 'direction': 'ascending'}], self.views['teacher_today']['sorts'])
-        self.assertTrue({'교실', '상태', '동기화 시각'} <= set(self.views['teacher_today']['show']))
+        self.assertTrue({'교실', '상태'} <= set(self.views['teacher_today']['show']))
         for key in ('active_students', 'active_counseling', 'progress_class', 'active_assessments'):
             self.assertIn('이름', self.views[key]['show'])
             self.assertGreater(len(self.views[key]['show']), 3)

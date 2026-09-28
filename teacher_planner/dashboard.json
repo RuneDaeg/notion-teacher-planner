@@ -1,7 +1,7 @@
 {
   "id": "teacher-notebook",
   "name": "교무수첩 데스크",
-  "version": 3,
+  "version": 4,
   "shared_view_groups": [
     [
       "weekly",
@@ -304,7 +304,7 @@
         "key": "teaching",
         "title": "교과 진도표 & 시간표",
         "icon": "📚",
-        "description": "주간 수업과 반별 진도를 확인하고 다음 수업을 준비합니다.",
+        "description": "월~금 주간 시간표와 반별 진도를 확인하고 다음 수업을 준비합니다.",
         "sections": [
           {
             "key": "matrix",
@@ -315,7 +315,7 @@
           },
           {
             "key": "timetable",
-            "title": "시간표 기록",
+            "title": "시간표 원본 · 관리용",
             "kind": "views",
             "color": "blue_background",
             "views": [

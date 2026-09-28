@@ -11,6 +11,7 @@ from unittest.mock import patch
 from teacher_planner.blocks import BlockJournal, children
 from teacher_planner.cli import main, verify_remote
 from teacher_planner.client import NotionError
+from teacher_planner.dashboard import top_columns
 from teacher_planner.home import refresh_dashboard, verify_dashboard
 from teacher_planner.install import Journal, block, install
 from teacher_planner.model import blueprint, config
@@ -26,7 +27,7 @@ def plain(items):
     return ''.join(item.get('plain_text', item.get('text', {}).get('content', '')) for item in items)
 
 
-class HomeTests(unittest.TestCase):
+class NotebookFixture:
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
@@ -56,6 +57,47 @@ class HomeTests(unittest.TestCase):
     def caption(self):
         row = self.api.objects['/blocks/' + self.state()['dashboard']['caption_id']]
         return plain(row['paragraph']['rich_text'])
+
+
+class HomeTests(NotebookFixture, unittest.TestCase):
+    def test_teaching_matrix_precedes_compact_management_tables(self):
+        state = self.state()
+        layout = state['dashboard']
+        self.assertIn('matrix_id', layout)
+        self.assertIn('caption_id', layout)
+        self.assertNotIn('layout:top', state['objects'])
+        self.assertEqual(self.obj('layout:matrix')['id'], layout['matrix_id'])
+        order = layout['page_order']['teaching']
+        self.assertLess(order.index(layout['caption_id']), order.index(layout['matrix_id']))
+        self.assertLess(order.index(layout['matrix_id']), order.index(layout['anchors']['teaching:timetable']))
+        self.assertLess(order.index(layout['anchors']['teaching:timetable']),
+                        order.index(self.obj('teaching:teacher_week')['parent']['database_id']))
+        self.assertNotIn(layout['matrix_id'], layout['page_order']['home'])
+        props = self.api.request('GET', '/data_sources/' + state['databases']['timetable']['data_source_id'])['properties']
+        names = ['이름', '수업일', '교시', '학급', '교과', '교실', '상태']
+        expected = [props[name]['id'] for name in names]
+        for key in ('view:teacher_week', 'home:teacher_today', 'home:teacher_changes',
+                    'teaching:teacher_week', 'teaching:teacher_changes'):
+            view = self.api.objects['/views/' + self.obj(key)['id']]
+            with self.subTest(key=key):
+                self.assertEqual('table', view['type'])
+                self.assertEqual(expected, [p['property_id'] for p in view['configuration']['properties'] if p['visible']])
+                self.assertNotIn('view_range', view['configuration'])
+        teaching = self.api.objects['/views/' + self.obj('teaching:teacher_week')['id']]
+        self.assertEqual([{'property': '수업일', 'direction': 'ascending'},
+                          {'property': '교시', 'direction': 'ascending'}], teaching['sorts'])
+
+    def test_earlier_notebook_without_grid_needs_no_block_refresh_or_state_change(self):
+        state = self.state()
+        for name in ('matrix_id', 'caption_id', 'matrix_row_ids'):
+            state['dashboard'].pop(name)
+        self.path.write_text(json.dumps(state), encoding='utf-8')
+        self.synced()
+        self.api.calls.clear()
+        before = self.path.read_bytes()
+        self.assertEqual(0, refresh_dashboard(self.api, self.path, self.rows))
+        self.assertEqual(before, self.path.read_bytes())
+        self.assertEqual([], self.api.calls)
 
     def test_four_pages_keep_views_as_direct_page_children(self):
         state = self.state()
@@ -111,7 +153,9 @@ class HomeTests(unittest.TestCase):
                     visible.append(lesson)
         self.assertEqual(1, len(visible))
         self.assertEqual(1, visible[0]['properties']['교시']['number'])
-        self.assertIn(plain(visible[0]['properties']['교과']['rich_text']), self.matrix_text()[1][2])
+        self.assertEqual('table', week['type'])
+        self.assertIn('영어', self.matrix_text()[1][2])
+        self.assertIn('2026-09-28 ~ 2026-10-02', self.caption())
         for key in ('home:todo', 'home:weekly', 'home:monthly', 'planning:weekly', 'planning:monthly'):
             view = self.api.objects['/views/' + self.obj(key)['id']]
             self.assertEqual(state['databases']['agenda']['data_source_id'], view['data_source_id'])
@@ -157,15 +201,6 @@ class HomeTests(unittest.TestCase):
         page = self.api.objects['/pages/' + self.state()['dashboard']['pages']['classroom']]
         page['parent']['page_id'] = self.api.parent
         self.assertTrue(any('classroom: 하위 페이지' in issue for issue in verify_dashboard(self.api, self.state())))
-
-    def test_top_matrix_and_column_widths_match_notebook_layout(self):
-        top = children(self.api, self.obj('layout:top')['id'])
-        self.assertEqual([.625, .375], [row['column']['width_ratio'] for row in top])
-        table = self.api.objects['/blocks/' + self.state()['dashboard']['matrix_id']]
-        self.assertEqual(top[0]['id'], table['parent']['block_id'])
-        self.assertEqual(7, table['table']['table_width'])
-        self.assertEqual(['교시', '수업시간', '월', '화', '수', '목', '금'], self.matrix_text()[0])
-        self.assertEqual([f'{i}교시' for i in range(1, 8)] + ['공동'], [row[0] for row in self.matrix_text()[1:]])
 
     def test_verification_detects_moved_home_views_without_rewriting(self):
         state = self.state()
@@ -234,6 +269,74 @@ class HomeTests(unittest.TestCase):
         before = len(self.api.objects)
         install(self.api, self.c, self.api.parent, self.path)
         self.assertEqual(before, len(self.api.objects))
+        self.assertEqual([], [call for call in self.api.calls if call[0] in ('POST', 'PATCH')])
+
+    def test_legacy_state_without_dashboard_is_untouched(self):
+        state = self.state()
+        del state['dashboard']
+        self.path.write_text(json.dumps(state), encoding='utf-8')
+        before = self.path.read_bytes()
+        self.assertEqual(0, refresh_dashboard(self.api, self.path, self.rows))
+        self.assertEqual([], self.api.calls)
+        self.assertEqual(before, self.path.read_bytes())
+
+    def test_recover_cli_reads_block_endpoint_and_does_not_reappend(self):
+        journal = Journal(self.path, self.api)
+        original = self.api.request
+
+        def lose_response(method, path, payload=None):
+            result = original(method, path, payload)
+            if method == 'PATCH':
+                raise NotionError('lost response')
+            return result
+
+        with patch.object(self.api, 'request', side_effect=lose_response):
+            with self.assertRaises(NotionError):
+                BlockJournal(journal).append('layout:recovered', self.obj('root')['id'], block('paragraph', '복구 확인'))
+        created = children(self.api, self.obj('root')['id'])[-1]
+        self.api.calls.clear()
+        with patch('teacher_planner.cli.Client', return_value=self.api), patch('sys.stdout', new=io.StringIO()):
+            self.assertEqual(0, main(['recover', '--state', str(self.path), '--id', created['id']]))
+        self.assertIn(('GET', '/blocks/' + created['id'], None), self.api.calls)
+        self.assertNotIn('pending', self.state())
+        self.assertEqual(created['id'], self.obj('layout:recovered')['id'])
+        BlockJournal(Journal(self.path, self.api)).append('layout:recovered', self.obj('root')['id'], block('paragraph', '복구 확인'))
+        self.assertEqual([], [call for call in self.api.calls if call[0] == 'PATCH'])
+
+
+class WeeklyMatrixTests(NotebookFixture, unittest.TestCase):
+    def test_teaching_matrix_has_full_width_and_weekday_period_axes(self):
+        table = self.api.objects['/blocks/' + self.state()['dashboard']['matrix_id']]
+        self.assertEqual(self.state()['dashboard']['pages']['teaching'], table['parent']['page_id'])
+        self.assertEqual(7, table['table']['table_width'])
+        self.assertEqual(['교시', '수업시간', '월', '화', '수', '목', '금'], self.matrix_text()[0])
+        self.assertEqual([f'{i}교시' for i in range(1, 8)] + ['공동'], [row[0] for row in self.matrix_text()[1:]])
+
+    def test_legacy_column_grid_keeps_refresh_and_width_verification(self):
+        journal = Journal(self.path, self.api)
+        layout = journal.data['dashboard']
+        parent = layout['pages']['teaching']
+        top = BlockJournal(journal).append('layout:top', parent, top_columns(self.c, {}))
+        left = children(self.api, top['id'])[0]['id']
+        old_ids = [layout['caption_id'], layout['matrix_id']]
+        for identifier in old_ids:
+            self.api.block_children[parent].remove(identifier)
+            self.api.block_children[left].append(identifier)
+            self.api.objects['/blocks/' + identifier]['parent'] = {'block_id': left}
+        self.api.block_children[parent].remove(top['id'])
+        expected = layout['page_order']['teaching']
+        index = expected.index(layout['caption_id'])
+        expected[index:index + 2] = [top['id']]
+        self.api.block_children[parent].insert(index, top['id'])
+        layout['version'] = 3
+        journal.save()
+        self.assertEqual([], verify_dashboard(self.api, self.state()))
+        self.synced()
+        self.assertGreater(refresh_dashboard(self.api, self.path, self.rows), 0)
+        self.assertIn('영어', self.matrix_text()[1][2])
+        self.api.objects['/blocks/' + left]['column']['width_ratio'] = .5
+        self.api.calls.clear()
+        self.assertIn('수업 시간표: 열 개수·비율을 확인하세요.', verify_dashboard(self.api, self.state()))
         self.assertEqual([], [call for call in self.api.calls if call[0] in ('POST', 'PATCH')])
 
     def test_refresh_uses_actual_remote_lessons_and_second_refresh_is_noop(self):
@@ -393,37 +496,6 @@ class HomeTests(unittest.TestCase):
         self.assertIn('영어', self.matrix_text()[1][2])
         self.assertEqual('08:40–09:30', self.matrix_text()[1][1])
 
-    def test_legacy_state_without_dashboard_is_untouched(self):
-        state = self.state()
-        del state['dashboard']
-        self.path.write_text(json.dumps(state), encoding='utf-8')
-        before = self.path.read_bytes()
-        self.assertEqual(0, refresh_dashboard(self.api, self.path, self.rows))
-        self.assertEqual([], self.api.calls)
-        self.assertEqual(before, self.path.read_bytes())
-
-    def test_recover_cli_reads_block_endpoint_and_does_not_reappend(self):
-        journal = Journal(self.path, self.api)
-        original = self.api.request
-
-        def lose_response(method, path, payload=None):
-            result = original(method, path, payload)
-            if method == 'PATCH':
-                raise NotionError('lost response')
-            return result
-
-        with patch.object(self.api, 'request', side_effect=lose_response):
-            with self.assertRaises(NotionError):
-                BlockJournal(journal).append('layout:recovered', self.obj('root')['id'], block('paragraph', '복구 확인'))
-        created = children(self.api, self.obj('root')['id'])[-1]
-        self.api.calls.clear()
-        with patch('teacher_planner.cli.Client', return_value=self.api), patch('sys.stdout', new=io.StringIO()):
-            self.assertEqual(0, main(['recover', '--state', str(self.path), '--id', created['id']]))
-        self.assertIn(('GET', '/blocks/' + created['id'], None), self.api.calls)
-        self.assertNotIn('pending', self.state())
-        self.assertEqual(created['id'], self.obj('layout:recovered')['id'])
-        BlockJournal(Journal(self.path, self.api)).append('layout:recovered', self.obj('root')['id'], block('paragraph', '복구 확인'))
-        self.assertEqual([], [call for call in self.api.calls if call[0] == 'PATCH'])
 
 
 if __name__ == '__main__':

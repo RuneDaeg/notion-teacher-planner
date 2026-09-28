@@ -1,4 +1,4 @@
-"""Install the reference-based home and refresh its dated timetable mirror."""
+"""Install the workspace and refresh its dated, source-backed weekly timetable."""
 from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
 
@@ -98,15 +98,18 @@ def verify_dashboard(client, state):
 def refresh_dashboard(client, state_path, imported_rows, week_start=None):
     """Refresh only the owned matrix, reading all saved lessons in its week.
 
-    Legacy notebooks have no owned dashboard and retain their previous behavior.
+    The teaching page shows a weekly grid; home reads today's source records.
+    Earlier notebooks without an owned grid need no separate block refresh.
     This reads after synchronization, so a missing input slot never clears a
     previously imported lesson that the sync engine intentionally preserved.
     """
     j = Journal(state_path, client)
     j.ready()
     layout = j.data.get('dashboard')
+    if not layout or not layout.get('matrix_id'):
+        return 0
     week = _week_for(imported_rows, week_start)
-    if not layout or week is None:
+    if week is None:
         return 0
     c, dbs = j.data['config'], j.data['databases']
     class_names = {p['id']: text_property(p, '이름') for p in client.pages(dbs['classes']['data_source_id'])}

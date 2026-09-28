@@ -10,6 +10,7 @@ from datetime import date
 from pathlib import Path
 from unittest.mock import Mock, patch
 
+from teacher_planner.blocks import children
 from teacher_planner.cli import main
 from teacher_planner.client import NotionError
 from teacher_planner.install import install
@@ -64,6 +65,10 @@ class ComciganCliTests(unittest.TestCase):
 
     def state(self):
         return json.loads(self.state_path.read_text())
+
+    def matrix_cell(self, row, column):
+        rows = children(self.api, self.state()['dashboard']['matrix_id'])
+        return ''.join(item['text']['content'] for item in rows[row]['table_row']['cells'][column])
 
     def test_week_writes_only_private_snapshot_atomically_with_mode_0600(self):
         output = self.private / 'week.json'
@@ -122,6 +127,9 @@ class ComciganCliTests(unittest.TestCase):
         self.assertEqual([], self.api.pages(state['databases']['agenda']['data_source_id']))
         ds = state['databases']['timetable']['data_source_id']
         self.assertTrue(all(row['properties']['출처']['select']['name'] == '컴시간 어댑터' for row in self.api.pages(ds)))
+        self.assertEqual('월\n09/28', self.matrix_cell(0, 2))
+        self.assertIn('영어', self.matrix_cell(1, 2))
+        self.assertIn('영어', self.matrix_cell(2, 3))
         self.api.calls.clear()
         self.assertEqual(0, self.run_apply())
         self.assertEqual([], [call for call in self.api.calls if call[0] in ('POST', 'PATCH')])
@@ -135,6 +143,8 @@ class ComciganCliTests(unittest.TestCase):
         timetable = state['databases']['timetable']['data_source_id']
         self.assertEqual(2, len(self.api.pages(timetable)))
         self.assertEqual([], self.api.pages(state['databases']['agenda']['data_source_id']))
+        self.assertEqual('월\n09/28', self.matrix_cell(0, 2))
+        self.assertIn('영어', self.matrix_cell(1, 2))
         pages = [payload for method, path, payload in self.api.calls if method == 'POST' and path == '/pages']
         self.assertEqual(2, len(pages))
         self.assertTrue(all(page['parent']['data_source_id'] == timetable for page in pages))

@@ -1,5 +1,5 @@
 {
-  "version": 4,
+  "version": 5,
   "notion_version": "2026-03-11",
   "databases": [
     {
@@ -1111,10 +1111,8 @@
     {
       "key": "teacher_week",
       "source": "timetable",
-      "name": "교사 주간 시간표",
-      "type": "calendar",
-      "date": "수업일",
-      "range": "week",
+      "name": "수업 시간표",
+      "type": "table",
       "filter": {
         "property": "보관",
         "checkbox": {
@@ -1123,9 +1121,22 @@
       },
       "show": [
         "이름",
+        "수업일",
         "교시",
+        "학급",
         "교과",
+        "교실",
         "상태"
+      ],
+      "sorts": [
+        {
+          "property": "수업일",
+          "direction": "ascending"
+        },
+        {
+          "property": "교시",
+          "direction": "ascending"
+        }
       ]
     },
     {
@@ -1664,13 +1675,12 @@
       },
       "show": [
         "이름",
-        "교시",
         "수업일",
+        "교시",
         "학급",
-        "교실",
-        "상태",
         "교과",
-        "동기화 시각"
+        "교실",
+        "상태"
       ],
       "sorts": [
         {
@@ -1717,8 +1727,7 @@
         "학급",
         "교과",
         "교실",
-        "상태",
-        "동기화 시각"
+        "상태"
       ],
       "sorts": [
         {
