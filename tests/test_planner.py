@@ -36,6 +36,9 @@ class FakeNotion:
         if url.path.startswith('/blocks/') and url.path.endswith('/children'):
             parent = url.path.split('/')[2]
             if method == 'GET':
+                reference = self.objects.get('/blocks/' + parent, {}).get('synced_block', {}).get('synced_from')
+                if reference:
+                    parent = reference['block_id']
                 query = parse_qs(url.query)
                 offset = int(query.get('start_cursor', ['0'])[0])
                 limit = int(query.get('page_size', ['100'])[0])
@@ -49,6 +52,8 @@ class FakeNotion:
                 rows = self.add_blocks(parent, payload['children'], payload.get('position'))
                 return {'object': 'list', 'results': copy.deepcopy(rows), 'has_more': False, 'next_cursor': None}
         if method == 'PATCH' and path.startswith('/blocks/'):
+            if 'synced_block' in payload:
+                raise NotionError('Updating synced_block itself is unsupported', 400)
             self.objects[path].update(copy.deepcopy(payload))
             return copy.deepcopy(self.objects[path])
         if method == 'GET':
@@ -138,6 +143,12 @@ class FakeNotion:
             parent_kind = 'page_id' if '/pages/' + parent in self.objects else 'block_id'
             row.update(id=id_, object='block', parent={'type': parent_kind, parent_kind: parent},
                        has_children=bool(nested), in_trash=False)
+            reference = row.get('synced_block', {}).get('synced_from')
+            if reference:
+                original = self.objects['/blocks/' + reference['block_id']]
+                assert original['type'] == 'synced_block' and original['synced_block']['synced_from'] is None
+                assert not nested
+                row['has_children'] = original['has_children']
             self.objects['/blocks/' + id_] = row
             self.add_blocks(id_, nested)
             rows.append(row)

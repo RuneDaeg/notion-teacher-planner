@@ -58,6 +58,24 @@ class NotebookFixture:
         row = self.api.objects['/blocks/' + self.state()['dashboard']['caption_id']]
         return plain(row['paragraph']['rich_text'])
 
+    def legacy_unshared_layout(self):
+        journal = Journal(self.path, self.api)
+        layout = journal.data['dashboard']
+        parent = layout['pages']['teaching']
+        source = layout.pop('matrix_sync_id')
+        ids = [layout['caption_id'], layout['matrix_id']]
+        for identifier in ids:
+            self.api.block_children[source].remove(identifier)
+            self.api.objects['/blocks/' + identifier]['parent'] = {'type': 'page_id', 'page_id': parent}
+        for order in (layout['page_order']['teaching'], self.api.block_children[parent]):
+            index = order.index(source)
+            order[index:index + 1] = ids
+        for page, identifier in layout.pop('matrix_reference_ids').items():
+            layout['page_order'][page].remove(identifier)
+            self.api.block_children[layout['pages'][page]].remove(identifier)
+        layout['version'] = 4
+        journal.save()
+
 
 class HomeTests(NotebookFixture, unittest.TestCase):
     def test_teaching_matrix_precedes_compact_management_tables(self):
@@ -68,11 +86,15 @@ class HomeTests(NotebookFixture, unittest.TestCase):
         self.assertNotIn('layout:top', state['objects'])
         self.assertEqual(self.obj('layout:matrix')['id'], layout['matrix_id'])
         order = layout['page_order']['teaching']
-        self.assertLess(order.index(layout['caption_id']), order.index(layout['matrix_id']))
-        self.assertLess(order.index(layout['matrix_id']), order.index(layout['anchors']['teaching:timetable']))
+        shared = children(self.api, layout['matrix_sync_id'])
+        self.assertEqual([layout['caption_id'], layout['matrix_id']], [row['id'] for row in shared[:2]])
+        self.assertLess(order.index(layout['matrix_sync_id']), order.index(layout['anchors']['teaching:timetable']))
         self.assertLess(order.index(layout['anchors']['teaching:timetable']),
                         order.index(self.obj('teaching:teacher_week')['parent']['database_id']))
         self.assertNotIn(layout['matrix_id'], layout['page_order']['home'])
+        home_order = layout['page_order']['home']
+        reference = layout['matrix_reference_ids']['home']
+        self.assertLess(home_order.index(reference), home_order.index(layout['anchors']['home:today']))
         props = self.api.request('GET', '/data_sources/' + state['databases']['timetable']['data_source_id'])['properties']
         names = ['이름', '수업일', '교시', '학급', '교과', '교실', '상태']
         expected = [props[name]['id'] for name in names]
@@ -306,13 +328,56 @@ class HomeTests(NotebookFixture, unittest.TestCase):
 
 class WeeklyMatrixTests(NotebookFixture, unittest.TestCase):
     def test_teaching_matrix_has_full_width_and_weekday_period_axes(self):
-        table = self.api.objects['/blocks/' + self.state()['dashboard']['matrix_id']]
-        self.assertEqual(self.state()['dashboard']['pages']['teaching'], table['parent']['page_id'])
+        layout = self.state()['dashboard']
+        table = self.api.objects['/blocks/' + layout['matrix_id']]
+        shared = self.api.objects['/blocks/' + layout['matrix_sync_id']]
+        self.assertEqual(layout['pages']['teaching'], shared['parent']['page_id'])
+        self.assertEqual(shared['id'], table['parent']['block_id'])
         self.assertEqual(7, table['table']['table_width'])
         self.assertEqual(['교시', '수업시간', '월', '화', '수', '목', '금'], self.matrix_text()[0])
         self.assertEqual([f'{i}교시' for i in range(1, 8)] + ['공동'], [row[0] for row in self.matrix_text()[1:]])
 
+    def test_home_reference_shares_one_matrix_and_week_during_refresh(self):
+        layout = self.state()['dashboard']
+        reference = layout['matrix_reference_ids']['home']
+        self.assertEqual(layout['pages']['home'], self.api.objects['/blocks/' + reference]['parent']['page_id'])
+        self.assertEqual(layout['matrix_sync_id'], self.api.objects['/blocks/' + reference]['synced_block']['synced_from']['block_id'])
+        self.assertEqual([layout['matrix_id']], [row['id'] for row in children(self.api, reference) if row['type'] == 'table'])
+        self.synced()
+        refresh_dashboard(self.api, self.path, self.rows)
+        home_blocks = children(self.api, reference)
+        self.assertEqual(layout['caption_id'], home_blocks[0]['id'])
+        self.assertIn('2026-09-28 ~ 2026-10-02', plain(home_blocks[0]['paragraph']['rich_text']))
+        home_rows = children(self.api, home_blocks[1]['id'])
+        self.assertIn('영어', plain(home_rows[1]['table_row']['cells'][2]))
+        refresh_dashboard(self.api, self.path, [], '2026-10-05')
+        self.assertIn('2026-10-05 ~ 2026-10-09', plain(children(self.api, reference)[0]['paragraph']['rich_text']))
+        self.assertEqual('', self.matrix_text()[1][2])
+        self.assertEqual(layout['matrix_id'], children(self.api, reference)[1]['id'])
+        self.assertEqual([], self.api.pages(self.state()['databases']['agenda']['data_source_id']))
+
+    def test_broken_shared_reference_stops_refresh_before_writes(self):
+        layout = self.state()['dashboard']
+        reference = self.api.objects['/blocks/' + layout['matrix_reference_ids']['home']]
+        reference['synced_block']['synced_from'] = None
+        self.api.calls.clear()
+        with self.assertRaisesRegex(ValueError, '같은 공유 원본'):
+            refresh_dashboard(self.api, self.path, self.rows)
+        self.assertTrue(any('같은 공유 원본' in issue for issue in verify_dashboard(self.api, self.state())))
+        self.assertEqual([], [call for call in self.api.calls if call[0] in ('POST', 'PATCH')])
+
+    def test_legacy_full_width_grid_refreshes_without_relocation(self):
+        self.legacy_unshared_layout()
+        before = self.state()['dashboard']['page_order']
+        self.synced()
+        refresh_dashboard(self.api, self.path, self.rows)
+        self.assertEqual(before, self.state()['dashboard']['page_order'])
+        self.assertNotIn('matrix_sync_id', self.state()['dashboard'])
+        self.assertIn('영어', self.matrix_text()[1][2])
+        self.assertEqual([], verify_dashboard(self.api, self.state()))
+
     def test_legacy_column_grid_keeps_refresh_and_width_verification(self):
+        self.legacy_unshared_layout()
         journal = Journal(self.path, self.api)
         layout = journal.data['dashboard']
         parent = layout['pages']['teaching']

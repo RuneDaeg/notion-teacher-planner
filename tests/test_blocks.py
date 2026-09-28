@@ -168,6 +168,31 @@ class BlockTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, '하위 블록 수'):
             recover_block(self.api, pending, changed)
 
+    def test_recovery_of_synced_reference_checks_target_not_mirrored_children(self):
+        original = self.blocks.append('original', self.api.parent, {
+            'object': 'block', 'type': 'synced_block', 'synced_block': {
+                'synced_from': None, 'children': [block('paragraph', '공유 시간표')]}})
+        expected = {'object': 'block', 'type': 'synced_block', 'synced_block': {
+            'synced_from': {'type': 'block_id', 'block_id': original['id']}}}
+        request = self.api.request
+
+        def lose_response(method, path, payload=None):
+            result = request(method, path, payload)
+            if method == 'PATCH':
+                raise NotionError('lost response')
+            return result
+
+        with patch.object(self.api, 'request', side_effect=lose_response):
+            with self.assertRaises(NotionError):
+                self.blocks.append('reference', self.api.parent, expected)
+        reference = children(self.api, self.api.parent)[-1]
+        self.assertTrue(reference['has_children'])
+        self.assertEqual(1, len(children(self.api, reference['id'])))
+        recover_block(self.api, self.state()['pending'], reference)
+        reference['synced_block']['synced_from']['block_id'] = str(uuid4())
+        with self.assertRaises(ValueError):
+            recover_block(self.api, self.state()['pending'], reference)
+
 
 if __name__ == '__main__':
     unittest.main()

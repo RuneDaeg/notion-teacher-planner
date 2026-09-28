@@ -1,7 +1,7 @@
 {
   "id": "teacher-notebook",
   "name": "교무수첩 데스크",
-  "version": 4,
+  "version": 5,
   "shared_view_groups": [
     [
       "weekly",
@@ -131,7 +131,7 @@
         "key": "home",
         "title": "대시보드 & 오늘 허브",
         "icon": "📒",
-        "description": "오늘의 수업, 학생 기록, 마감 업무를 한눈에 확인합니다.",
+        "description": "주간 수업 시간표, 학생 기록, 마감 업무를 한눈에 확인합니다.",
         "sections": [
           {
             "key": "briefing",
@@ -148,8 +148,15 @@
             "views": []
           },
           {
+            "key": "matrix",
+            "title": "오늘의 수업 · 주간 시간표",
+            "kind": "matrix_reference",
+            "color": "blue_background",
+            "views": []
+          },
+          {
             "key": "today",
-            "title": "오늘의 수업",
+            "title": "오늘·변경 수업 · 관리용",
             "kind": "views",
             "color": "blue_background",
             "views": [

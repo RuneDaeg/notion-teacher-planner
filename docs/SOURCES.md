@@ -6,6 +6,7 @@
 - [Notion 뷰 생성](https://developers.notion.com/reference/create-view): 기존 DB의 뷰 또는 페이지의 linked database view 생성.
 - [Notion 뷰 구성](https://developers.notion.com/guides/data-apis/working-with-views): 캘린더 `date_property_id`, `view_range`의 week/month, 그룹 설정, 연결 뷰의 부모 구조.
 - [Notion 블록](https://developers.notion.com/reference/block): 제목·구분선·표·열 구성. `column.width_ratio`의 합은 1이며 열 묶음을 생성할 때는 최소 두 열과 각 열의 자식 블록이 필요함. 네 페이지는 원본 이미지를 임베드하지 않고 이 블록들로 구성.
+- [Notion 동기화 블록](https://developers.notion.com/reference/block#synced-block): `synced_from: null`인 원본을 먼저 만들고 다른 페이지의 참조가 원본 블록 ID를 사용함. 홈과 교과 페이지가 하나의 주간 시간표를 공유하는 근거. 동기화 블록 객체 자체의 콘텐츠 수정은 지원하지 않는다고 명시되어 있어 Python 경로는 저장된 안내 문단·표 행의 개별 블록 ID를 갱신하며, 실제 반영 후 두 화면을 확인해야 함.
 - [Notion 수식 문법과 함수](https://www.notion.com/help/formula-syntax): `today`, `dateStart`, `formatDate`, `parseDate`, `dateBetween`, `empty`와 조건 함수의 문법. 오늘 보기·달력 날짜 기준 D-Day 수식에 사용하며, 실제 워크스페이스에서의 수식 실행 검증과 문법 확인은 구분한다.
 - [Notion 내부 연결](https://developers.notion.com/guides/get-started/create-a-notion-integration): 토큰과 페이지 접근 설정.
 - [NEIS 급식식단정보 API](https://open.neis.go.kr/portal/data/service/selectServicePage.do?infId=OPEN17320190722180924242823&infSeq=2): 일자별 메뉴·원산지·칼로리·영양정보, 메뉴에 붙은 알레르기 번호를 제공하며 적재 주기는 매일로 안내됨. 인증키 없는 5건 샘플과 실제 학교 조회를 구분함. 홈 표시의 기준 날짜·확인 시각은 실제 조회 결과를 사용함.

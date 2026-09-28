@@ -98,7 +98,7 @@ def verify_dashboard(client, state):
 def refresh_dashboard(client, state_path, imported_rows, week_start=None):
     """Refresh only the owned matrix, reading all saved lessons in its week.
 
-    The teaching page shows a weekly grid; home reads today's source records.
+    Home and teaching share one weekly grid and one displayed date range.
     Earlier notebooks without an owned grid need no separate block refresh.
     This reads after synchronization, so a missing input slot never clears a
     previously imported lesson that the sync engine intentionally preserved.
@@ -108,6 +108,11 @@ def refresh_dashboard(client, state_path, imported_rows, week_start=None):
     layout = j.data.get('dashboard')
     if not layout or not layout.get('matrix_id'):
         return 0
+    if layout.get('matrix_sync_id'):
+        from .workspace import verify_matrix_sharing
+        issues = verify_matrix_sharing(client, layout)
+        if issues:
+            raise ValueError(' '.join(issues))
     week = _week_for(imported_rows, week_start)
     if week is None:
         return 0

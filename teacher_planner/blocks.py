@@ -100,6 +100,10 @@ def _verify_tree(client, expected, actual, parent):
             or not actual.get('id') or actual.get('type') != kind
             or not _matches_value(expected, actual)):
         raise ValueError('복구 블록의 부모·유형·내용이 생성 요청과 일치하지 않습니다.')
+    if kind == 'synced_block' and expected['synced_block'].get('synced_from'):
+        # A reference can report the original's children. The authored payload
+        # owns only the link, whose target was checked above, not another copy.
+        return
     expected_children = expected.get(kind, {}).get('children', [])
     if expected_children or actual.get('has_children'):
         actual_children = list(children(client, actual['id']))

@@ -62,8 +62,12 @@ def install_workspace(j, c, root, databases, actual_props):
         links[name] = links['agenda'] + '?v=' + j.data['objects']['view:' + view]['id'].replace('-', '')
     settings = dashboard_config(c)
     ordered, groups, anchors = {}, [], {}
-    matrix = caption = None
-    for page in spec['workspace']['pages']:
+    matrix = caption = matrix_sync = None
+    matrix_references = {}
+    # Create the teaching source before home refers to it. Display order within
+    # each page still comes exclusively from the public layout manifest.
+    page_specs = sorted(spec['workspace']['pages'], key=lambda p: p['key'] != 'teaching')
+    for page in page_specs:
         key, parent = page['key'], pages[page['key']]
         ordered[key] = []
         previous = None
@@ -133,12 +137,21 @@ def install_workspace(j, c, root, databases, actual_props):
                     append('layout:' + instance + ':' + name,
                            paragraph(title + ('' if url else ' · 내 링크 설정'), url or None))
             elif kind == 'matrix':
-                caption = append('layout:matrix-caption', matrix_title(None))
-                matrix = append('layout:matrix', matrix_table(c))
-                append('layout:' + instance + ':sync', callout(
-                    '시간표 파일·컴시간 동기화 후 해당 주 수업을 표시합니다. 확인되지 않은 교시 시각은 비워 둡니다. 수정·변경·휴강 기록은 아래 관리용 표에서 확인하세요.', '🔄', 'blue_background'))
+                matrix_sync = append('layout:matrix-sync', {'object': 'block', 'type': 'synced_block',
+                    'synced_block': {'synced_from': None}})
+                caption = writer.append('layout:matrix-caption', matrix_sync['id'], matrix_title(None))
+                matrix = writer.append('layout:matrix', matrix_sync['id'], matrix_table(c))
+                writer.append('layout:' + instance + ':sync', matrix_sync['id'], callout(
+                    '홈과 교과 페이지가 같은 주간 표를 공유합니다. 시간표 파일·컴시간 동기화 후 함께 갱신됩니다. 확인되지 않은 교시 시각은 비워 둡니다. 수정·변경·휴강 기록은 아래 관리용 표에서 확인하세요.', '🔄', 'blue_background'))
                 append('layout:quick-links', {'object': 'block', 'type': 'toggle', 'toggle': {
                     'rich_text': rich('빠른 동작 / 즐겨찾기'), 'children': quick_links(c, links)}})
+            elif kind == 'matrix_reference':
+                if matrix_sync is None:
+                    raise ValueError('공유할 교과 주간 시간표 원본이 먼저 필요합니다.')
+                reference = append('layout:' + instance + ':reference', {
+                    'object': 'block', 'type': 'synced_block', 'synced_block': {
+                        'synced_from': {'type': 'block_id', 'block_id': matrix_sync['id']}}})
+                matrix_references[key] = reference['id']
             elif kind == 'para':
                 append('layout:' + instance + ':cards', cards([
                     callout(title, icon, color, links[name]) for name, title, icon, color in (
@@ -160,7 +173,35 @@ def install_workspace(j, c, root, databases, actual_props):
     if matrix:
         rows = previous.get('matrix_row_ids') or [r['id'] for r in children(j.client, matrix['id'])]
         j.data['dashboard'].update(matrix_id=matrix['id'], caption_id=caption['id'], matrix_row_ids=rows)
+    if matrix_sync:
+        j.data['dashboard'].update(matrix_sync_id=matrix_sync['id'], matrix_reference_ids=matrix_references)
     j.save()
+
+
+def verify_matrix_sharing(client, layout):
+    """Check the shared wrapper without treating mirrored children as new blocks."""
+    source_id = layout.get('matrix_sync_id')
+    if not source_id:
+        return []
+    issues = []
+    source = client.request('GET', '/blocks/' + source_id)
+    if (source.get('type') != 'synced_block'
+            or source.get('synced_block', {}).get('synced_from') is not None
+            or source.get('parent', {}).get('page_id') != layout['pages']['teaching']
+            or source.get('in_trash') or source.get('archived')):
+        issues.append('주간 시간표: 교과 페이지의 공유 원본을 확인하세요.')
+    expected = [layout['caption_id'], layout['matrix_id']]
+    found = [row['id'] for row in children(client, source_id) if row['id'] in expected]
+    if found != expected:
+        issues.append('주간 시간표: 공유 원본 안의 표시 주간·표 위치를 확인하세요.')
+    for page, identifier in layout.get('matrix_reference_ids', {}).items():
+        reference = client.request('GET', '/blocks/' + identifier)
+        if (reference.get('type') != 'synced_block'
+                or (reference.get('synced_block', {}).get('synced_from') or {}).get('block_id') != source_id
+                or reference.get('parent', {}).get('page_id') != layout['pages'][page]
+                or reference.get('in_trash') or reference.get('archived')):
+            issues.append(f'{page}: 교과 시간표와 같은 공유 원본을 연결하세요.')
+    return issues
 
 
 def verify_workspace(client, state):
@@ -197,4 +238,5 @@ def verify_workspace(client, state):
         table = client.request('GET', '/blocks/' + layout['matrix_id'])
         if table.get('type') != 'table' or table.get('table', {}).get('table_width') != 7:
             issues.append('수업 시간표: 교시·수업시간·월~금 7개 열을 확인하세요.')
+        issues.extend(verify_matrix_sharing(client, layout))
     return issues
