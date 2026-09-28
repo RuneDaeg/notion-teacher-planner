@@ -181,6 +181,9 @@ class HomeTests(unittest.TestCase):
     def test_home_links_reference_created_database_and_view_ids(self):
         database_ids = {record['id'].replace('-', '') for record in self.state()['databases'].values()}
         database_ids.update(identifier.replace('-', '') for identifier in self.state()['dashboard']['pages'].values())
+        forms = self.state()['forms']
+        database_ids.add(forms['library_id'].replace('-', ''))
+        database_ids.update(entry['page_id'].replace('-', '') for entry in forms['entries'].values())
         view_ids = {record['id'].replace('-', '') for key, record in self.state()['objects'].items() if key.startswith('view:')}
         seen = []
 

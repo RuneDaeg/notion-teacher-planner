@@ -50,6 +50,8 @@ def config(path):
         raise ValueError('모듈 선택과 demo는 true/false여야 합니다.')
     from .dashboard import dashboard_config
     dashboard_config(c)
+    from .forms import selected_forms
+    selected_forms(c)
     return c
 
 

@@ -46,6 +46,8 @@ def main(argv=None):
     sync.add_argument('--interval', type=int, default=600, help='확인 간격 초, 최소 300 (기본 600)')
     from .school_calendar_cli import add_commands
     add_commands(commands)
+    from .extras_cli import add_commands as add_extras
+    add_extras(commands)
     verify = commands.add_parser('verify', help='설치된 원격 속성·관계·캘린더·홈 배치 확인')
     verify.add_argument('--state', default='.local/state.json')
     rec = commands.add_parser('recover', help='불확실한 생성 요청의 기존 Notion 객체 연결')
@@ -53,7 +55,10 @@ def main(argv=None):
     rec.add_argument('--id', required=True, help='Notion에서 확인한 생성 객체 ID')
     args = p.parse_args(argv)
     try:
-        if args.command in ('neis-calendar', 'neis-sync'):
+        if args.command in ('setup-extras', 'neis-meals', 'meals-sync'):
+            from .extras_cli import run
+            return run(args)
+        elif args.command in ('neis-calendar', 'neis-sync'):
             from .school_calendar_cli import run
             return run(args)
         elif args.command in ('comcigan-week', 'comcigan-sync'):
@@ -67,6 +72,9 @@ def main(argv=None):
                 report.update(semester=c.get('semester', 1), workspace_page_count=4,
                               workspace_view_count=len(instances),
                               workspace_database_block_count=len({(v['workspace_page'], v['section']) for v in instances}))
+                from .forms import selected_forms
+                report['forms'] = [f['title'] for f in selected_forms(c)]
+                report['meal_display'] = '홈 급식 칸; NEIS 연결 후 날짜별 조회 결과 표시'
                 if getattr(args, 'full', False):
                     report['views'] = vs
                     report['workspace_views'] = instances
@@ -293,4 +301,5 @@ def verify_remote(client, state):
                     if conf.get('view_range') != v['range'] or conf.get('date_property_id') != props[v['date']]['id']:
                         issues.append(f"{key}: 캘린더 날짜/주간·월간 범위 불일치")
     from .home import verify_dashboard
-    return issues + verify_dashboard(client, state)
+    from .extras import verify_extras
+    return issues + verify_dashboard(client, state) + verify_extras(client, state)

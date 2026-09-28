@@ -83,7 +83,7 @@ def run(args):
             source = {'office_code': snapshot['office_code'], 'school_code': snapshot['school_code'],
                       'academic_year': snapshot['academic_year']}
             binding = fingerprint(source)
-            if j.data.get('neis_source') and j.data['neis_source'] != binding:
+            if any(j.data.get(field) and j.data[field] != binding for field in ('neis_source', 'neis_meals_source')):
                 raise ValueError('기존 학사일정 연결과 학교·교육청·학년도가 다릅니다. 학교와 설치 상태를 확인하세요.')
             ops = changes(client, c, j.data, snapshot)
             if ops and not j.data.get('neis_source'):

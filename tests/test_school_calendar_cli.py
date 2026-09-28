@@ -10,7 +10,7 @@ from unittest.mock import patch
 
 from teacher_planner.cli import main
 from teacher_planner.client import NotionError
-from teacher_planner.install import install
+from teacher_planner.install import fingerprint, install
 from teacher_planner.model import config
 from teacher_planner.neis import event_id
 
@@ -114,6 +114,15 @@ class SchoolCalendarCliTests(unittest.TestCase):
         before = self.path.read_bytes()
         self.snapshot['office_code'] = 'C10'
         self.api.calls.clear()
+        self.assertEqual(1, self.apply())
+        self.assertEqual(before, self.path.read_bytes())
+        self.assertEqual([], [call for call in self.api.calls if call[0] in ('POST', 'PATCH')])
+
+    def test_other_school_meal_binding_is_rejected_before_calendar_writes(self):
+        state = self.state()
+        state['neis_meals_source'] = fingerprint({'office_code': 'B10', 'school_code': '7654321', 'academic_year': 2026})
+        self.path.write_text(json.dumps(state))
+        before = self.path.read_bytes()
         self.assertEqual(1, self.apply())
         self.assertEqual(before, self.path.read_bytes())
         self.assertEqual([], [call for call in self.api.calls if call[0] in ('POST', 'PATCH')])

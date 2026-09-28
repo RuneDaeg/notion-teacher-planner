@@ -21,6 +21,8 @@ AI가 GitHub를 읽을 수 없다면 저장소를 ZIP으로 내려받아 첨부�
 
 | 구성 | 사용 방법 |
 | --- | --- |
+| 오늘 급식 | NEIS 식단을 홈에 표시, 날짜·확인 시각·알레르기 번호 보존 |
+| 기록 양식 | 상담·학부모 연락·회의·수업·평가·조회/종례의 복사용 빈 페이지 |
 | 학생 명단 | 학급·번호·학생 ID로 명단 관리 |
 | 상담 기록 | 학생 연결, 관찰 사실, 합의 사항, 후속 확인 |
 | To Do List | P1~P4, 업무 분류, 상태, 다음 행동, 마감 |
@@ -42,6 +44,7 @@ AI가 GitHub를 읽을 수 없다면 저장소를 ZIP으로 내려받아 첨부�
  ├─ 학급 경영 & 학생 상담     명렬표·학생 카드·관찰·출결·상담·연락·제출
  ├─ 교과 진도표 & 시간표      주간 격자·변경 수업·반/교과/학기 진도·평가
  ├─ 학사 캘린더 & PARA        주간/월간/마감 탭·프로젝트·영역·자료·보관
+ ├─ 양식 모음                선택한 기록 양식
  ├─ 운영 자료                업무 원본 DB
  └─ 학생 기록                학생 기록 원본 DB
 ```
@@ -142,6 +145,23 @@ python -m teacher_planner neis-sync --office-code 시도교육청코드 --school
 
 같은 학교·과정·날짜·행사의 중복을 막고 설명 변경을 갱신합니다. 날짜나 행사명이 바뀌면 새 일정이 생기며 이전 일정은 남습니다. 누락된 행사를 자동 삭제·취소하지 않습니다. `--watch --interval 21600 --apply`로 실행 중인 프로세스에서 6시간마다 조회할 수 있습니다. [인증키·기간·반영 규칙](docs/SCHOOL_CALENDAR.md)을 확인하세요.
 
+## 오늘 급식과 기록 양식
+
+홈의 급식 영역에 NEIS 공개 식단을 표시할 수 있습니다. 학사일정과 같은 `NEIS_API_KEY`, 시도교육청 코드·표준학교코드를 사용하며 업무·일정이나 시간표에 행을 만들지 않습니다.
+
+```bash
+# 기존 수첩에 급식 영역과 선택한 양식 모음 추가
+python -m teacher_planner setup-extras --config .local/config.json --state .local/state.json
+python -m teacher_planner setup-extras --config .local/config.json --state .local/state.json --apply
+
+# 오늘 식단 조회 후 홈에 반영
+python -m teacher_planner meals-sync --office-code 시도교육청코드 --school-code 표준학교코드 --config .local/config.json --apply
+```
+
+새 설치에는 급식 안내 영역과 현재 설정에 맞는 양식이 포함됩니다. `setup-extras`는 기존 수첩의 페이지·DB·기록을 다시 만들지 않습니다. 급식 조회는 별도로 실행하며 `--watch --interval 21600 --apply`로 실행 중 6시간마다 갱신하고 날짜가 바뀌면 새 날짜를 조회합니다. 프로세스가 멈추면 마지막 날짜의 표시가 남습니다. [급식 설정](docs/MEALS.md)을 확인하세요.
+
+`양식 모음`은 상담·학부모 연락·회의록·수업·평가·조회/종례의 **복사용 빈 페이지 양식**입니다. DB의 새로 만들기 템플릿으로 자동 등록되지는 않습니다. `forms`로 선택하고 양식 본문을 새 기록에 복사합니다. [설정과 사용법](docs/FORMS.md)을 참고하세요.
+
 ## AI와 개발자를 위한 안내
 
 - [START_HERE.md](START_HERE.md): AI가 읽을 첫 문서
@@ -151,6 +171,8 @@ python -m teacher_planner neis-sync --office-code 시도교육청코드 --school
 - [DEFAULT_TEMPLATE.md](docs/DEFAULT_TEMPLATE.md): 네 페이지 배치·보기 탭·시간표 격자
 - [DATA_MODEL.md](docs/DATA_MODEL.md): 관계와 데이터 입력 규칙
 - [SCHOOL_CALENDAR.md](docs/SCHOOL_CALENDAR.md): NEIS 공개 학사일정 조회·중복 처리·주기 반영
+- [MEALS.md](docs/MEALS.md): 홈 급식 조회·날짜 갱신·기존 수첩 추가
+- [FORMS.md](docs/FORMS.md): 여섯 기록 양식 선택·복사·재사용
 - [PARA.md](docs/PARA.md): 첨부 PARA를 교사 업무로 재설계한 근거
 - [DAILY_USE.md](docs/DAILY_USE.md): 매일·매주 사용 및 AI 요청 예시
 - [ACCEPTANCE.md](docs/ACCEPTANCE.md): 설치 확인 기준
@@ -161,7 +183,7 @@ python -m teacher_planner neis-sync --office-code 시도교육청코드 --school
 
 ## 검증 상태
 
-오프라인 테스트는 API 요청 구성, 설치 재실행, 관계 연결, 주간·월간 뷰, 실패 후 중복 방지, 시간표 변경·휴강, 컴시간·NEIS 응답 해석, 날짜·전체 페이지 검증을 검증합니다. **이 저장소 제작 과정에서는 사용자 요청에 따라 실제 Notion에 생성하지 않았으며, 실제 학교의 시간표·학사일정을 조회해 검증하지 않았습니다.** 실제 연결에서는 설치 후 `verify`와 [화면 확인 기준](docs/ACCEPTANCE.md)을 수행하세요.
+오프라인 테스트는 API 요청 구성, 설치 재실행, 관계 연결, 주간·월간 뷰, 실패 후 중복 방지, 시간표 변경·휴강, 컴시간·NEIS 응답 해석, 날짜·전체 페이지 검증, 급식 표시와 양식 재사용을 검증합니다. **이 저장소 제작 과정에서는 사용자 요청에 따라 실제 Notion에 생성하지 않았으며, 실제 학교의 시간표·학사일정·급식을 조회해 검증하지 않았습니다.** 실제 연결에서는 설치 후 `verify`와 [화면 확인 기준](docs/ACCEPTANCE.md)을 수행하세요.
 
 ```bash
 python -m unittest discover -s tests -v

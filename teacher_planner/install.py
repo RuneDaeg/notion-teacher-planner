@@ -149,6 +149,8 @@ def install(client, c, parent, state_path):
         j.create('view:' + v['key'], '/views', view_payload(v, databases[v['source']], actual_props[v['source']], c['academic_year']))
     from .home import install_dashboard
     install_dashboard(j, c, root['id'], databases, actual_props)
+    from .extras import install_extras
+    install_extras(j, c, root['id'], databases)
     seeds(j, c, definitions, databases)
     j.data['complete'] = True
     j.save()
