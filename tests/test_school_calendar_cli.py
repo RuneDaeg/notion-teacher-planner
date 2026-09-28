@@ -109,6 +109,33 @@ class SchoolCalendarCliTests(unittest.TestCase):
         self.assertEqual(0, self.apply())
         self.assertEqual([], [call for call in self.api.calls if call[0] in ('POST', 'PATCH')])
 
+    def test_preview_counts_periods_separately_from_preserved_daily_rows(self):
+        second = copy.deepcopy(self.row)
+        second['date'] = '2026-09-29'
+        second['external_id'] = event_id('B10', '1234567', second['date'], second['title'], '주간', '중학교')
+        self.snapshot['rows'].append(second)
+        before = self.path.read_bytes()
+        self.assertEqual(0, main(self.args(extra=['--merge-existing'])))
+        summary = json.loads(self.out.getvalue())
+        self.assertEqual((1, 2), (summary['event_count'], summary['daily_record_count']))
+        self.assertEqual(before, self.path.read_bytes())
+        self.assertEqual([], self.api.calls)
+
+    def test_merge_flag_reaches_preflight_and_saved_summary_uses_group_count(self):
+        second = copy.deepcopy(self.row)
+        second['date'] = '2026-09-29'
+        second['external_id'] = event_id('B10', '1234567', second['date'], second['title'], '주간', '중학교')
+        self.snapshot['rows'].append(second)
+        from teacher_planner.school_calendar import changes
+        with patch('teacher_planner.school_calendar.changes', wraps=changes) as preflight:
+            self.assertEqual(0, self.apply(['--merge-existing']))
+        self.assertTrue(preflight.call_args.kwargs['merge_existing'])
+        summary = self.state()['neis_last_range']
+        self.assertEqual((1, 2), (summary['event_count'], summary['daily_record_count']))
+        agenda = self.api.pages(self.state()['databases']['agenda']['data_source_id'])
+        self.assertEqual(1, len(agenda))
+        self.assertEqual({'start': '2026-09-28', 'end': '2026-09-29'}, agenda[0]['properties']['일정']['date'])
+
     def test_other_school_binding_is_rejected_before_writes(self):
         self.assertEqual(0, self.apply())
         before = self.path.read_bytes()

@@ -11,7 +11,8 @@ from teacher_planner.client import NotionError
 from teacher_planner.install import Journal, compact
 from teacher_planner.model import blueprint, config, rich, schema
 from teacher_planner.neis import event_id
-from teacher_planner.school_calendar import SOURCE_URL, apply_changes, changes, info_key, page_key
+from teacher_planner.school_calendar import (SOURCE_URL, apply_changes, changes,
+                                            group_events, grouped_schedule, info_key, page_key)
 from teacher_planner.timetable import text_property
 from test_planner import FakeNotion
 
@@ -68,8 +69,8 @@ class SchoolCalendarTests(unittest.TestCase):
     def state(self):
         return json.loads(self.path.read_text())
 
-    def sync(self):
-        return apply_changes(self.api, self.path, changes(self.api, self.c, self.state(), self.snapshot))
+    def sync(self, **options):
+        return apply_changes(self.api, self.path, changes(self.api, self.c, self.state(), self.snapshot, **options))
 
     def writes(self):
         return [call for call in self.api.calls if call[0] in ('POST', 'PATCH')]
@@ -363,6 +364,192 @@ class SchoolCalendarTests(unittest.TestCase):
         self.sync()
         for old in originals:
             self.assertEqual(old, self.api.objects['/pages/' + old['id']])
+
+    def legacy_import(self):
+        rows = self.snapshot['rows']
+        for row in rows:
+            self.snapshot['rows'] = [row]
+            self.sync()
+        self.snapshot['rows'] = rows
+        state = self.state()
+        state.pop('neis_groups', None)
+        self.path.write_text(json.dumps(state))
+        self.api.calls.clear()
+
+    def test_consecutive_days_use_one_inclusive_period_and_preserve_daily_details(self):
+        second = self.add_row('2026-09-29')
+        second.update(description='둘째 날만 진행하는 평가', grades=[3], day_type='휴업일', updated_at='20260926000000')
+        self.add_row('2026-09-30')
+        before = copy.deepcopy(self.snapshot)
+        self.assertEqual(1, self.sync())
+        self.assertEqual(1, len(self.api.pages(self.ds)))
+        self.assertEqual({'start': '2026-09-28', 'end': '2026-09-30'}, self.page()['properties']['일정']['date'])
+        text = ''.join(item['text']['content'] for item in self.info()['callout']['rich_text'])
+        for fragment in ('2026-09-29', '둘째 날만 진행하는 평가', '3학년', '휴업일', '20260926000000'):
+            self.assertIn(fragment, text)
+        self.assertEqual(before, self.snapshot)
+        self.api.calls.clear()
+        self.assertEqual(0, self.sync())
+        self.assertEqual([], self.writes())
+
+    def test_gaps_titles_courses_and_daynight_split_periods_without_weekend_guessing(self):
+        self.snapshot['rows'] = []
+        self.add_row('2026-09-25')  # Friday and Monday do not imply a weekend event.
+        self.add_row('2026-09-28')
+        self.add_row('2026-09-29')
+        self.add_row('2026-09-30', '가상 학사행사 ')
+        for course, day_night in [('고등학교', '주간'), ('중학교', '야간')]:
+            row = self.add_row('2026-09-29')
+            row.update(course=course, day_night=day_night)
+            row['external_id'] = event_id('B10', '1234567', row['date'], row['title'], day_night, course)
+        groups = grouped_schedule(self.snapshot, self.c)
+        self.assertEqual(5, len(groups))
+        self.assertEqual([None, '2026-09-29', None, None, None], [group['end'] for group in groups])
+        self.assertEqual(6, sum(len(group['source_rows']) for group in groups))
+
+    def test_grouping_is_order_independent_and_crosses_month_and_year_boundaries(self):
+        rows = []
+        for day in ('2026-12-31', '2027-01-01', '2027-01-02'):
+            rows.append(self.add_row(day))
+        grouped = group_events(rows[::-1])
+        self.assertEqual(1, len(grouped))
+        self.assertEqual(('2026-12-31', '2027-01-02'), (grouped[0]['date'], grouped[0]['end']))
+        self.assertEqual([row['external_id'] for row in rows], grouped[0]['source_ids'])
+
+    def test_extension_at_either_end_reuses_saved_page_and_anchor(self):
+        self.add_row('2026-09-29')
+        self.sync()
+        original_id, original_external = self.page()['id'], self.snapshot['rows'][0]['external_id']
+        self.add_row('2026-09-27')
+        self.add_row('2026-09-30')
+        self.snapshot['rows'].reverse()
+        self.assertEqual(1, self.sync())
+        self.assertEqual(1, len(self.api.pages(self.ds)))
+        page = self.api.objects['/pages/' + original_id]
+        self.assertEqual(original_external, text_property(page, '외부 ID'))
+        self.assertEqual({'start': '2026-09-27', 'end': '2026-09-30'}, page['properties']['일정']['date'])
+        self.assertEqual(4, len(self.state()['neis_groups'][original_external]['source_ids']))
+        self.api.calls.clear()
+        self.assertEqual(0, self.sync())
+        self.assertEqual([], self.writes())
+
+    def test_legacy_merge_requires_flag_then_preserves_notes_relations_and_links(self):
+        self.add_row('2026-09-29')
+        self.add_row('2026-09-30')
+        self.legacy_import()
+        original_ids = [self.page(i)['id'] for i in range(3)]
+        manual = {'학급': {'type': 'relation', 'relation': [{'id': str(uuid4())}]},
+                  '다음 행동': {'type': 'rich_text', 'rich_text': rich('둘째 날 후속 메모')},
+                  '상태': {'type': 'select', 'select': {'name': '완료'}}}
+        self.page(1)['properties'].update(copy.deepcopy(manual))
+        note = self.api.add_blocks(original_ids[1], [{'object': 'block', 'type': 'paragraph',
+                                                    'paragraph': {'rich_text': rich('보존할 상세 메모')}}])[0]
+        before = self.path.read_bytes()
+        with self.assertRaisesRegex(ValueError, '--merge-existing'):
+            self.sync()
+        self.assertEqual(before, self.path.read_bytes())
+        self.assertEqual([], self.writes())
+        self.assertEqual(1, self.sync(merge_existing=True))
+        self.assertEqual(original_ids, [self.page(i)['id'] for i in range(3)])
+        self.assertEqual([False, True, True], [self.page(i)['properties']['보관']['checkbox'] for i in range(3)])
+        self.assertEqual(manual, {name: self.page(1)['properties'][name] for name in manual})
+        self.assertEqual(note, self.api.objects['/blocks/' + note['id']])
+        links = [item['text'].get('link', {}).get('url') for item in self.info()['callout']['rich_text']]
+        self.assertIn('https://www.notion.so/' + original_ids[1].replace('-', ''), links)
+        self.assertTrue(all(not self.page(i).get('in_trash') for i in range(3)))
+        self.api.calls.clear()
+        self.assertEqual(0, self.sync())  # Accepted migration does not need its flag again.
+        self.assertEqual([], self.writes())
+
+    def test_legacy_merge_rejects_partial_range_before_any_write(self):
+        self.add_row('2026-09-29')
+        self.legacy_import()
+        self.snapshot.update(start='2026-09-01', end='2026-09-30')
+        with self.assertRaisesRegex(ValueError, '전체 학년도'):
+            self.sync(merge_existing=True)
+        self.assertEqual([], self.writes())
+
+    def test_legacy_merge_prefers_active_page_over_earlier_manually_archived_page(self):
+        self.add_row('2026-09-29')
+        self.legacy_import()
+        first, second = self.page(), self.page(1)
+        first['properties']['보관']['checkbox'] = True
+        self.sync(merge_existing=True)
+        self.assertTrue(first['properties']['보관']['checkbox'])
+        self.assertFalse(second['properties']['보관']['checkbox'])
+        self.assertEqual({'start': '2026-09-28', 'end': '2026-09-29'}, second['properties']['일정']['date'])
+        self.assertEqual([self.snapshot['rows'][1]['external_id']], list(self.state()['neis_groups']))
+        self.api.calls.clear()
+        self.assertEqual(0, self.sync())
+        self.assertEqual([], self.writes())
+
+    def test_partial_range_cannot_shrink_or_duplicate_adjacent_saved_period(self):
+        self.add_row('2026-09-29')
+        self.sync()
+        original = copy.deepcopy(self.snapshot)
+        for start, end, days in [('2026-09-29', '2026-09-30', ['2026-09-29']),
+                                 ('2026-09-27', '2026-09-27', ['2026-09-27'])]:
+            self.snapshot = copy.deepcopy(original)
+            self.snapshot.update(start=start, end=end, rows=[])
+            for day in days:
+                self.add_row(day)
+            self.api.calls.clear()
+            with self.subTest(start=start), self.assertRaisesRegex(ValueError, '부분 조회'):
+                self.sync()
+            self.assertEqual([], self.writes())
+
+    def test_source_split_and_shrink_fail_before_changes_to_other_events(self):
+        self.add_row('2026-09-29')
+        self.add_row('2026-09-30')
+        self.sync()
+        original = copy.deepcopy(self.snapshot)
+        for removed in ('2026-09-28', '2026-09-29', '2026-09-30'):
+            self.snapshot = copy.deepcopy(original)
+            self.snapshot['rows'] = [row for row in self.snapshot['rows'] if row['date'] != removed]
+            self.add_row('2026-09-01', '먼저 정렬되는 신규 행사')
+            self.api.calls.clear()
+            with self.subTest(removed=removed), self.assertRaisesRegex(ValueError, '축소·분리'):
+                self.sync()
+            self.assertEqual([], self.writes())
+
+    def test_source_bridge_of_two_saved_periods_requires_manual_resolution(self):
+        self.add_row('2026-09-30')
+        self.sync()
+        self.add_row('2026-09-29')
+        self.api.calls.clear()
+        with self.assertRaisesRegex(ValueError, '두 개가 하나로'):
+            self.sync(merge_existing=True)
+        self.assertEqual([], self.writes())
+
+    def test_lost_archive_response_is_reconciled_without_duplicate_or_repeat_write(self):
+        self.add_row('2026-09-29')
+        self.legacy_import()
+        archive_path = '/pages/' + self.page(1)['id']
+        original = self.api.request
+
+        def lose_response(method, path, payload=None):
+            result = original(method, path, payload)
+            if method == 'PATCH' and path == archive_path:
+                raise NotionError('unknown archive response', 503)
+            return result
+
+        with patch.object(self.api, 'request', side_effect=lose_response), self.assertRaises(NotionError):
+            self.sync(merge_existing=True)
+        self.assertFalse(self.state().get('pending'))
+        self.api.calls.clear()
+        self.assertEqual(0, self.sync())
+        self.assertEqual([], self.writes())
+        self.assertEqual(2, len(self.api.pages(self.ds)))
+
+    def test_missing_previously_archived_page_does_not_recreate_or_drop_its_link(self):
+        self.add_row('2026-09-29')
+        self.legacy_import()
+        self.sync(merge_existing=True)
+        del self.api.objects['/pages/' + self.page(1)['id']]
+        self.api.calls.clear()
+        with self.assertRaisesRegex(ValueError, '보관 페이지'):
+            self.sync()
+        self.assertEqual([], self.writes())
 
 
 if __name__ == '__main__':

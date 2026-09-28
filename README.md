@@ -143,7 +143,7 @@ python -m teacher_planner neis-sync --office-code 시도교육청코드 --school
 python -m teacher_planner neis-sync --office-code 시도교육청코드 --school-code 표준학교코드 --config .local/config.json --apply
 ```
 
-같은 학교·과정·날짜·행사의 중복을 막고 설명 변경을 갱신합니다. 날짜나 행사명이 바뀌면 새 일정이 생기며 이전 일정은 남습니다. 누락된 행사를 자동 삭제·취소하지 않습니다. `--watch --interval 21600 --apply`로 실행 중인 프로세스에서 6시간마다 조회할 수 있습니다. [인증키·기간·반영 규칙](docs/SCHOOL_CALENDAR.md)을 확인하세요.
+같은 학교·학년도·과정에서 같은 이름의 행사가 달력상 연속되면 **첫날~마지막 날의 행사 페이지 하나**로 묶습니다. 날짜별 설명·대상 학년은 보존하며, 중간 날짜가 비면 별도 행사로 둡니다. 기존 날짜별 페이지를 묶는 Python 작업은 `--merge-existing`을 추가하고 원래 페이지는 삭제 없이 보관합니다. 같은 기간을 다시 조회하면 대표 페이지를 재사용합니다. 누락된 행사를 자동 삭제·취소하지 않습니다. `--watch --interval 21600 --apply`로 실행 중인 프로세스에서 6시간마다 조회할 수 있습니다. [인증키·기간·병합 규칙](docs/SCHOOL_CALENDAR.md)을 확인하세요.
 
 ## 오늘 급식과 기록 양식
 

@@ -24,6 +24,7 @@ def add_commands(commands):
     sync.add_argument('--config', default='.local/config.json')
     sync.add_argument('--state', default='.local/state.json')
     sync.add_argument('--apply', action='store_true')
+    sync.add_argument('--merge-existing', action='store_true', help='기존 일별 행사 페이지를 기간으로 통합하고 중복 페이지는 보관; 전체 학년도 조회 필요')
     sync.add_argument('--watch', action='store_true', help='터미널 프로세스에서 반복 갱신; --apply 필요')
     sync.add_argument('--interval', type=int, default=21600, help='반복 간격 초; 최소 3600, 기본 21600 (6시간)')
 
@@ -42,7 +43,7 @@ def _state(j, c):
 def run(args):
     from .cli import private_json
     from .neis import fetch_schedule
-    from .school_calendar import changes, apply_changes
+    from .school_calendar import changes, apply_changes, group_events
 
     if not args.office_code or not args.school_code:
         raise ValueError('나이스 교육청 코드와 표준학교 코드를 입력하세요. 컴시간 학교 코드와 다릅니다.')
@@ -65,14 +66,15 @@ def run(args):
     while True:
         snapshot = fetch_schedule(args.office_code, args.school_code, year,
                                   api_key=api_key, start=args.start, end=args.end)
+        event_count = len(group_events(snapshot['rows']))
         summary = {'academic_year': year, 'start': snapshot['start'], 'end': snapshot['end'],
-                   'event_count': len(snapshot['rows']), 'applied': False}
+                   'event_count': event_count, 'daily_record_count': len(snapshot['rows']), 'applied': False}
         if args.command == 'neis-calendar':
             private_json(args.output, snapshot)
             print(json.dumps({**summary, 'output': args.output}, ensure_ascii=False, indent=2))
             return 0
         if not args.apply:
-            print(json.dumps({**summary, 'behavior': '조회만 완료했습니다. --apply로 기존 업무·일정 DB에 반영합니다. 원본에서 빠지거나 이름·날짜가 바뀐 기존 일정은 자동 삭제하지 않습니다.'}, ensure_ascii=False, indent=2))
+            print(json.dumps({**summary, 'behavior': '조회만 완료했습니다. 같은 행사명·학교 과정·주야 과정의 연속된 날짜를 한 기간으로 표시합니다. --apply로 반영하며 기존 일별 페이지 통합에는 --merge-existing이 필요합니다. 누락·이름 변경은 자동 삭제하지 않으며 기존 기간의 축소·분리는 확인 후 처리합니다.'}, ensure_ascii=False, indent=2))
             return 0
         with locked(args.state):
             client = Client(os.getenv('NOTION_TOKEN'))
@@ -85,7 +87,7 @@ def run(args):
             binding = fingerprint(source)
             if any(j.data.get(field) and j.data[field] != binding for field in ('neis_source', 'neis_meals_source')):
                 raise ValueError('기존 학사일정 연결과 학교·교육청·학년도가 다릅니다. 학교와 설치 상태를 확인하세요.')
-            ops = changes(client, c, j.data, snapshot)
+            ops = changes(client, c, j.data, snapshot, merge_existing=args.merge_existing)
             if ops and not j.data.get('neis_source'):
                 j.data['neis_source'] = binding
                 j.save()
@@ -94,9 +96,9 @@ def run(args):
             latest = Journal(args.state, client)
             latest.data['neis_last_checked_at'] = datetime.now(ZoneInfo('Asia/Seoul')).isoformat()
             latest.data['neis_last_range'] = {'start': snapshot['start'], 'end': snapshot['end'],
-                                             'event_count': len(snapshot['rows'])}
+                                             'event_count': event_count, 'daily_record_count': len(snapshot['rows'])}
             latest.save()
-        print(f"{snapshot['start']} ~ {snapshot['end']}: 학사일정 {len(snapshot['rows'])}건 확인, {count}건 반영. 기존 주간·월간 캘린더에서 확인하세요.", flush=True)
+        print(f"{snapshot['start']} ~ {snapshot['end']}: 일별 {len(snapshot['rows'])}건 → 기간 행사 {event_count}건, {count}건 반영. 기존 주간·월간 캘린더에서 확인하세요.", flush=True)
         if not args.watch:
             return 0
         sleep(args.interval)
