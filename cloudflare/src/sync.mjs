@@ -79,8 +79,9 @@ export function createNotionClient(token, fetchFn=fetch) {
     if(calls>=LIMITS.notionRequests||Date.now()>=until) throw new SyncError('이번 실행의 요청 한도에 도달했습니다.',{retryable:true});
     calls++;
     let response;
-    try { response=await fetchFn('https://api.notion.com/v1'+path,{method,redirect:'error',signal:AbortSignal.timeout(Math.max(1,Math.min(LIMITS.requestMs,until-Date.now()))),headers:{Authorization:'Bearer '+token,'Notion-Version':'2026-03-11','Content-Type':'application/json'},...(payload===undefined?{}:{body:JSON.stringify(payload)})}); }
+    try { response=await fetchFn('https://api.notion.com/v1'+path,{method,redirect:'manual',signal:AbortSignal.timeout(Math.max(1,Math.min(LIMITS.requestMs,until-Date.now()))),headers:{Authorization:'Bearer '+token,'Notion-Version':'2026-03-11','Content-Type':'application/json'},...(payload===undefined?{}:{body:JSON.stringify(payload)})}); }
     catch { throw new SyncError('Notion 응답을 확정할 수 없습니다.',{retryable:true}); }
+    if(response.status>=300&&response.status<400) {try{await response.body?.cancel();}catch{}throw new SyncError('Notion 요청의 리디렉션을 허용하지 않습니다.');}
     if(!response.ok) throw new SyncError('Notion 요청을 완료하지 못했습니다.',{status:response.status,retryable:response.status===429||response.status>=500});
     try { return await readJson(response); } catch(error) { if(error instanceof SyncError)throw error;throw new SyncError('Notion 응답을 끝까지 읽지 못했습니다.',{retryable:true}); }
   }};
@@ -158,8 +159,9 @@ export async function fetchSchoolSnapshot(manifest, day, apiKey, fetchFn=fetch) 
   async function load(service,query,index) {
     if(Date.now()>=until)throw new SyncError('NEIS 조회 시간이 이번 실행 한도를 넘었습니다.',{retryable:true});
     let response;
-    try { response=await fetchFn('https://open.neis.go.kr/hub/'+service+'?'+new URLSearchParams({KEY:apiKey,Type:'json',pSize:'1000',ATPT_OFCDC_SC_CODE:manifest.office_code,SD_SCHUL_CODE:manifest.school_code,...query,pIndex:String(index)}),{redirect:'error',signal:AbortSignal.timeout(Math.max(1,Math.min(10000,until-Date.now()))),headers:{Accept:'*/*'}}); }
+    try { response=await fetchFn('https://open.neis.go.kr/hub/'+service+'?'+new URLSearchParams({KEY:apiKey,Type:'json',pSize:'1000',ATPT_OFCDC_SC_CODE:manifest.office_code,SD_SCHUL_CODE:manifest.school_code,...query,pIndex:String(index)}),{redirect:'manual',signal:AbortSignal.timeout(Math.max(1,Math.min(10000,until-Date.now()))),headers:{Accept:'*/*'}}); }
     catch { throw new SyncError('NEIS 조회에 실패했습니다.',{retryable:true}); }
+    if(response.status>=300&&response.status<400) {try{await response.body?.cancel();}catch{}throw new SyncError('NEIS 요청의 리디렉션을 허용하지 않습니다.');}
     if(!response.ok)throw new SyncError('NEIS 서버 조회에 실패했습니다.',{retryable:response.status===429||response.status>=500});
     try { return await readJson(response); } catch(error) { if(error instanceof SyncError)throw error;throw new SyncError('NEIS 응답을 끝까지 읽지 못했습니다.',{retryable:true}); }
   }

@@ -9,7 +9,7 @@ export class RetryableConnectionError extends ConnectionError {
 const PROVIDER_OAUTH_ERRORS = Object.freeze(['invalid_request','invalid_client','invalid_grant',
   'unauthorized_client','unsupported_grant_type','invalid_scope','access_denied','test_env_error',
   'missing_version','validation_error','restricted_resource']);
-const EXCHANGE_DIAGNOSTICS = Object.freeze([...PROVIDER_OAUTH_ERRORS,'transport','http_error',
+const EXCHANGE_DIAGNOSTICS = Object.freeze([...PROVIDER_OAUTH_ERRORS,'transport','redirect','http_error',
   'rate_limited','server_error','invalid_response','invalid_access_token','invalid_refresh_token']);
 function exchangeFailure(diagnostic, retryable = false) {
   const error = retryable ? new RetryableConnectionError() : new ConnectionError('reconnect');
@@ -87,11 +87,16 @@ export async function exchange(clientId, secret, body, fetchFn = fetch) {
   let response;
   try {
     response = await fetchFn('https://api.notion.com/v1/oauth/token', {
-      method:'POST', redirect:'error', signal:AbortSignal.timeout(15000),
+      // workerd supports manual redirects; reject 3xx below before another request.
+      method:'POST', redirect:'manual', signal:AbortSignal.timeout(15000),
       headers:{'Authorization':'Basic '+btoa(clientId+':'+secret),'Content-Type':'application/json','Notion-Version':'2026-03-11'},
       body:JSON.stringify(body)
     });
   } catch { throw exchangeFailure('transport'); }
+  if (response.status >= 300 && response.status < 400) {
+    try { await response.body?.cancel(); } catch { /* No redirect is followed. */ }
+    throw exchangeFailure('redirect');
+  }
   if (response.status === 429 || response.status >= 500) {
     try { await response.body?.cancel(); } catch { /* The definite HTTP status remains known. */ }
     throw exchangeFailure(response.status === 429 ? 'rate_limited' : 'server_error',true);

@@ -131,7 +131,7 @@ test('OAuth provider errors never expose tokens or retry an ambiguous refresh',a
   await assert.rejects(()=>exchange('client','secret',{},async()=>new Response('x'.repeat(66000))),ConnectionError);
   let options;
   await exchange('client','secret',{},async(url,opts)=>{assert.equal(url,'https://api.notion.com/v1/oauth/token');options=opts;return Response.json({access_token:'a',refresh_token:'r'});});
-  assert.equal(options.redirect,'error');
+  assert.equal(options.redirect,'manual');
   assert.equal(options.headers['Notion-Version'],'2026-03-11');
 });
 test('code exchange accepts nullable or omitted refresh tokens without weakening access or refresh-grant validation',async()=>{
@@ -153,6 +153,7 @@ test('callback token diagnostics are bounded allowlisted classifications, never 
   const privateText='private-token private-code private-owner';
   const cases=[
     ['transport',()=>{throw new Error(privateText);}],
+    ['redirect',()=>new Response(privateText,{status:302,headers:{Location:'https://private-target.example/private-code'}})],
     ['invalid_client',()=>Response.json({error:'invalid_client',error_description:privateText},{status:401})],
     ['invalid_grant',()=>Response.json({code:'invalid_grant',message:privateText},{status:400})],
     ['missing_version',()=>Response.json({code:'missing_version',message:privateText},{status:400})],
