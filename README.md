@@ -162,6 +162,14 @@ python -m teacher_planner meals-sync --office-code 시도교육청코드 --schoo
 
 `양식 모음`은 상담·학부모 연락·회의록·수업·평가·조회/종례의 **복사용 빈 페이지 양식**입니다. DB의 새로 만들기 템플릿으로 자동 등록되지는 않습니다. `forms`로 선택하고 양식 본문을 새 기록에 복사합니다. [설정과 사용법](docs/FORMS.md)을 참고하세요.
 
+## 컴퓨터를 꺼도 매일 자동 갱신하기
+
+선택형 Firebase 서비스는 **매일 오전 7시부터(한국 시간)** NEIS 급식·학사일정을 기존 Notion 수첩에 순차 반영하도록 구성되어 있습니다. 학교별 조회 결과를 함께 사용하고 교사별 Notion 변경은 작업 큐로 처리합니다. 현재는 한 작업자가 처리하는 시범 운영 규모이며, 교무수첩의 화면과 기록은 계속 Notion 안에 남습니다.
+
+설치 AI가 이미 받은 학교·학년도와 실제 페이지 ID로 연결 링크를 준비하면, 교사는 링크에서 **Notion 연결을 승인**합니다. 학교를 다시 입력하거나 NEIS 키를 발급받거나 Firebase 콘솔을 열 필요가 없습니다. AI의 MCP 권한과 클라우드의 OAuth 권한은 별개이며, 기존 수첩을 선택해 연결합니다.
+
+**현재 코드 제공 단계이며 운영 프로젝트 배포·OAuth 설정·교사 등록 전에는 예약 갱신이 켜지지 않습니다.** 운영자는 Firebase Blaze 프로젝트와 Notion 공개 연결, NEIS 키를 준비해야 합니다. Notion 무료 플랜도 서버 예약 방식을 사용할 수 있습니다. 로컬 `--watch` 실행과는 별개입니다. [교사 연결·운영자 배포 안내](docs/CLOUD_SYNC.md)를 확인하세요.
+
 ## AI와 개발자를 위한 안내
 
 - [START_HERE.md](START_HERE.md): AI가 읽을 첫 문서
@@ -172,6 +180,7 @@ python -m teacher_planner meals-sync --office-code 시도교육청코드 --schoo
 - [DATA_MODEL.md](docs/DATA_MODEL.md): 관계와 데이터 입력 규칙
 - [SCHOOL_CALENDAR.md](docs/SCHOOL_CALENDAR.md): NEIS 공개 학사일정 조회·중복 처리·주기 반영
 - [MEALS.md](docs/MEALS.md): 홈 급식 조회·날짜 갱신·기존 수첩 추가
+- [CLOUD_SYNC.md](docs/CLOUD_SYNC.md): 학교 재입력 없는 클라우드 연결·매일 갱신·운영자 Firebase 배포
 - [FORMS.md](docs/FORMS.md): 여섯 기록 양식 선택·복사·재사용
 - [PARA.md](docs/PARA.md): 첨부 PARA를 교사 업무로 재설계한 근거
 - [DAILY_USE.md](docs/DAILY_USE.md): 매일·매주 사용 및 AI 요청 예시

@@ -48,6 +48,8 @@ def main(argv=None):
     add_commands(commands)
     from .extras_cli import add_commands as add_extras
     add_extras(commands)
+    from .cloud_registration import add_commands as add_cloud
+    add_cloud(commands)
     verify = commands.add_parser('verify', help='설치된 원격 속성·관계·캘린더·홈 배치 확인')
     verify.add_argument('--state', default='.local/state.json')
     rec = commands.add_parser('recover', help='불확실한 생성 요청의 기존 Notion 객체 연결')
@@ -55,7 +57,10 @@ def main(argv=None):
     rec.add_argument('--id', required=True, help='Notion에서 확인한 생성 객체 ID')
     args = p.parse_args(argv)
     try:
-        if args.command in ('setup-extras', 'neis-meals', 'meals-sync'):
+        if args.command == 'cloud-connect':
+            from .cloud_registration import run
+            return run(args)
+        elif args.command in ('setup-extras', 'neis-meals', 'meals-sync'):
             from .extras_cli import run
             return run(args)
         elif args.command in ('neis-calendar', 'neis-sync'):

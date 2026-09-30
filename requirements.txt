@@ -1,0 +1,6 @@
+# Firebase Functions deployment only. The local planner CLI remains stdlib-only.
+firebase-functions==0.6.0
+firebase-admin==7.7.0
+google-cloud-tasks==2.25.0
+cryptography==48.0.1
+Flask==3.1.3

@@ -1,0 +1,22 @@
+{
+  "functions": [{
+    "source": ".local/firebase/functions", "codebase": "teacher-planner", "runtime": "python312",
+    "predeploy": ["python3 scripts/build_cloud.py"],
+    "ignore": ["venv", ".env*", "__pycache__", "**/__pycache__/**", "**/*.pyc"]
+  }],
+  "firestore": {"rules": "firestore.rules"},
+  "hosting": {
+    "public": "cloud/web",
+    "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
+    "rewrites": [
+      {"source": "/api/**", "function": {"functionId": "planner_api", "region": "asia-northeast3"}},
+      {"source": "**", "destination": "/index.html"}
+    ],
+    "headers": [{"source": "**", "headers": [
+      {"key": "Referrer-Policy", "value": "no-referrer"},
+      {"key": "X-Content-Type-Options", "value": "nosniff"},
+      {"key": "Content-Security-Policy", "value": "default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'"}
+    ]}]
+  },
+  "emulators": {"functions": {"port": 5001}, "firestore": {"port": 8080}, "hosting": {"port": 5000}}
+}

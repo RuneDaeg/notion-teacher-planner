@@ -11,3 +11,7 @@ private/
 *.egg-info/
 build/
 dist/
+.firebase/
+firebase-debug.log*
+*-debug.log
+venv/
