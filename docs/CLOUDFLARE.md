@@ -73,11 +73,14 @@ Cron 설정은 UTC 기준이므로 실행 여부와 일일 중복 방지는 코�
 cd cloudflare
 npm ci
 npm test
+npm run test:runtime
 npm run check
 npm run dry-run
 ```
 
-`dry-run`은 예시 설정으로 배포 파일을 검증해 `.local/cloudflare-build`에 준비한다. 실제 배포·OAuth 승인·무료 CPU 한도 내 운영을 증명하지 않는다.
+`npm test`는 외부 API를 모의 처리한 로직 검증이다. 별도 `npm run test:runtime`은 Wrangler에 포함된 Miniflare로 실제 `workerd`를 실행해 요청 옵션·타임아웃·리다이렉트 거부 호환성을 확인한다. 이 검사도 외부 응답은 모의 처리하며 실제 토큰이나 NEIS·Notion 네트워크를 사용하지 않는다. 로컬 루프백 수신이 가능한 환경에서 실행하고, CI에서도 일반 테스트 다음에 실행한다.
+
+`npm run check`는 문법을 검사한다. `npm run dry-run`은 예시 설정으로 배포 파일을 검증해 `.local/cloudflare-build`에 준비한다. 이 로컬 검사들은 실제 배포·OAuth 승인·NEIS 조회·Notion 반영·무료 CPU 한도 내 운영을 증명하지 않는다. 실제 서비스 검증은 아래 ‘기존 수첩을 연결하고 확인하기’ 절차로 별도 수행한다.
 
 운영자 계정을 연결하고 서비스용 D1을 만든다.
 
