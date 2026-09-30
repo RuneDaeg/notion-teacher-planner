@@ -6,6 +6,20 @@ export class ConnectionError extends Error {
 export class RetryableConnectionError extends ConnectionError {
   constructor() { super('oauth_unavailable', 503); this.retryable = true; }
 }
+const PROVIDER_OAUTH_ERRORS = Object.freeze(['invalid_request','invalid_client','invalid_grant',
+  'unauthorized_client','unsupported_grant_type','invalid_scope','access_denied','test_env_error',
+  'missing_version','validation_error','restricted_resource']);
+const EXCHANGE_DIAGNOSTICS = Object.freeze([...PROVIDER_OAUTH_ERRORS,'transport','http_error',
+  'rate_limited','server_error','invalid_response','invalid_access_token','invalid_refresh_token']);
+function exchangeFailure(diagnostic, retryable = false) {
+  const error = retryable ? new RetryableConnectionError() : new ConnectionError('reconnect');
+  error.exchangeCode = diagnostic;
+  return error;
+}
+export function exchangeDiagnostic(error) {
+  return error instanceof ConnectionError && EXCHANGE_DIAGNOSTICS.includes(error.exchangeCode)
+    ? 'token_exchange_'+error.exchangeCode : null;
+}
 export function base64url(bytes) {
   return btoa(String.fromCharCode(...bytes)).replaceAll('+','-').replaceAll('/','_').replace(/=+$/,'');
 }
@@ -74,15 +88,32 @@ export async function exchange(clientId, secret, body, fetchFn = fetch) {
   try {
     response = await fetchFn('https://api.notion.com/v1/oauth/token', {
       method:'POST', redirect:'error', signal:AbortSignal.timeout(15000),
-      headers:{'Authorization':'Basic '+btoa(clientId+':'+secret),'Content-Type':'application/json'},
+      headers:{'Authorization':'Basic '+btoa(clientId+':'+secret),'Content-Type':'application/json','Notion-Version':'2026-03-11'},
       body:JSON.stringify(body)
     });
-  } catch { throw new ConnectionError('reconnect'); }
-  if (response.status === 429 || response.status >= 500) { await response.body?.cancel(); throw new RetryableConnectionError(); }
-  if (!response.ok) { await response.body?.cancel(); throw new ConnectionError('reconnect'); }
+  } catch { throw exchangeFailure('transport'); }
+  if (response.status === 429 || response.status >= 500) {
+    try { await response.body?.cancel(); } catch { /* The definite HTTP status remains known. */ }
+    throw exchangeFailure(response.status === 429 ? 'rate_limited' : 'server_error',true);
+  }
+  if (!response.ok) {
+    let diagnostic = 'http_error';
+    try {
+      const failure = await readJSON(response,8192);
+      // OAuth uses error; newer Notion responses use code. Never retain descriptions.
+      const code = [failure?.error,failure?.code].find(value=>PROVIDER_OAUTH_ERRORS.includes(value));
+      if (code) diagnostic = code;
+    } catch { /* Empty, malformed or oversized responses retain the fixed fallback. */ }
+    throw exchangeFailure(diagnostic);
+  }
   let value;
-  try { value = await readJSON(response); } catch { throw new ConnectionError('reconnect'); }
-  if (!value || !['access_token','refresh_token'].every(k => typeof value[k] === 'string' && value[k].length > 0 && value[k].length <= 4096)) throw new ConnectionError('reconnect');
+  try { value = await readJSON(response); } catch { throw exchangeFailure('invalid_response'); }
+  const token = input => typeof input === 'string' && input.length > 0 && input.length <= 4096;
+  if (!value || Array.isArray(value) || !token(value.access_token)) throw exchangeFailure('invalid_access_token');
+  // The current official response schema permits a null refresh_token. Older
+  // code exchanges can omit it. A refresh grant must return a fresh valid pair.
+  // https://developers.notion.com/reference/create-a-token
+  if (!(body?.grant_type === 'authorization_code' && value.refresh_token == null) && !token(value.refresh_token)) throw exchangeFailure('invalid_refresh_token');
   return value;
 }
 export function validateManifest(input) {

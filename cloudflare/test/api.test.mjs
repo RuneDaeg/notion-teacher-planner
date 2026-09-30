@@ -132,6 +132,51 @@ test('OAuth provider errors never expose tokens or retry an ambiguous refresh',a
   let options;
   await exchange('client','secret',{},async(url,opts)=>{assert.equal(url,'https://api.notion.com/v1/oauth/token');options=opts;return Response.json({access_token:'a',refresh_token:'r'});});
   assert.equal(options.redirect,'error');
+  assert.equal(options.headers['Notion-Version'],'2026-03-11');
+});
+test('code exchange accepts nullable or omitted refresh tokens without weakening access or refresh-grant validation',async()=>{
+  for(const refresh of [{},{refresh_token:null},{refresh_token:'refresh'}]) {
+    const tokens={access_token:'access',...refresh};
+    assert.deepEqual(await exchange('client','secret',{grant_type:'authorization_code'},async()=>Response.json(tokens)),tokens);
+    const f=fixture({exchangeFn:()=>exchange('client','secret',{grant_type:'authorization_code'},async()=>Response.json({...tokens,owner:{user:{id:'teacher'}},workspace_id:'workspace',bot_id:'bot'}))});
+    assert.equal((await f.complete(await f.start())).status,303);assert.equal(f.written,1);
+  }
+  for(const access of [undefined,null,'',123,'a'.repeat(4097)]) {
+    await assert.rejects(()=>exchange('client','secret',{grant_type:'authorization_code'},async()=>Response.json({access_token:access,refresh_token:null})),error=>error.exchangeCode==='invalid_access_token');
+  }
+  for(const refresh of [undefined,null,'',123,'r'.repeat(4097)]) {
+    await assert.rejects(()=>exchange('client','secret',{grant_type:'refresh_token'},async()=>Response.json({access_token:'access',refresh_token:refresh})),error=>error.exchangeCode==='invalid_refresh_token'&&error.code==='reconnect');
+  }
+  await assert.rejects(()=>exchange('client','secret',{grant_type:'authorization_code'},async()=>Response.json({access_token:'access',refresh_token:''})),error=>error.exchangeCode==='invalid_refresh_token');
+});
+test('callback token diagnostics are bounded allowlisted classifications, never provider bodies or descriptions',async()=>{
+  const privateText='private-token private-code private-owner';
+  const cases=[
+    ['transport',()=>{throw new Error(privateText);}],
+    ['invalid_client',()=>Response.json({error:'invalid_client',error_description:privateText},{status:401})],
+    ['invalid_grant',()=>Response.json({code:'invalid_grant',message:privateText},{status:400})],
+    ['missing_version',()=>Response.json({code:'missing_version',message:privateText},{status:400})],
+    ['http_error',()=>Response.json({error:privateText,message:privateText},{status:400})],
+    ['http_error',()=>new Response(privateText.repeat(1000),{status:400})],
+    ['invalid_response',()=>new Response(privateText)],
+    ['invalid_access_token',()=>Response.json({refresh_token:privateText})],
+    ['invalid_refresh_token',()=>Response.json({access_token:privateText,refresh_token:123})],
+    ['rate_limited',()=>new Response(privateText,{status:429})],
+    ['server_error',()=>new Response(privateText,{status:503})],
+  ];
+  for(const [code,fetcher] of cases) {
+    let calls=0;
+    const f=fixture({exchangeFn:(client,secret,body)=>exchange(client,secret,body,async()=>{calls++;return fetcher();})});
+    const response=await f.complete(await f.start()),result=await response.json();
+    assert.equal(result.phase,'exchange');assert.equal(result.error_code,'token_exchange_'+code);
+    assert.equal(response.status,['rate_limited','server_error'].includes(code)?503:400);
+    assert.doesNotMatch(JSON.stringify(result),/private-token|private-code|private-owner|error_description|message/);
+    assert.equal(calls,1);assert.equal(f.written,0);assert.equal(f.validated,0);
+  }
+  for(const error of [Object.assign(new Error(privateText),{exchangeCode:'invalid_client'}),Object.assign(new ConnectionError(privateText),{exchangeCode:privateText})]) {
+    const f=fixture({exchangeFn:async()=>{throw error;}}),result=await (await f.complete(await f.start())).json();
+    assert.equal(result.error_code,'token_exchange');assert.doesNotMatch(JSON.stringify(result),/private-token/);
+  }
 });
 test('service origin disallows credentials, paths, local/IP destinations and query strings',()=>{
   assert.equal(origin(base),base);

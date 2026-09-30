@@ -1,4 +1,4 @@
-import {TokenBox, ConnectionError, exchange, nonce, origin, readJSON, validateManifest} from './security.mjs';
+import {TokenBox, ConnectionError, exchange, exchangeDiagnostic, nonce, origin, readJSON, validateManifest} from './security.mjs';
 import {SyncError} from './sync.mjs';
 
 const COOKIE = '__Host-planner';
@@ -14,10 +14,11 @@ const redirect = (path, session, age = 3600) => new Response(null, {status:303, 
 const CALLBACK_ERRORS = Object.freeze({session:'invalid_session',exchange:'token_exchange',identity:'identity_missing',targets:'target_validation',register:'registration_failed'});
 function callbackDiagnostic(phase, error) {
   if (!Object.hasOwn(CALLBACK_ERRORS,phase)) return {};
-  // Match one locally defined error exactly; never reflect provider/error text or codes.
+  // Only allowlisted classifications and exact local errors reach the response.
   const callout = phase === 'targets' && error instanceof SyncError &&
     error.message === '급식·상태 전용 콜아웃 구조를 확인하세요.';
-  return {phase,error_code:callout ? 'callout_structure' : CALLBACK_ERRORS[phase],
+  const exchangeCode = phase === 'exchange' ? exchangeDiagnostic(error) : null;
+  return {phase,error_code:callout ? 'callout_structure' : exchangeCode || CALLBACK_ERRORS[phase],
     ...(callout ? {error:'급식·상태 영역은 본문만 있는 콜아웃 또는 빈 콜아웃 안에 문단 하나만 있는 형태로 준비한 뒤 다시 연결하세요.'} : {})};
 }
 
