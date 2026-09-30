@@ -12,10 +12,18 @@ export async function schoolCacheKey(manifest, day) {
   return base64url(new Uint8Array(await crypto.subtle.digest('SHA-256', encoder.encode(source))));
 }
 
-async function updateStatus(notion, manifest, day, now, publicUrl, checkpoint) {
+async function updateStatus(notion, manifest, target, day, now, publicUrl, checkpoint) {
+  const canonical=value=>typeof value==='string'?value.replaceAll('-','').toLowerCase():'';
+  // syncStep passes its live validation result, never a persisted target or a
+  // browser-supplied paragraph ID. Reusing it avoids another ancestry walk.
+  if(!target||canonical(target.container_id)!==canonical(manifest.status_block_id)
+      ||!(/^[a-f\d]{32}$/i.test(canonical(target.id)))
+      ||!['callout','paragraph'].includes(target.type)
+      ||(target.type==='callout'&&canonical(target.id)!==canonical(target.container_id))
+      ||(target.type==='paragraph'&&[manifest.root_page_id,manifest.agenda_data_source_id,manifest.meals_block_id,manifest.status_block_id].some(id=>canonical(id)===canonical(target.id))))throw new Error('invalid_status_target');
   const link = origin(publicUrl) + '/connect#' + base64url(encoder.encode(JSON.stringify(manifest)));
   await checkpoint();
-  await notion.request('PATCH', '/blocks/' + manifest.status_block_id, { callout: { rich_text: [
+  await notion.request('PATCH', '/blocks/' + target.id, { [target.type]: { rich_text: [
     { type: 'text', text: { content: `자동 갱신 · 매일 오전 7시부터 순차 실행 (한국 시간)\n${day} 급식·학사일정 반영 완료\n확인: ${new Date(now + 9 * 3_600_000).toISOString().slice(0, 16).replace('T', ' ')}\n` } },
     { type: 'text', text: { content: '자동 갱신 연결·관리', link: { url: link } } },
   ] } });
@@ -92,7 +100,7 @@ export async function runCron(env, dependencies = {}) {
     const result = await step({ notion, manifest: doc.manifest, snapshot, state, saveState, day });
     if (typeof result?.done !== 'boolean') throw new Error('invalid_step_result');
     await saveState(result.state ?? state);
-    if (result.done) await updateStatus(notion, doc.manifest, day, now(), env.PUBLIC_BASE_URL, () => store.saveState(lease, state));
+    if (result.done) await updateStatus(notion, doc.manifest, result.statusTarget, day, now(), env.PUBLIC_BASE_URL, () => store.saveState(lease, state));
     // Cron supplies the cadence. Adding 60 seconds after completion would skip
     // the next minute when this step finishes a few seconds after its trigger.
     await store.finish(lease, { done: result.done, delay: 0 });

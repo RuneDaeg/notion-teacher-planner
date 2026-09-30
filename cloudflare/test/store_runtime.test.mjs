@@ -4,7 +4,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { readFileSync } from 'node:fs';
 import { Store, BusyError, LeaseError, LEASE_MS, koreaDay, morning } from '../src/store.mjs';
 import { runCron, schoolCacheKey } from '../src/runtime.mjs';
-import { createNotionClient as realClient, syncStep as realStep, eventId } from '../src/sync.mjs';
+import { createNotionClient as realClient, syncStep as realStep, eventId, LIMITS } from '../src/sync.mjs';
 
 // Real SQLite executes production SQL. This shim only supplies D1's binding,
 // async result shapes and atomic batch transaction; it is not a cloud test.
@@ -30,6 +30,7 @@ const fakeId = number => `12345678-1234-4123-8123-${String(number).padStart(12, 
 function manifest(number = 1) { return { version: 1, office_code: 'B10', school_code: '1234567', school_name: '가상학교', academic_year: 2026,
   root_page_id: fakeId(number), agenda_data_source_id: fakeId(101), meals_block_id: fakeId(102), status_block_id: fakeId(103) }; }
 const identity = { owner_id: 'owner', workspace_id: 'workspace', bot_id: 'bot' };
+const statusTarget = (m=manifest()) => ({id:m.status_block_id,type:'callout',container_id:m.status_block_id});
 const error = (status, retryable = false) => Object.assign(new Error('PRIVATE_DO_NOT_LOG'), { status, retryable });
 function fixture(options = {}) {
   const clock = { value: Date.parse('2026-09-30T07:00:00+09:00') }, db = new D1();
@@ -42,7 +43,7 @@ function fixture(options = {}) {
     exchangeTokens: async () => { calls.rotate++; return { access_token: 'new-access', refresh_token: 'new-refresh', expires_in: 3600 }; },
     fetchSchoolSnapshot: async (_manifest, day) => { calls.snapshot++; return { calendar: { rows: [] }, meals: { date: day } }; },
     createNotionClient: access => { calls.access.push(access); return { request: async (...args) => calls.writes.push(args) }; },
-    syncStep: async ({ state, saveState }) => { calls.step++; state.count = (state.count || 0) + 1; await saveState(state); return { done: true, state }; },
+    syncStep: async ({ state, saveState, manifest }) => { calls.step++; state.count = (state.count || 0) + 1; await saveState(state); return { done: true, state, statusTarget:statusTarget(manifest) }; },
   };
   return { db, store, clock, calls, env, dependencies, run: () => runCron(env, dependencies),
     register: (number = 1) => store.register(manifest(number), identity, 'encrypted') };
@@ -123,7 +124,7 @@ test('a completed notebook runs once per Korean day and next daily run waits for
 test('initial enrollment and its bounded continuation can run before 07:00', async () => {
   const f = fixture(); f.clock.value = Date.parse('2026-09-30T05:00:00+09:00');
   const id = await f.register();
-  f.dependencies.syncStep = async ({ state, saveState }) => { state.count = (state.count || 0) + 1; await saveState(state); return { done: state.count === 2, state }; };
+  f.dependencies.syncStep = async ({ state, saveState }) => { state.count = (state.count || 0) + 1; await saveState(state); return { done: state.count === 2, state, statusTarget:statusTarget() }; };
   assert.equal((await f.run()).status, 'continued'); f.clock.value += 60_000;
   assert.equal((await f.run()).status, 'complete');
   await f.store.setEnabled(id, identity.owner_id, true);
@@ -154,7 +155,7 @@ test('three transient failures defer to next day; pending persists and success r
     assert.equal(doc.failures, index + 1); assert.equal(doc.state.pending.key, 'maybe-written');
     assert.equal(doc.last_success_at, null); f.clock.value = doc.next_due;
   }
-  f.dependencies.syncStep = async ({ state }) => ({ done: true, state });
+  f.dependencies.syncStep = async ({ state }) => ({ done: true, state, statusTarget:statusTarget() });
   assert.equal((await f.run()).status, 'complete');
   assert.equal((await f.store.get(id)).failures, 0);
 });
@@ -218,7 +219,7 @@ test('public snapshots are shared per school/year/day and expired cache cleanup 
 
 test('401 rotates once and resumes later; other successful steps do not rotate', async () => {
   const f = fixture(); const id = await f.register(); let attempts = 0;
-  f.dependencies.syncStep = async ({ state, saveState }) => { attempts++; state.pending = { key: 'retain' }; await saveState(state); if (attempts === 1) throw error(401); return { done: true, state }; };
+  f.dependencies.syncStep = async ({ state, saveState }) => { attempts++; state.pending = { key: 'retain' }; await saveState(state); if (attempts === 1) throw error(401); return { done: true, state, statusTarget:statusTarget() }; };
   assert.equal((await f.run()).status, 'token_refreshed');
   assert.equal(attempts, 1); assert.equal(f.calls.rotate, 1);
   assert.equal((await f.store.get(id)).state.pending.key, 'retain');
@@ -277,7 +278,7 @@ test('a Korean day rollover invalidates an outstanding write fence', async () =>
   await assert.rejects(f.store.saveState(work.lease, { overwrite: true }), LeaseError);
 });
 
-test('real engine + bounded Notion client + SQLite recover a lost creation and finish one period', async () => {
+for(const native of [false,true]) test(`real engine + bounded Notion client + SQLite recover a lost creation (${native?'native paragraph':'flat callout'} targets)`, async () => {
   const f = fixture(), day = koreaDay(Date.now());
   const year = Number(day.slice(0, 4)) - (day.slice(5, 7) < '03' ? 1 : 0);
   f.clock.value = morning(day);
@@ -293,10 +294,26 @@ test('real engine + bounded Notion client + SQLite recover a lost creation and f
     parent: { type: 'database_id', database_id: fakeId(200) } });
   for (const key of ['meals_block_id', 'status_block_id']) objects.set('/blocks/' + m[key], { id: m[key], object: 'block', type: 'callout',
     has_children: false, parent: { type: 'page_id', page_id: m.root_page_id }, callout: { rich_text: rich('미조회') } });
+  const targetIds={meals:m.meals_block_id,status:m.status_block_id};
+  if(native) {
+    // Match the real notebook: meal callout in a column, status at page root.
+    objects.set('/blocks/'+fakeId(201),{id:fakeId(201),object:'block',type:'column_list',has_children:true,parent:{type:'page_id',page_id:m.root_page_id}});
+    objects.set('/blocks/'+fakeId(202),{id:fakeId(202),object:'block',type:'column',has_children:true,parent:{type:'block_id',block_id:fakeId(201)}});
+    objects.get('/blocks/'+m.meals_block_id).parent={type:'block_id',block_id:fakeId(202)};
+    for(const [index,name] of ['meals','status'].entries()) {
+      const container=objects.get('/blocks/'+m[name+'_block_id']), childId=fakeId(210+index);
+      container.callout.rich_text=[];container.has_children=true;
+      children.set(container.id,[childId]);targetIds[name]=childId;
+      objects.set('/blocks/'+childId,{id:childId,object:'block',type:'paragraph',has_children:false,archived:false,in_trash:false,
+        parent:{type:'block_id',block_id:container.id},paragraph:{rich_text:rich('서버 연결 준비')}});
+    }
+  }
+  const clients=[],requests=[],originalContainers=native?structuredClone([objects.get('/blocks/'+m.meals_block_id),objects.get('/blocks/'+m.status_block_id)]):null;
   let serial = 300, createCount = 0, loseResponse = true;
   const fetchFn = async (url, options) => {
     const parsed = new URL(url), path = parsed.pathname.replace('/v1', ''), method = options.method;
     const body = options.body ? JSON.parse(options.body) : undefined;
+    requests.push([method,path,body]);
     const saved = (await f.store.get(id)).state;
     let result;
     if (method === 'GET' && path.endsWith('/children')) result = { results: (children.get(path.split('/')[2]) || []).map(key => objects.get('/blocks/' + key)), has_more: false };
@@ -317,10 +334,11 @@ test('real engine + bounded Notion client + SQLite recover a lost creation and f
       }
       if (loseResponse) { loseResponse = false; throw new TypeError('simulated lost response'); }
     } else if (method === 'PATCH') {
-      if (path === '/blocks/' + m.status_block_id) assert.equal(saved.meals_date, day, 'status follows durable engine completion');
+      if (path === '/blocks/' + targetIds.status) assert.equal(saved.meals_date, day, 'status follows durable engine completion');
       else assert.ok(saved.mutation, 'D1 mutation must commit before a real client patch request');
       result = objects.get(path); assert.ok(result);
       if (body.callout) Object.assign(result.callout, body.callout);
+      if (body.paragraph) Object.assign(result.paragraph, body.paragraph);
       if (body.properties) Object.assign(result.properties, body.properties);
     } else assert.fail('Unexpected bounded request');
     return Response.json(result);
@@ -333,7 +351,7 @@ test('real engine + bounded Notion client + SQLite recover a lost creation and f
   f.dependencies.fetchSchoolSnapshot = async () => ({ calendar: { ...metadata, source: 'neis', academic_year: year, start: `${year}-03-01`,
     end: new Date(Date.UTC(year + 1, 2, 1) - 86400000).toISOString().slice(0, 10), rows }, meals: { ...metadata, source: 'neis-meals', date: day,
     rows: [{ meal_code: '2', meal_name: '중식', menu: '가상국 (1.2.5)' }] } });
-  f.dependencies.createNotionClient = access => realClient(access, fetchFn);
+  f.dependencies.createNotionClient = access => {const client=realClient(access,fetchFn);clients.push(client);return client;};
   f.dependencies.syncStep = realStep;
   assert.equal((await f.run()).status, 'continued');
   assert.equal(createCount, 0, 'today meals are displayed before the calendar backlog');
@@ -354,6 +372,23 @@ test('real engine + bounded Notion client + SQLite recover a lost creation and f
   assert.equal(stored.last_success_day, day); assert.equal(stored.state.pending, undefined);
   const page = objects.get('/pages/' + groups[0].page_id);
   assert.deepEqual(page.properties.일정.date, { start: `${year}-03-02`, end: `${year}-03-03` });
-  assert.match(text(objects.get('/blocks/' + m.meals_block_id).callout.rich_text), /1\.2\.5/);
-  assert.match(text(objects.get('/blocks/' + m.status_block_id).callout.rich_text), /반영 완료/);
+  assert.match(text(objects.get('/blocks/' + targetIds.meals)[native?'paragraph':'callout'].rich_text), /1\.2\.5/);
+  assert.match(text(objects.get('/blocks/' + targetIds.status)[native?'paragraph':'callout'].rich_text), /반영 완료/);
+  assert.ok(clients.every(client=>client.calls<=LIMITS.notionRequests));
+  assert.equal(LIMITS.notionRequests,19);assert.equal(LIMITS.deadlineMs,45000);
+  if(native) {
+    assert.deepEqual([objects.get('/blocks/'+m.meals_block_id),objects.get('/blocks/'+m.status_block_id)],originalContainers);
+    assert.equal(requests.filter(([method,path])=>method==='GET'&&[m.meals_block_id,m.status_block_id].some(id=>path===`/blocks/${id}/children`)).length,clients.length*2);
+    assert.equal(requests.filter(([method,path])=>method==='PATCH'&&[m.meals_block_id,m.status_block_id].some(id=>path===`/blocks/${id}`)).length,0);
+    assert.equal(requests.filter(([method,path])=>method==='PATCH'&&path==='/blocks/'+targetIds.status).length,1);
+  }
+});
+
+test('runtime fails closed without a current bound status target',async()=>{
+  for(const target of [undefined,{...statusTarget(),container_id:fakeId(999)},{...statusTarget(),id:fakeId(999)},{...statusTarget(),type:'paragraph'}]) {
+    const f=fixture(),id=await f.register();
+    f.dependencies.syncStep=async({state})=>({done:true,state,statusTarget:target});
+    assert.equal((await f.run()).status,'attention');
+    assert.equal(f.calls.writes.length,0);assert.equal((await f.store.get(id)).last_success_day,null);
+  }
 });

@@ -1,4 +1,5 @@
 import {TokenBox, ConnectionError, exchange, nonce, origin, readJSON, validateManifest} from './security.mjs';
+import {SyncError} from './sync.mjs';
 
 const COOKIE = '__Host-planner';
 const NO_CACHE = {'Cache-Control':'private, no-store','Referrer-Policy':'no-referrer','X-Content-Type-Options':'nosniff'};
@@ -10,6 +11,15 @@ function readCookie(request) {
   return candidates[0].slice(COOKIE.length+1);
 }
 const redirect = (path, session, age = 3600) => new Response(null, {status:303, headers:{...NO_CACHE,'Location':path,'Set-Cookie':cookie(session,age)}});
+const CALLBACK_ERRORS = Object.freeze({session:'invalid_session',exchange:'token_exchange',identity:'identity_missing',targets:'target_validation',register:'registration_failed'});
+function callbackDiagnostic(phase, error) {
+  if (!Object.hasOwn(CALLBACK_ERRORS,phase)) return {};
+  // Match one locally defined error exactly; never reflect provider/error text or codes.
+  const callout = phase === 'targets' && error instanceof SyncError &&
+    error.message === '급식·상태 전용 콜아웃 구조를 확인하세요.';
+  return {phase,error_code:callout ? 'callout_structure' : CALLBACK_ERRORS[phase],
+    ...(callout ? {error:'급식·상태 영역은 본문만 있는 콜아웃 또는 빈 콜아웃 안에 문단 하나만 있는 형태로 준비한 뒤 다시 연결하세요.'} : {})};
+}
 
 export function createAPI({store,publicUrl,clientId,clientSecret,encryptionKey,clientFactory,targetValidator,
     exchangeFn=exchange,now=()=>Date.now()}) {
@@ -28,6 +38,7 @@ export function createAPI({store,publicUrl,clientId,clientSecret,encryptionKey,c
     return {current,doc};
   }
   return async function handle(request) {
+    let callbackPhase = null;
     try {
       const url = new URL(request.url);
       if (url.origin !== base) throw new ConnectionError('origin',403);
@@ -41,6 +52,7 @@ export function createAPI({store,publicUrl,clientId,clientSecret,encryptionKey,c
         return json({authorize_url:authorize.href},200,{'Set-Cookie':cookie(await box.seal('pending',{nonce:csrf}),600)});
       }
       if (url.pathname === '/api/callback' && request.method === 'GET') {
+        callbackPhase = 'session';
         const pending = await box.open('pending',readCookie(request),600);
         const state = await box.open('oauth',url.searchParams.get('state'),600);
         if (!pending.nonce || pending.nonce !== state.nonce) throw new ConnectionError();
@@ -48,10 +60,14 @@ export function createAPI({store,publicUrl,clientId,clientSecret,encryptionKey,c
         const code = url.searchParams.get('code');
         if (!code || code.length > 4096) throw new ConnectionError();
         const manifest = validateManifest(state.manifest);
+        callbackPhase = 'exchange';
         const tokens = await exchangeFn(clientId,clientSecret,{grant_type:'authorization_code',code,redirect_uri:callback});
+        callbackPhase = 'identity';
         const owner = tokens.owner?.user?.id;
         if (!owner || !tokens.workspace_id || !tokens.bot_id || tokens.duplicated_template_id) throw new ConnectionError();
+        callbackPhase = 'targets';
         await targetValidator(clientFactory(tokens.access_token),manifest);
+        callbackPhase = 'register';
         const credentials = {access_token:tokens.access_token,refresh_token:tokens.refresh_token};
         if (Number.isFinite(tokens.expires_in) && tokens.expires_in > 0) credentials.expires_at = now()+tokens.expires_in*1000;
         const id = await store.register(manifest,{owner_id:owner,workspace_id:tokens.workspace_id,bot_id:tokens.bot_id},await box.seal('notion',credentials));
@@ -81,7 +97,7 @@ export function createAPI({store,publicUrl,clientId,clientSecret,encryptionKey,c
       const message = status === 409 ? '갱신 중이거나 등록 가능한 수첩 수를 넘었습니다. 잠시 후 다시 확인해 주세요.'
         : status === 503 || status === 429 ? '연결 서버가 잠시 응답하지 않습니다. 수첩의 연결 링크에서 다시 시도해 주세요.'
         : '연결을 확인하지 못했습니다. 설치 정보와 Notion 접근 허용을 확인하고 다시 시도하세요.';
-      return json({error:message},status);
+      return json({error:message,...callbackDiagnostic(callbackPhase,error)},status);
     }
   };
 }

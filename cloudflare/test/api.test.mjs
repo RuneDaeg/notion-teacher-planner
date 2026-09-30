@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createAPI} from '../src/api.mjs';
 import {TokenBox,base64url,exchange,origin,validateManifest,ConnectionError,RetryableConnectionError} from '../src/security.mjs';
+import {SyncError} from '../src/sync.mjs';
 
 const key = base64url(new Uint8Array(32).fill(19));
 const base = 'https://planner.example.com';
@@ -9,7 +10,7 @@ const ids = [1,2,3,4].map(n=>`11111111-1111-4111-8111-${String(n).padStart(12,'0
 const manifest = {version:1,office_code:'X10',school_code:'1234567',school_name:'가상고등학교',academic_year:2026,
   root_page_id:ids[0],agenda_data_source_id:ids[1],meals_block_id:ids[2],status_block_id:ids[3]};
 const cookieOnly = response => response.headers.get('Set-Cookie').split(';')[0];
-function fixture() {
+function fixture(overrides={}) {
   let time = 1790000000000, doc, written = 0, validated = 0;
   const now = () => time;
   const store = {
@@ -19,7 +20,7 @@ function fixture() {
   };
   const api = createAPI({store,publicUrl:base,clientId:'client',clientSecret:'secret',encryptionKey:key,now,
     clientFactory:token=>({token}),targetValidator:async (client,m)=>{assert.equal(client.token,'access');assert.deepEqual(m,manifest);validated++;},
-    exchangeFn:async ()=>({access_token:'access',refresh_token:'refresh',owner:{user:{id:'teacher'}},workspace_id:'workspace',bot_id:'bot'})});
+    exchangeFn:async ()=>({access_token:'access',refresh_token:'refresh',owner:{user:{id:'teacher'}},workspace_id:'workspace',bot_id:'bot'}),...overrides});
   const request = (path,{data,cookie,csrf,origin:requestOrigin=base,method}={}) => new Request(base+path,{method:method||(data?'POST':'GET'),headers:{'Origin':requestOrigin,'Content-Type':'application/json',...(cookie?{Cookie:cookie}:{}),...(csrf?{'X-CSRF-Token':csrf}:{})},...(data?{body:JSON.stringify(data)}:{})});
   async function start() {
     const response = await api(request('/api/start',{data:manifest}));assert.equal(response.status,200);
@@ -55,6 +56,53 @@ test('expired OAuth state is rejected and cancellation clears pending cookie',as
   const connected=await f.complete(await f.start());
   const unsolicited=await f.api(f.request('/api/callback?error=access_denied',{cookie:cookieOnly(connected)}));
   assert.equal(unsolicited.headers.get('Set-Cookie'),null);
+});
+test('callback failures expose only fixed diagnostic phase and code at each boundary',async()=>{
+  const privateText='provider secret: ntn_private-token; code=private-auth-code; owner=private-user-id';
+  const cases=[
+    {phase:'session',error_code:'invalid_session',status:400,session:true},
+    {phase:'exchange',error_code:'token_exchange',status:503,overrides:{exchangeFn:async()=>{const error=new RetryableConnectionError();error.message=privateText;throw error;}}},
+    {phase:'identity',error_code:'identity_missing',status:400,overrides:{exchangeFn:async()=>({access_token:privateText,refresh_token:privateText,owner:{user:{}},workspace_id:privateText,bot_id:privateText})}},
+    {phase:'targets',error_code:'target_validation',status:403,overrides:{targetValidator:async()=>{throw new SyncError(privateText,{status:403});}}},
+    {phase:'register',error_code:'registration_failed',status:409,overrides:{store:{register:async()=>{throw new ConnectionError(privateText,409);}}}},
+  ];
+  for(const item of cases) {
+    const f=fixture(item.overrides),started=await f.start();
+    const response=await f.complete(item.session?{...started,cookie:'__Host-planner=private-invalid-cookie'}:started);
+    assert.equal(response.status,item.status,item.phase);
+    assert.equal(response.headers.get('Cache-Control'),'private, no-store');
+    assert.equal(response.headers.get('Set-Cookie'),null);
+    const result=await response.json();
+    assert.deepEqual(Object.keys(result).sort(),['error','error_code','phase']);
+    assert.equal(result.phase,item.phase);assert.equal(result.error_code,item.error_code);
+    assert.doesNotMatch(JSON.stringify(result),/ntn_private|private-auth|private-user|private-invalid|provider secret/);
+    assert.equal(f.written,0);
+  }
+});
+test('only the exact local callout structure error gets a safe actionable diagnostic',async()=>{
+  const message='급식·상태 전용 콜아웃 구조를 확인하세요.';
+  for(const [error,expected] of [
+    [new SyncError(message),'callout_structure'],
+    [new SyncError(message+' private-target-id'),'target_validation'],
+    [new Error(message),'target_validation'],
+  ]) {
+    const f=fixture({targetValidator:async()=>{throw error;}});
+    const response=await f.complete(await f.start());assert.equal(response.status,400);
+    const result=await response.json();assert.equal(result.phase,'targets');assert.equal(result.error_code,expected);
+    if(expected==='callout_structure') assert.equal(result.error,'급식·상태 영역은 본문만 있는 콜아웃 또는 빈 콜아웃 안에 문단 하나만 있는 형태로 준비한 뒤 다시 연결하세요.');
+    else assert.doesNotMatch(result.error,/콜아웃|private-target/);
+    assert.equal(f.written,0);
+  }
+});
+test('expired and cross-session callbacks stop before token exchange without diagnostics leaking to other routes',async()=>{
+  let exchanges=0;
+  const f=fixture({exchangeFn:async()=>{exchanges++;throw new Error('must not exchange');}});
+  const a=await f.start(),b=await f.start();
+  assert.deepEqual((await (await f.complete({state:a.state,cookie:b.cookie})).json()).phase,'session');
+  f.advance(601000);
+  const expired=await (await f.complete(a)).json();assert.equal(expired.error_code,'invalid_session');assert.equal(exchanges,0);
+  const other=await (await f.api(f.request('/api/status'))).json();
+  assert.deepEqual(Object.keys(other),['error']);
 });
 test('public API has no endpoint to trigger a sync or bypass ownership',async()=>{
   const f=fixture();assert.equal((await f.api(f.request('/api/sync',{data:{}}))).status,404);

@@ -24,6 +24,16 @@ class FakeNotion {
   }
   put(kind,obj){this.objects.set('/'+kind+'/'+obj.id,obj);return obj;}
   newBlock(parent,payload){const block={...clone(payload),id:uuid(this.serial++),object:'block',parent:{type:'page_id',page_id:parent},has_children:false};this.put('blocks',block);const all=this.children.get(parent)??[];all.push(block.id);this.children.set(parent,all);return block;}
+  nativeCallouts() {
+    const targets={};
+    for(const name of ['meals','status']) {
+      const parent=this.objects.get('/blocks/'+manifest[name+'_block_id']);
+      parent.callout.rich_text=[];parent.has_children=true;
+      const child=this.newBlock(parent.id,{type:'paragraph',paragraph:{rich_text:rt('연결 준비')},archived:false,in_trash:false});
+      child.parent={type:'block_id',block_id:parent.id};targets[name]=child;
+    }
+    return targets;
+  }
   event(row,{end=null,archived=false,notes=true}={}) {
     const page={object:'page',id:uuid(this.serial++),parent:{type:'data_source_id',data_source_id:manifest.agenda_data_source_id},properties:{이름:{title:rt(row.title)},일정:{date:{start:row.date,end}},학년도:{number:year},'외부 ID':{rich_text:rt(row.external_id)},보관:{checkbox:archived},'교사 관계':{relation:[{id:uuid(88)}]},상태:{select:{name:'검토중'}}}};
     this.put('pages',page);if(notes)this.newBlock(page.id,{type:'paragraph',paragraph:{rich_text:rt('수동 메모 유지')}});return page;
@@ -44,7 +54,7 @@ class FakeNotion {
       const offset=Number(payload.start_cursor??0),size=100;result={results:clone(found.slice(offset,offset+size)),has_more:offset+size<found.length,next_cursor:String(offset+size)};
     } else if(method==='POST'&&path==='/pages') {result=this.put('pages',{object:'page',id:uuid(this.serial++),parent:clone(payload.parent),properties:clone(payload.properties)});for(const block of payload.children??[])this.newBlock(result.id,block);}
     else if(method==='PATCH'&&path.endsWith('/children'))result={results:payload.children.map(block=>this.newBlock(path.split('/')[2],block))};
-    else if(method==='PATCH') {result=this.objects.get(path);assert.ok(result);if(payload.properties)Object.assign(result.properties,clone(payload.properties));if(payload.callout)Object.assign(result.callout,clone(payload.callout));}
+    else if(method==='PATCH') {result=this.objects.get(path);assert.ok(result);if(payload.properties)Object.assign(result.properties,clone(payload.properties));if(payload.callout)Object.assign(result.callout,clone(payload.callout));if(payload.paragraph)Object.assign(result.paragraph,clone(payload.paragraph));}
     else throw new Error('unhandled '+method+path);
     if(lost){this.loss=null;throw new SyncError('lost',{retryable:true});}
     return clone(result);
@@ -67,8 +77,75 @@ const jsonResponse=value=>new Response(JSON.stringify(value),{headers:{'Content-
 
 test('event IDs exactly match Python UTF-8 compact JSON contract',async()=>assert.equal(await eventId('Z99','0000001','2026-09-30','가상 행사','주간','고등학교'),'neis:d2c624340ada54b2d28c2e0f75780602c1efbacf7c80d7ae435f0ab4ad3727f6'));
 test('grouping uses exact title/course/night and adjacent calendar days while preserving details',async()=>{const f=await fixture([[dayAt(1),'행사','첫째',[1]],[dayAt(2),'행사','둘째',[2]],[dayAt(4),'행사']]);const groups=await groupedSchedule(f.snapshot.calendar,manifest);assert.equal(groups.length,2);assert.equal(groups[0].end,dayAt(2));assert.deepEqual(groups[0].source_rows.map(row=>row.grades),[[1],[2]]);assert.equal(groups[1].end,null);});
-test('target validation is read only and verifies actual parents and flat dedicated blocks',async()=>{const f=await fixture();await validateTargets(f.notion,manifest);assert.equal(f.notion.mutations().length,0);for(const id of [manifest.meals_block_id,manifest.status_block_id]){const block=f.notion.objects.get('/blocks/'+id);block.has_children=true;await assert.rejects(validateTargets(f.notion,manifest),/하위 내용/);block.has_children=false;}f.notion.objects.get('/databases/'+uuid(5)).parent={type:'workspace',workspace:true};await assert.rejects(validateTargets(f.notion,manifest),/루트 밖/);});
+test('target validation is read only and verifies actual parents and flat dedicated blocks',async()=>{const f=await fixture();await validateTargets(f.notion,manifest);assert.equal(f.notion.mutations().length,0);for(const id of [manifest.meals_block_id,manifest.status_block_id]){const block=f.notion.objects.get('/blocks/'+id);block.has_children=true;await assert.rejects(validateTargets(f.notion,manifest),/급식·상태 전용 콜아웃 구조를 확인하세요\./);block.has_children=false;}f.notion.objects.get('/databases/'+uuid(5)).parent={type:'workspace',workspace:true};await assert.rejects(validateTargets(f.notion,manifest),/루트 밖/);});
 test('schema change, trash and parent cycles stop before mutations',async()=>{const f=await fixture();f.notion.objects.get('/data_sources/'+manifest.agenda_data_source_id).properties={...schema,일정:{type:'rich_text'}};await assert.rejects(f.step(),/속성/);assert.equal(f.notion.mutations().length,0);});
+test('native empty callouts resolve exactly one paragraph each with two bounded child queries',async()=>{
+  const f=await fixture(),children=f.notion.nativeCallouts();
+  const result=await validateTargets(f.notion,manifest);
+  for(const name of ['meals','status']) {
+    assert.equal(result[name].id,manifest[name+'_block_id']);
+    assert.deepEqual(result[name+'Text'],{id:children[name].id,type:'paragraph',container_id:manifest[name+'_block_id'],rich_text:rt('연결 준비')});
+  }
+  assert.equal(f.notion.calls.filter(([,path])=>path.endsWith('/children?page_size=2')).length,2);
+  assert.equal(f.notion.mutations().length,0);
+});
+test('native callouts reject titles, manual sibling notes, nesting and inconsistent child metadata',async()=>{
+  const bad=[
+    (f,c,p)=>p.callout.rich_text=rt('기존 제목/메모'),
+    (f,c,p)=>p.callout.rich_text=rt(''),
+    (f,c,p)=>delete p.has_children,
+    (f,c)=>c.archived=true,
+    (f,c)=>c.in_trash=true,
+    (f,c)=>c.object='page',
+    (f,c)=>c.has_children=true,
+    (f,c)=>delete c.has_children,
+    (f,c)=>c.type='heading_1',
+    (f,c)=>c.paragraph.rich_text=null,
+    (f,c)=>c.parent={type:'page_id',page_id:manifest.root_page_id},
+    (f,c)=>c.parent={type:'block_id',block_id:manifest.status_block_id},
+    (f,c)=>c.id=manifest.root_page_id,
+    (f,c)=>c.id='not-an-id',
+    (f,c,p)=>f.notion.newBlock(p.id,{type:'paragraph',paragraph:{rich_text:rt('수동 메모')}}),
+  ];
+  for(const mutate of bad) {
+    const f=await fixture(),children=f.notion.nativeCallouts(),parent=f.notion.objects.get('/blocks/'+manifest.meals_block_id);
+    mutate(f,children.meals,parent);
+    await assert.rejects(f.step(),SyncError);
+    assert.equal(f.notion.mutations().length,0);
+  }
+});
+test('native callout child lists must be complete and contain exactly one active block',async()=>{
+  for(const response of [{has_more:true},{has_more:undefined},{next_cursor:'unexpected'}, {results:[]},{results:null}]) {
+    const f=await fixture();f.notion.nativeCallouts();
+    const request=f.notion.request.bind(f.notion);
+    f.notion.request=async(method,path,payload)=>{
+      const result=await request(method,path,payload);
+      return path===`/blocks/${manifest.meals_block_id}/children?page_size=2`?{...result,...response}:result;
+    };
+    await assert.rejects(f.step(),SyncError);assert.equal(f.notion.mutations().length,0);
+  }
+});
+test('native meal write and lost response recovery only patch the verified paragraph',async()=>{
+  const f=await fixture(),children=f.notion.nativeCallouts();
+  const original=clone(f.notion.objects.get('/blocks/'+manifest.meals_block_id));
+  f.notion.loss=(method,path)=>method==='PATCH'&&path==='/blocks/'+children.meals.id;
+  await assert.rejects(f.step(),/lost/);
+  assert.equal(f.state.mutation.path,'/blocks/'+children.meals.id);
+  const done=await f.step();assert.equal(done.done,true);
+  assert.equal(done.statusTarget.id,children.status.id);assert.equal(done.statusTarget.type,'paragraph');
+  assert.match(flatten(children.meals.paragraph.rich_text),/1\.2\.5/);
+  assert.deepEqual(f.notion.objects.get('/blocks/'+manifest.meals_block_id),original);
+  assert.deepEqual(f.notion.mutations().map(([method,path,payload])=>[method,path,Object.keys(payload)]),[['PATCH','/blocks/'+children.meals.id,['paragraph']]]);
+  assert.equal(f.state.mutation,undefined);
+});
+test('native paragraph moved or annotated between attempts is never reused from saved mutation',async()=>{
+  const f=await fixture(),children=f.notion.nativeCallouts();
+  f.notion.loss=(method,path)=>method==='PATCH'&&path==='/blocks/'+children.meals.id;
+  await assert.rejects(f.step(),/lost/);
+  children.meals.parent={type:'block_id',block_id:manifest.status_block_id};f.notion.calls=[];
+  await assert.rejects(f.step(),SyncError);assert.equal(f.notion.mutations().length,0);
+  assert.ok(f.state.mutation);
+});
 test('meal is published first, then one event per step; unchanged hash makes no calendar query',async()=>{const f=await fixture([[dayAt(1),'첫 행사'],[dayAt(3),'다른 행사']]);assert.equal((await f.step()).done,false);assert.equal(f.state.meals_date,day);assert.equal(f.state.completed_at,undefined);assert.equal(f.state.records,undefined);assert.equal(f.notion.calls.filter(([,p])=>p.endsWith('/query')).length,0);assert.equal((await f.step()).done,false);assert.equal(Object.keys(f.state.records).length,1);assert.equal((await f.step()).done,false);assert.equal(Object.keys(f.state.records).length,2);assert.equal((await f.step()).done,true);f.notion.calls=[];const before=f.saved.length;assert.equal((await f.step()).done,true);assert.ok(f.saved.length>before);assert.equal(f.notion.calls.filter(([,path])=>path.endsWith('/query')).length,0);assert.equal(f.notion.mutations().length,0);});
 test('lost create response recovers by external ID and marker without duplicate page',async()=>{const f=await fixture([[dayAt(1)]]);await f.primeMeals();f.notion.loss=(method,path)=>method==='POST'&&path==='/pages';await assert.rejects(f.step(),/lost/);assert.ok(f.state.pending);const creates=f.notion.calls.filter(([m,p])=>m==='POST'&&p==='/pages').length;assert.equal((await f.step()).done,false);assert.equal(f.state.pending,undefined);await f.finish();assert.equal(f.notion.calls.filter(([m,p])=>m==='POST'&&p==='/pages').length,creates);});
 test('ambiguous create with zero matching pages stops without blind retry',async()=>{const f=await fixture([[dayAt(1)]]);await f.primeMeals();f.notion.loss=(method,path)=>method==='POST'&&path==='/pages';f.notion.loseBefore=true;await assert.rejects(f.step());await assert.rejects(f.step(),error=>error.retryable===false&&/불확실/.test(error.message));assert.equal(f.notion.calls.filter(([m,p])=>m==='POST'&&p==='/pages').length,1);});

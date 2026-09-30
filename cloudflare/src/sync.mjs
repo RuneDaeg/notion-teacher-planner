@@ -102,7 +102,33 @@ export async function validateTargets(notion, manifest) {
   const agenda=await get('data_source',manifest.agenda_data_source_id); await inside(agenda);
   for(const [name,type]of Object.entries(REQUIRED)) if(agenda.properties?.[name]?.type!==type)fail('업무·일정 필수 속성 유형을 확인하세요.');
   const result={root,agenda};
-  for(const name of ['meals','status']) { const block=await get('block',manifest[name+'_block_id']); if(block.type!=='callout'||block.has_children)fail('급식·상태는 하위 내용 없는 전용 콜아웃이어야 합니다.'); await inside(block); result[name]=block; }
+  const invalidCallout=()=>fail('급식·상태 전용 콜아웃 구조를 확인하세요.');
+  for(const name of ['meals','status']) {
+    const block=await get('block',manifest[name+'_block_id']);
+    if(block.type!=='callout'||!Array.isArray(block.callout?.rich_text)
+        ||typeof block.has_children!=='boolean')invalidCallout();
+    await inside(block);
+    let target=block;
+    if(block.has_children) {
+      // Native Notion can represent a one-line callout as an empty wrapper
+      // with one paragraph. Never overwrite a wrapper title or extra notes.
+      if(block.callout.rich_text.length!==0)invalidCallout();
+      const children=await notion.request('GET',`/blocks/${block.id}/children?page_size=2`);
+      if(!Array.isArray(children?.results)||children.has_more!==false
+          ||children.next_cursor!=null||children.results.length!==1)invalidCallout();
+      target=children.results[0];
+      if(!target||target.object!=='block'||target.archived||target.in_trash
+          ||target.type!=='paragraph'||target.has_children!==false
+          ||!Array.isArray(target.paragraph?.rich_text)
+          ||target.parent?.type!=='block_id'||!same(target.parent.block_id,block.id))invalidCallout();
+      uuid(target.id);
+      if(IDS.some(key=>same(target.id,manifest[key])))invalidCallout();
+    }
+    result[name]=block;
+    // This target is valid only for this invocation; it is not saved in state.
+    result[name+'Text']={id:target.id,type:target.type,container_id:block.id,
+      rich_text:target[target.type].rich_text};
+  }
   return result;
 }
 function cleanHtml(value) {
@@ -314,8 +340,8 @@ export async function syncStep({notion,manifest,snapshot,state,saveState,day}) {
   const current=new Date(Date.now()+9*3600000).toISOString().slice(0,10);
   if(day!==current)fail('작업 날짜가 바뀌었습니다. 오늘의 급식을 다시 조회하세요.');
   if(state.meals_date!==day) {
-    if(stable(richValue(targets.meals.callout.rich_text))!==stable(richValue(meal))) {
-      await patch('/blocks/'+manifest.meals_block_id,{callout:{rich_text:meal}});
+    if(stable(richValue(targets.mealsText.rich_text))!==stable(richValue(meal))) {
+      await patch('/blocks/'+targets.mealsText.id,{[targets.mealsText.type]:{rich_text:meal}});
     }
     state.meals_date=day;
     state.meals_checked_at=snapshot.meals.fetched_at;
@@ -362,5 +388,5 @@ export async function syncStep({notion,manifest,snapshot,state,saveState,day}) {
     state.calendar_hash=sourceHash;state.calendar_count=count;state.calendar_checked_at=snapshot.calendar.fetched_at;delete state.cycle;await save();
   }
   state.completed_at=new Date().toISOString();delete state.mutation;await save();
-  return {done:true,state};
+  return {done:true,state,statusTarget:targets.statusText};
 }
