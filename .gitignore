@@ -15,3 +15,8 @@ dist/
 firebase-debug.log*
 *-debug.log
 venv/
+node_modules/
+.wrangler/
+.dev.vars*
+cloudflare/wrangler.jsonc
+cloudflare/wrangler.json

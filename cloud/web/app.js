@@ -5,6 +5,7 @@ const messages = {active:'자동 갱신이 연결되어 있습니다.',waiting:'
   syncing:'급식과 학사일정을 갱신하고 있습니다.',paused:'자동 갱신이 일시 정지되어 있습니다.',
   retrying:'일시적인 오류로 다시 시도하고 있습니다. 기존 내용은 유지됩니다.',
   attention:'설정이나 원본 자료 확인이 필요합니다. 설치를 도운 AI에게 확인을 요청해 주세요.',
+  quota_wait:'오늘의 처리 한도에 도달해 다음 날 순차 갱신을 기다리고 있습니다. 기존 내용은 유지됩니다.',
   reconnect:'Notion 접근 권한을 다시 연결해 주세요.',academic_year_ended:'수첩 학년도가 끝나 자동 갱신을 중지했습니다.'};
 async function api(path, body, headers = {}) {
   const response = await fetch('/api/' + path, {method:body ? 'POST':'GET',credentials:'same-origin',

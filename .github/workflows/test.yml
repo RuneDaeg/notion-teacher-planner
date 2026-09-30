@@ -25,3 +25,19 @@ jobs:
       - run: pip install -r requirements.txt
       - run: python -m unittest discover -s cloud/tests -v
       - run: python -c "import main; assert main.planner_daily.__firebase_endpoint__.scheduleTrigger['schedule'] == '0 7 * * *'"
+  cloudflare:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: cloudflare
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: cloudflare/package-lock.json
+      - run: npm ci
+      - run: npm run check
+      - run: npm test
+      - run: npm run dry-run

@@ -1,0 +1,14 @@
+{
+  "name": "notion-teacher-planner-cloudflare",
+  "private": true,
+  "type": "module",
+  "engines": {"node": ">=22.13.0"},
+  "scripts": {
+    "test": "node --test test/*.test.mjs",
+    "check": "node --check src/index.mjs && node --check src/api.mjs && node --check src/security.mjs",
+    "dry-run": "wrangler deploy --dry-run --config wrangler.example.jsonc --outdir ../.local/cloudflare-build",
+    "dev": "wrangler dev --config wrangler.example.jsonc --test-scheduled",
+    "deploy": "node scripts/check-config.mjs && wrangler deploy --config wrangler.jsonc"
+  },
+  "devDependencies": {"wrangler": "4.144.0"}
+}
