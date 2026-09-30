@@ -70,16 +70,50 @@ class MealTests(unittest.TestCase):
         self.assertEqual(('PATCH', '/blocks/' + block), (method, target))
         self.assertEqual({'rich_text'}, set(body['callout']))
         content = json.dumps(body, ensure_ascii=False)
-        for value in ('2026-09-28', '가상학교', '중식', '(1.2.5)', '700 Kcal', '가상 원산지', '가상 영양정보', SOURCE_URL):
+        for value in ('오늘의 중식', '2026-09-28', '가상학교', '(1.2.5)', '700 Kcal', SOURCE_URL):
             self.assertIn(value, content)
+        for value in ('가상 원산지', '가상 영양정보'):
+            self.assertNotIn(value, content)
         self.api.calls.clear()
         self.assertEqual(0, update_meals(self.api, self.path, self.snapshot))
         self.assertEqual([], self.writes())
+
+    def test_all_meals_snapshot_displays_only_lunch_without_changing_source(self):
+        breakfast = {**self.snapshot['rows'][0], 'meal_code': '1', 'meal_name': '조식', 'menu': '가상 아침밥', 'calories': '500 Kcal'}
+        dinner = {**self.snapshot['rows'][0], 'meal_code': '3', 'meal_name': '석식', 'menu': '가상 저녁밥', 'calories': '800 Kcal'}
+        self.snapshot['rows'] = [breakfast, self.snapshot['rows'][0], dinner]
+        before = copy.deepcopy(self.snapshot)
+        content = json.dumps(meal_block(self.snapshot, 2026), ensure_ascii=False)
+        for value in ('오늘의 중식', '가상밥', '가상국 (1.2.5)', '700 Kcal', SOURCE_URL):
+            self.assertIn(value, content)
+        for value in ('가상 아침밥', '가상 저녁밥', '500 Kcal', '800 Kcal', '원산지', '영양정보'):
+            self.assertNotIn(value, content)
+        self.assertEqual(before, self.snapshot)
+
+    def test_missing_lunch_never_falls_back_to_breakfast_or_dinner(self):
+        for code, name in (('1', '조식'), ('3', '석식')):
+            with self.subTest(code=code):
+                snapshot = {**self.snapshot, 'rows': [{**self.snapshot['rows'][0], 'meal_code': code, 'meal_name': name}]}
+                content = json.dumps(meal_block(snapshot, 2026), ensure_ascii=False)
+                self.assertIn('해당 날짜에 공개된 중식 정보가 없습니다.', content)
+                self.assertNotIn('가상밥', content)
+                self.assertNotIn('700 Kcal', content)
+
+    def test_hidden_meal_and_fields_remain_validated_before_writes(self):
+        for field in ('menu', 'calories', 'origin', 'nutrition'):
+            for code, name in (('1', '조식'), ('2', '중식'), ('3', '석식')):
+                with self.subTest(field=field, code=code):
+                    invalid = {**self.snapshot['rows'][0], 'meal_code': code, 'meal_name': name, field: ['invalid']}
+                    rows = [invalid] if code == '2' else [self.snapshot['rows'][0], invalid]
+                    with self.assertRaises(ValueError):
+                        update_meals(self.api, self.path, {**self.snapshot, 'rows': rows})
+                    self.assertEqual([], self.api.calls)
 
     def test_empty_initial_result_does_not_bind_school_and_does_not_claim_no_meal(self):
         empty = {**self.snapshot, 'rows': [], 'school_name': ''}
         self.assertEqual(1, update_meals(self.api, self.path, empty))
         self.assertNotIn('neis_meals_source', self.state())
+        self.assertIn('해당 날짜에 공개된 중식 정보가 없습니다.', json.dumps(self.writes()[0][2], ensure_ascii=False))
         self.assertIn('미실시로 단정하지 않습니다', json.dumps(self.writes()[0][2], ensure_ascii=False))
         update_meals(self.api, self.path, self.snapshot)
         binding = self.state()['neis_meals_source']
@@ -206,6 +240,9 @@ class ExtrasSetupTests(unittest.TestCase):
                 state = Journal(path, api).data
                 self.assertEqual(before, state['databases'])
                 self.assertEqual(6, len(state['forms']['entries']))
+                meal_content = json.dumps(api.objects['/blocks/' + state['extras']['meal_block_id']], ensure_ascii=False)
+                self.assertIn('오늘의 중식', meal_content)
+                self.assertNotIn('조식·중식·석식', meal_content)
                 self.assertEqual([], verify_remote(api, state))
                 self.assertFalse(any(path.startswith(('/data_sources/', '/views')) or path == '/databases'
                                      for method, path, body in api.calls if method in ('POST', 'PATCH')))

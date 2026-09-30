@@ -55,9 +55,10 @@ def meal_block(snapshot, academic_year):
         raise ValueError('급식 행 배열을 확인하세요.')
     if rows and not name.strip():
         raise ValueError('급식 학교명이 없습니다.')
-    lines = [f'오늘의 급식 · {day.isoformat()} ({"월화수목금토일"[day.weekday()]})',
+    lines = [f'오늘의 중식 · {day.isoformat()} ({"월화수목금토일"[day.weekday()]})',
              name or f'교육청 {office} · 학교 {school}', f'조회: {checked}', '']
     codes = set()
+    lunch = None
     for row in rows:
         if not isinstance(row, dict):
             raise ValueError('급식 행 형식을 확인하세요.')
@@ -68,14 +69,18 @@ def meal_block(snapshot, academic_year):
         meal_name = {'1': '조식', '2': '중식', '3': '석식'}[code]
         if row.get('meal_name') != meal_name or not text(row.get('menu')).strip():
             raise ValueError('급식 구분·메뉴를 확인하세요.')
-        lines += [meal_name, row['menu']]
-        for field, label in (('calories', '열량'), ('origin', '원산지'), ('nutrition', '영양정보')):
-            value = text(row.get(field, ''))
-            if value:
-                lines.append(label + ': ' + value)
+        # Validate the complete snapshot even though home displays only lunch.
+        details = {field: text(row.get(field, '')) for field in ('calories', 'origin', 'nutrition')}
+        if code == '2':
+            lunch = (row['menu'], details['calories'])
+    if lunch is not None:
+        menu, calories = lunch
+        lines.append(menu)
+        if calories:
+            lines.append('열량: ' + calories)
         lines.append('')
-    if not rows:
-        lines += ['해당 날짜에 공개된 급식 정보가 없습니다.', '미등록·미제공일 수 있으므로 급식 미실시로 단정하지 않습니다.', '']
+    else:
+        lines += ['해당 날짜에 공개된 중식 정보가 없습니다.', '미등록·미제공일 수 있으므로 중식 미실시로 단정하지 않습니다.', '']
     lines += ['메뉴의 알레르기 번호는 원문 표시입니다. 번호가 없다고 알레르기 성분이 없다는 뜻은 아닙니다.',
               '마지막 조회 결과입니다. 표시 날짜를 확인하세요.']
     body = '\n'.join(lines)

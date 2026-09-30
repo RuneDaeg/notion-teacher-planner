@@ -305,9 +305,18 @@ function mealInfo(snapshot,manifest,day) {
   if(snapshot?.source!=='neis-meals'||snapshot.office_code!==manifest.office_code||snapshot.school_code!==manifest.school_code||snapshot.date!==day||day<start||day>end||!Array.isArray(snapshot.rows)||snapshot.rows.length>3||typeof snapshot.fetched_at!=='string'||!/(?:Z|[+-]\d{2}:\d{2})$/.test(snapshot.fetched_at)||!Number.isFinite(Date.parse(snapshot.fetched_at)))fail('오늘의 완전한 급식 원본이 필요합니다.');
   if(snapshot.rows.length&&snapshot.school_name!==manifest.school_name)fail('급식 학교명이 다릅니다.');
   const checked=new Date(Date.parse(snapshot.fetched_at)+9*3600000).toISOString().slice(0,16).replace('T',' ')+' KST';
-  const lines=['오늘의 급식 · '+day,manifest.school_name,'조회: '+checked,''],seen=new Set();
-  for(const row of snapshot.rows) { if(!MEAL_NAMES[row.meal_code]||seen.has(row.meal_code)||row.meal_name!==MEAL_NAMES[row.meal_code])fail('급식 식사 구분이 다르거나 중복됩니다.');seen.add(row.meal_code);lines.push(row.meal_name,text(row.menu,20000,true));for(const [key,label]of [['calories','열량'],['origin','원산지'],['nutrition','영양정보']]){const value=text(row[key]??'',20000);if(value)lines.push(label+': '+value);}lines.push(''); }
-  if(!snapshot.rows.length)lines.push('해당 날짜에 공개된 급식 정보가 없습니다.','미등록·미제공일 수 있으므로 급식 미실시로 단정하지 않습니다.');
+  const lines=['오늘의 중식 · '+day,manifest.school_name,'조회: '+checked,''],seen=new Set();
+  let lunch;
+  for(const row of snapshot.rows) {
+    if(typeof row?.meal_code!=='string'||!MEAL_NAMES[row.meal_code]||seen.has(row.meal_code)||row.meal_name!==MEAL_NAMES[row.meal_code])fail('급식 식사 구분이 다르거나 중복됩니다.');
+    seen.add(row.meal_code);
+    const menu=text(row.menu,20000,true),calories=text(row.calories??'',20000);
+    // Validate the complete snapshot, including fields omitted from the home view.
+    text(row.origin??'',20000);text(row.nutrition??'',20000);
+    if(row.meal_code==='2')lunch={menu,calories};
+  }
+  if(lunch) {lines.push(lunch.menu);if(lunch.calories)lines.push('열량: '+lunch.calories);lines.push('');}
+  else lines.push('해당 날짜에 공개된 중식 정보가 없습니다.','미등록·미제공일 수 있으므로 중식 미실시로 단정하지 않습니다.');
   lines.push('메뉴의 알레르기 번호는 원문 표시입니다. 번호가 없다고 알레르기 성분이 없다는 뜻은 아닙니다.','마지막 조회 결과입니다. 표시 날짜를 확인하세요.');
   const rt=rich(lines.join('\n'));rt.push({type:'text',text:{content:'\nNEIS 급식식단정보',link:{url:MEALS_URL}}});if(rt.length>100)fail('급식 표시 내용이 한도를 넘었습니다.');return rt;
 }

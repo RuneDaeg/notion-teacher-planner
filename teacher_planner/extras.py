@@ -32,7 +32,7 @@ def install_extras(j, c, root, databases):
     library = install_forms(j, c, root, databases)
     today = j.data['objects'].get('home:teacher_today', {}).get('parent', {}).get('database_id')
     meal = _place(j, MEAL_KEY, callout(
-        '오늘의 급식\n아직 조회하지 않았습니다. NEIS 인증키·교육청 코드·표준학교코드를 설정하고 meals-sync를 실행하세요.\n조회 후에는 날짜와 조식·중식·석식 메뉴를 표시합니다.',
+        '오늘의 중식\n아직 조회하지 않았습니다. NEIS 인증키·교육청 코드·표준학교코드를 설정하고 meals-sync를 실행하세요.\n조회 후에는 날짜와 중식 메뉴·열량을 표시합니다.',
         '🍱', 'yellow_background'), after=today)
     if library:
         anchor = j.data['objects'].get('layout:home:quick:cards', {}).get('id')

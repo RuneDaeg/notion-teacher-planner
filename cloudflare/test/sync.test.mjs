@@ -159,7 +159,37 @@ function plainText(block){return flatten(block.callout.rich_text);}
 test('lost info append is recovered without a duplicate block',async()=>{const f=await fixture([[dayAt(1)]]),page=f.notion.event(f.snapshot.calendar.rows[0]);await f.primeMeals();f.notion.loss=(m,p)=>m==='PATCH'&&p.endsWith('/children');await assert.rejects(f.step(),/lost/);assert.equal(f.state.pending.kind,'info');await f.finish();assert.equal(f.notion.children.get(page.id).length,2);assert.equal(f.notion.calls.filter(([m,p])=>m==='PATCH'&&p.endsWith('/children')).length,1);});
 test('owned callout containing new nested user notes is never overwritten',async()=>{const f=await fixture([[dayAt(1)]]);await f.finish();const key=f.snapshot.calendar.rows[0].external_id;f.notion.objects.get('/blocks/'+f.state.records[key].info_block_id).has_children=true;f.snapshot.calendar.rows[0].description='변경';f.notion.calls=[];await assert.rejects(f.step(),/하위 메모/);assert.equal(f.notion.mutations().length,0);});
 test('duplicate external IDs, partial year and stale meals stop without changes',async()=>{const f=await fixture([[dayAt(1)]]);f.notion.event(f.snapshot.calendar.rows[0]);f.notion.event(f.snapshot.calendar.rows[0]);await f.primeMeals();await assert.rejects(f.step(),/중복/);f.snapshot.calendar.start=dayAt(1);await assert.rejects(f.step(),/완전한 학년도/);f.snapshot.calendar.start=start;f.snapshot.meals.date=dayAt(0)===day?dayAt(1):dayAt(0);await assert.rejects(f.step(),/오늘의/);assert.equal(f.notion.mutations().length,0);});
-test('genuine no-data meals display dated absence; all three meals retain allergies',async()=>{const empty=await fixture();empty.snapshot.meals.rows=[];await empty.finish();assert.match(plainText(empty.notion.objects.get('/blocks/'+manifest.meals_block_id)),/공개된 급식 정보가 없습니다/);const f=await fixture();f.snapshot.meals.rows=[];for(const [code,name]of Object.entries({1:'조식',2:'중식',3:'석식'}))f.snapshot.meals.rows.push({meal_code:code,meal_name:name,menu:'가상국 (1.2.5)'});await f.finish();const body=plainText(f.notion.objects.get('/blocks/'+manifest.meals_block_id));for(const name of ['조식','중식','석식','1.2.5'])assert.ok(body.includes(name));});
+test('home renders only lunch menu and calories while retaining allergy numbers and source link',async()=>{
+  const f=await fixture();
+  f.snapshot.meals.rows=Object.entries({1:'조식',2:'중식',3:'석식'}).map(([code,name])=>({meal_code:code,meal_name:name,
+    menu:name+' 메뉴 (1.2.5)',calories:code+'00 Kcal',origin:'원산지 상세',nutrition:'영양정보 상세'}));
+  const original=clone(f.snapshot.meals);
+  await f.finish();
+  const block=f.notion.objects.get('/blocks/'+manifest.meals_block_id),body=plainText(block);
+  assert.ok(body.startsWith('오늘의 중식 · '+day));assert.match(body,/가상학교\n조회:/);
+  assert.match(body,/중식 메뉴 \(1\.2\.5\)/);assert.match(body,/열량: 200 Kcal/);
+  assert.doesNotMatch(body,/조식|석식|100 Kcal|300 Kcal|원산지 상세|영양정보 상세/);
+  assert.ok(block.callout.rich_text.some(item=>item.text?.content.includes('NEIS 급식식단정보')&&item.text.link?.url.startsWith('https://open.neis.go.kr/')));
+  assert.deepEqual(f.snapshot.meals,original);
+});
+test('missing lunch is explicit even when breakfast or dinner is present and never substitutes another meal',async()=>{
+  for(const codes of [[],['1'],['3'],['1','3']]) {
+    const f=await fixture();f.snapshot.meals.rows=codes.map(code=>({meal_code:code,meal_name:{1:'조식',3:'석식'}[code],menu:'다른 식사 메뉴 (1.2.5)'}));
+    await f.finish();const body=plainText(f.notion.objects.get('/blocks/'+manifest.meals_block_id));
+    assert.ok(body.startsWith('오늘의 중식 · '+day));
+    assert.match(body,/해당 날짜에 공개된 중식 정보가 없습니다\./);assert.doesNotMatch(body,/다른 식사 메뉴/);
+  }
+});
+test('excluded meals and undisplayed fields remain validated before any Notion write',async()=>{
+  for(const change of [{menu:''},{calories:123},{origin:{}},{nutrition:'x'.repeat(20001)},{meal_name:'잘못된 구분'},{meal_code:'9'},{meal_code:2,meal_name:'중식'}]) {
+    const f=await fixture();f.snapshot.meals.rows.push({meal_code:'1',meal_name:'조식',menu:'조식 메뉴',...change});
+    await assert.rejects(f.step(),SyncError);assert.equal(f.notion.mutations().length,0);
+  }
+  const duplicate=await fixture();duplicate.snapshot.meals.rows=[{meal_code:'1',meal_name:'조식',menu:'조식 메뉴'},{meal_code:'1',meal_name:'조식',menu:'다른 조식'}];
+  await assert.rejects(duplicate.step(),/중복/);assert.equal(duplicate.notion.mutations().length,0);
+  const lunch=await fixture();lunch.snapshot.meals.rows[0].origin=123;
+  await assert.rejects(lunch.step(),SyncError);assert.equal(lunch.notion.mutations().length,0);
+});
 test('NEIS complete snapshot reads meals once and validates school/date/allergy data',async()=>{const urls=[];const snapshot=await fetchSchoolSnapshot(manifest,day,'fake-neis-key',async url=>{urls.push(new URL(url));return jsonResponse(url.includes('SchoolSchedule')?apiPage('SchoolSchedule',[rawEvent()]):apiPage('mealServiceDietInfo',['1','2','3'].map(rawMeal)));});assert.equal(urls.length,2);assert.equal(snapshot.calendar.rows.length,1);assert.equal(snapshot.meals.rows.length,3);assert.equal(snapshot.meals.rows[0].menu,'밥\n국 (1.2.5)');assert.ok(!JSON.stringify(snapshot).includes('fake-neis-key'));});
 test('NEIS no-data is distinct from errors, partial pages and later-page gaps',async()=>{const empty=await fetchSchoolSnapshot(manifest,day,'fake-key',async()=>jsonResponse({RESULT:{CODE:'INFO-200'}}));assert.equal(empty.calendar.rows.length,0);assert.equal(empty.meals.rows.length,0);await assert.rejects(fetchSchoolSnapshot(manifest,day,'fake-key',async()=>jsonResponse({RESULT:{CODE:'ERROR-337'}})),error=>error.retryable===true);await assert.rejects(fetchSchoolSnapshot(manifest,day,'fake-key',async()=>jsonResponse(apiPage('SchoolSchedule',[rawEvent()],2))),/불완전/);let calls=0;await assert.rejects(fetchSchoolSnapshot(manifest,day,'fake-key',async()=>{calls++;return jsonResponse(calls===1?apiPage('SchoolSchedule',Array.from({length:1000},()=>rawEvent()),1001):{RESULT:{CODE:'INFO-200'}});}),/불완전/);assert.equal(calls,2);});
 test('NEIS 2000-row cap and wrong schools fail before partial snapshots',async()=>{await assert.rejects(fetchSchoolSnapshot(manifest,day,'fake-key',async()=>jsonResponse(apiPage('SchoolSchedule',[],2001))),/한도/);const raw=rawEvent();raw.SD_SCHUL_CODE='7654321';await assert.rejects(fetchSchoolSnapshot(manifest,day,'fake-key',async()=>jsonResponse(apiPage('SchoolSchedule',[raw]))),/학교/);});
