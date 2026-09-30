@@ -45,9 +45,11 @@ Cron 설정은 UTC 기준이므로 실행 여부와 일일 중복 방지는 코�
 
 1. Cloudflare 계정과 Workers Free 사용 가능 상태를 확인한다. 교사마다 Cloudflare 계정을 만들 필요는 없다.
 2. 서비스용 D1 데이터베이스를 만들고 반환된 실제 DB ID를 로컬 배포 설정에 기록한다. 계정·DB ID가 들어간 개인 설정은 공개 Git에 올리지 않는다.
-3. Notion 공개 OAuth 연결을 준비하고 읽기·삽입·수정 기능을 설정한다. 템플릿 복제를 등록하지 않고 기존 수첩을 선택하도록 한다. Redirect URI는 실제 서비스 기본 URL의 `/api/callback`이다. [Notion 공개 연결](https://developers.notion.com/guides/get-started/public-connections)
+3. Notion 공개 OAuth 연결을 준비하고 콘텐츠 읽기·수정·삽입 세 권한만 켠다. 댓글 읽기·삽입은 끄고 사용자 정보는 **사용자 정보 없음(No user information)**으로 설정한다. 템플릿 복제를 등록하지 않고 기존 수첩을 선택하도록 한다. Redirect URI는 실제 서비스 기본 URL의 `/api/callback`이다. [Notion 공개 연결](https://developers.notion.com/guides/get-started/public-connections), [권한 설정](https://developers.notion.com/reference/capabilities)
 4. 아래 비밀값과 공개 매개변수를 설정한다. 운영자가 보유한 NEIS 키 한 개로 학교별 공개 자료를 조회한다.
 5. 실제 Worker 배포와 D1 스키마 적용 후 테스트 수첩으로 OAuth·등록·일일 갱신·중복 실행·일시 중지를 확인한다.
+
+승인자 구분에는 OAuth 응답의 `owner.user.id`를 사용하며 이름·프로필 사진·이메일은 필요하지 않다. 공식 문서는 OAuth `owner`에 승인한 사용자의 객체가 반환되고 User 객체의 `object`와 `id`는 항상 포함된다고 명시한다. 사용자 정보 권한을 꺼도 이 식별값을 사용하는 설계이며, 실제 최소 권한 승인에서 등록 성공을 확인한다. 기존 연결의 권한을 변경했다면 다시 OAuth 승인을 받는다. [OAuth 응답](https://developers.notion.com/guides/get-started/authorization), [User 객체](https://developers.notion.com/reference/user), [권한 변경](https://developers.notion.com/reference/capabilities)
 
 | 설정 위치 | 이름 | 용도 |
 | --- | --- | --- |
