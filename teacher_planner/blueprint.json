@@ -470,7 +470,8 @@
         },
         "학생": {
           "type": "relation",
-          "target": "students"
+          "target": "students",
+          "reciprocal": "상담 기록"
         },
         "상담일": {
           "type": "date"

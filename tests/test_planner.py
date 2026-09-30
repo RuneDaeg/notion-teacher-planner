@@ -78,6 +78,7 @@ class FakeNotion:
                     title = next((p['title'] for p in payload['properties'].values() if 'title' in p), [])
                     self.add_reference(parent, obj_id, 'child_page', ''.join(x.get('text', {}).get('content', '') for x in title))
                 self.add_blocks(obj_id, payload.get('children', []))
+                self.sync_reciprocal_values(obj, {})
             if path == '/views':
                 if 'database_id' in payload:
                     obj['parent'] = {'type': 'database_id', 'database_id': payload['database_id']}
@@ -99,11 +100,13 @@ class FakeNotion:
             obj = self.objects[path]
             props = copy.deepcopy(payload['properties'])
             if path.startswith('/data_sources/'):
-                props = self.prop_schema(props)
+                self.update_schema(obj, props)
             else:
+                before = copy.deepcopy(obj['properties'])
                 for prop in props.values():
                     prop['type'] = next(iter(prop))
-            obj['properties'].update(props)
+                obj['properties'].update(props)
+                self.sync_reciprocal_values(obj, before)
             return copy.deepcopy(obj)
         raise AssertionError((method, path))
 
@@ -157,6 +160,49 @@ class FakeNotion:
 
     def prop_schema(self, props):
         return {n: {'id': str(uuid4())[:8], 'type': next(iter(v)), **copy.deepcopy(v)} for n, v in props.items()}
+
+    def update_schema(self, source, changes):
+        for key, change in changes.items():
+            old_name = next((name for name, prop in source['properties'].items() if prop['id'] == key), key)
+            if set(change) == {'name'}:
+                prop = source['properties'].pop(old_name)
+                source['properties'][change['name']] = prop
+                relation = prop.get('relation', {})
+                if relation.get('type') == 'dual_property':
+                    other = self.objects['/data_sources/' + relation['data_source_id']]['properties']
+                    paired = next(p for p in other.values() if p['id'] == relation['dual_property']['synced_property_id'])
+                    paired['relation']['dual_property']['synced_property_name'] = change['name']
+                continue
+            prop = self.prop_schema({key: change})[key]
+            if old_name in source['properties']:
+                prop['id'] = source['properties'][old_name]['id']
+            relation = prop.get('relation', {})
+            if relation.get('type') == 'dual_property' and not relation.get('dual_property'):
+                target = self.objects['/data_sources/' + relation['data_source_id']]
+                name = 'Related to ' + source['id']
+                reverse = self.prop_schema({name: {'relation': {
+                    'data_source_id': source['id'], 'type': 'dual_property',
+                    'dual_property': {'synced_property_id': prop['id'], 'synced_property_name': key}}}})[name]
+                target['properties'][name] = reverse
+                relation['dual_property'] = {'synced_property_id': reverse['id'], 'synced_property_name': name}
+            source['properties'][key] = prop
+
+    def sync_reciprocal_values(self, page, before):
+        ds = page.get('parent', {}).get('data_source_id')
+        if not ds:
+            return
+        for name, definition in self.objects['/data_sources/' + ds]['properties'].items():
+            relation = definition.get('relation', {})
+            if relation.get('type') != 'dual_property' or name not in page['properties']:
+                continue
+            reverse_name = relation['dual_property']['synced_property_name']
+            old = {v['id'] for v in before.get(name, {}).get('relation', [])}
+            new = {v['id'] for v in page['properties'][name]['relation']}
+            for related in old | new:
+                prop = self.objects['/pages/' + related]['properties'].setdefault(reverse_name, {'type': 'relation', 'relation': []})
+                prop['relation'] = [v for v in prop['relation'] if v['id'] != page['id']]
+                if related in new:
+                    prop['relation'].append({'id': page['id']})
 
     def pages(self, ds, filter_=None):
         # Fixtures contain one academic year. Returning all records is conservative

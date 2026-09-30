@@ -87,7 +87,8 @@ def schema(properties, ids=None):
         t = p['type']
         if t == 'relation':
             if ids is not None:
-                result[name] = {'relation': {'data_source_id': ids[p['target']], 'type': 'single_property', 'single_property': {}}}
+                kind = 'dual_property' if p.get('reciprocal') else 'single_property'
+                result[name] = {'relation': {'data_source_id': ids[p['target']], 'type': kind, kind: {}}}
         elif t in ('select', 'multi_select'):
             colors = ['red', 'blue', 'yellow', 'gray'] if name == '우선순위' else ['default'] * len(p['options'])
             result[name] = {t: {'options': [{'name': s, 'color': colors[i]} for i, s in enumerate(p['options'])]}}
@@ -98,6 +99,27 @@ def schema(properties, ids=None):
         else:
             result[name] = {t: {}}
     return result
+
+
+def reciprocal_property(source, source_name, source_id, target_id, target_properties):
+    """Resolve a native reciprocal by stable IDs, never by its display name alone."""
+    relation = source.get('relation', {})
+    paired = relation.get('dual_property', {})
+    matches = [(name, prop) for name, prop in target_properties.items()
+               if prop.get('id') and prop['id'] == paired.get('synced_property_id')]
+    if (source.get('type') != 'relation' or not source.get('id')
+            or relation.get('data_source_id') != target_id or relation.get('type') != 'dual_property'
+            or len(matches) != 1):
+        raise ValueError('양방향 관계의 원본·대상 속성을 확인할 수 없습니다.')
+    name, reverse = matches[0]
+    back = reverse.get('relation', {})
+    if (reverse.get('type') != 'relation' or back.get('data_source_id') != source_id
+            or back.get('type') != 'dual_property'
+            or back.get('dual_property', {}).get('synced_property_id') != source['id']
+            or paired.get('synced_property_name') != name
+            or back.get('dual_property', {}).get('synced_property_name') != source_name):
+        raise ValueError('양방향 관계의 역방향 연결이 일치하지 않습니다.')
+    return name, reverse
 
 
 def values(properties, definitions):

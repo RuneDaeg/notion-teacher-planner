@@ -9,7 +9,7 @@ from pathlib import Path
 from uuid import UUID
 
 from .client import NotionError
-from .model import blueprint, rich, schema, selected, values, view_payload
+from .model import blueprint, reciprocal_property, rich, schema, selected, values, view_payload
 
 
 def page_id(text):
@@ -91,6 +91,51 @@ def block(kind, text):
     return {'object': 'block', 'type': kind, kind: {'rich_text': rich(text)}}
 
 
+def finish_reciprocal(j, key, source_id, source_name, target_id, expected_name, source):
+    """Name only the reverse property made by this installation; resume by stable IDs.
+
+    Notion documents dual_property:{} creation and renaming returned properties by ID:
+    https://developers.notion.com/reference/property-object
+    https://developers.notion.com/reference/update-data-source-properties
+    """
+    target_path = '/data_sources/' + target_id
+    props = j.client.request('GET', target_path)['properties']
+    name, reverse = reciprocal_property(source, source_name, source_id, target_id, props)
+    plans = j.data.setdefault('reciprocal_relations', {})
+    plan = plans.get(key)
+    if plan is None:
+        # An existing relation is reusable only if already exactly as requested.
+        if name != expected_name:
+            raise ValueError('기존 역방향 관계 이름이 다릅니다. 자동 변경을 중단합니다.')
+        plan = plans[key] = {'source_id': source_id, 'target_id': target_id, 'name': expected_name}
+    if (plan.get('source_id'), plan.get('target_id'), plan.get('name')) != (source_id, target_id, expected_name):
+        raise ValueError('저장된 역방향 관계 계획이 다릅니다. 자동 변경을 중단합니다.')
+    if plan.get('creation_pending') and name != expected_name:
+        raise ValueError('양방향 관계 생성 응답이 불확실합니다. 역속성 이름을 확인한 뒤 재시도하세요. 자동 개명하지 않습니다.')
+    owns_pair = (plan.get('creating') and plan.get('source_property_id') == source['id']
+                 and plan.get('target_property_id') == reverse['id'])
+    for field, actual in (('source_property_id', source['id']), ('target_property_id', reverse['id'])):
+        if plan.get(field) not in (None, actual):
+            raise ValueError('저장된 양방향 관계 속성 ID가 다릅니다. 자동 변경을 중단합니다.')
+        plan[field] = actual
+    if name != expected_name:
+        if (plan.get('complete') or not owns_pair or expected_name in props
+                or plan.get('initial_name', name) != name):
+            raise ValueError('기존 역방향 관계 이름이 다르거나 충돌합니다. 자동 변경을 중단합니다.')
+        plan['initial_name'] = name
+        j.save()  # The exact property ID and original name precede the rename.
+        j.client.request('PATCH', target_path, {'properties': {reverse['id']: {'name': expected_name}}})
+        source = j.client.request('GET', '/data_sources/' + source_id)['properties'][source_name]
+        props = j.client.request('GET', target_path)['properties']
+        name, reverse = reciprocal_property(source, source_name, source_id, target_id, props)
+        if name != expected_name or reverse['id'] != plan['target_property_id']:
+            raise ValueError('역방향 관계 이름 변경을 확인하지 못했습니다.')
+    plan['complete'] = True
+    plan.pop('creating', None)
+    plan.pop('creation_pending', None)
+    j.save()
+
+
 def install(client, c, parent, state_path):
     parent = page_id(parent)
     j = Journal(state_path, client)
@@ -131,7 +176,6 @@ def install(client, c, parent, state_path):
     j.data['databases'] = databases
     j.save()
     ids = {k: v['data_source_id'] for k, v in databases.items()}
-    actual_props = {}
     for d in definitions:
         ds = ids[d['key']]
         current = client.request('GET', '/data_sources/' + ds)['properties']
@@ -139,12 +183,55 @@ def install(client, c, parent, state_path):
         missing = {}
         for name, prop in relations.items():
             if name not in current:
+                reciprocal = d['properties'][name].get('reciprocal')
+                if reciprocal:
+                    key = d['key'] + ':' + name
+                    target_id = prop['relation']['data_source_id']
+                    plans = j.data.setdefault('reciprocal_relations', {})
+                    plan = plans.get(key)
+                    if plan and plan.get('source_property_id'):
+                        raise ValueError('저장된 양방향 관계 속성이 없어 자동 재생성을 중단합니다.')
+                    if plan and plan.get('creation_pending'):
+                        raise ValueError('양방향 관계 생성 응답이 불확실합니다. 실제 생성 여부를 확인하기 전 자동 재생성을 중단합니다.')
+                    if plan and (plan.get('source_id'), plan.get('target_id'), plan.get('name')) != (ds, target_id, reciprocal):
+                        raise ValueError('저장된 역방향 관계 계획이 다릅니다. 자동 변경을 중단합니다.')
+                    target_props = client.request('GET', '/data_sources/' + target_id)['properties']
+                    if reciprocal in target_props:
+                        raise ValueError('역방향 관계 이름이 기존 속성과 충돌합니다. 자동 변경을 중단합니다.')
+                    plans[key] = {'source_id': ds, 'target_id': target_id, 'name': reciprocal, 'creation_pending': True}
+                    j.save()
                 missing[name] = prop
-            elif current[name].get('relation', {}).get('data_source_id') != prop['relation']['data_source_id']:
+            elif (current[name].get('relation', {}).get('data_source_id') != prop['relation']['data_source_id']
+                  or current[name].get('relation', {}).get('type') != prop['relation']['type']):
                 raise ValueError(f"{d['title']} / {name} 관계가 달라 자동 변경을 중단합니다.")
         if missing:
-            client.request('PATCH', '/data_sources/' + ds, {'properties': missing})
-        actual_props[d['key']] = client.request('GET', '/data_sources/' + ds)['properties']
+            duals = [name for name in missing if d['properties'][name].get('reciprocal')]
+            try:
+                result = client.request('PATCH', '/data_sources/' + ds, {'properties': missing})
+            except NotionError as error:
+                if error.status in (400, 401, 403, 404, 429):
+                    for name in duals:
+                        j.data['reciprocal_relations'].pop(d['key'] + ':' + name)
+                    j.save()
+                raise
+            # A plan alone does not establish ownership after a crash/unknown response.
+            # Persist the successful response's IDs before any read or reverse rename.
+            for name in duals:
+                created = result.get('properties', {}).get(name, {})
+                reverse_id = created.get('relation', {}).get('dual_property', {}).get('synced_property_id')
+                if not created.get('id') or not reverse_id:
+                    raise ValueError('양방향 관계 생성 응답의 속성 ID를 확인하지 못했습니다. 자동 개명하지 않습니다.')
+                plan = j.data['reciprocal_relations'][d['key'] + ':' + name]
+                plan.update(source_property_id=created['id'], target_property_id=reverse_id, creating=True)
+                plan.pop('creation_pending')
+            if duals:
+                j.save()
+        current = client.request('GET', '/data_sources/' + ds)['properties']
+        for name, prop in d['properties'].items():
+            if prop.get('reciprocal'):
+                finish_reciprocal(j, d['key'] + ':' + name, ds, name, ids[prop['target']], prop['reciprocal'], current[name])
+    # A later source may add a reciprocal to an earlier source (e.g. students).
+    actual_props = {key: client.request('GET', '/data_sources/' + ds)['properties'] for key, ds in ids.items()}
     for v in views:
         j.create('view:' + v['key'], '/views', view_payload(v, databases[v['source']], actual_props[v['source']], c['academic_year']))
     from .home import install_dashboard

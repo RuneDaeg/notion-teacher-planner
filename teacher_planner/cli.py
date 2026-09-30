@@ -10,7 +10,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from .client import Client, NotionError
 from .install import Journal, compact, fingerprint, install, locked, page_id
-from .model import blueprint, config, dashboard_views, selected
+from .model import blueprint, config, dashboard_views, reciprocal_property, selected
 from .timetable import apply_changes, changes, read_rows
 
 
@@ -286,6 +286,19 @@ def verify_remote(client, state):
                 issues.append(f"{d['title']}: {name} 속성/유형 불일치")
             elif expected['type'] == 'relation' and props[name]['relation'].get('data_source_id') != state['databases'][expected['target']]['data_source_id']:
                 issues.append(f"{d['title']}: {name} 관계 대상 불일치")
+            elif expected.get('reciprocal'):
+                target_id = state['databases'][expected['target']]['data_source_id']
+                target_props = client.request('GET', '/data_sources/' + target_id)['properties']
+                try:
+                    reverse_name, reverse = reciprocal_property(props[name], name, ref['data_source_id'], target_id, target_props)
+                    if reverse_name != expected['reciprocal']:
+                        raise ValueError('역방향 이름 불일치')
+                    pair = state.get('reciprocal_relations', {}).get(d['key'] + ':' + name, {})
+                    if (pair.get('source_property_id') != props[name]['id']
+                            or pair.get('target_property_id') != reverse['id']):
+                        raise ValueError('저장된 양방향 속성 ID 불일치')
+                except ValueError:
+                    issues.append(f"{d['title']}: {name} 양방향 관계 불일치")
         for v in (v for v in vs if v['source'] == d['key']):
             keys = ['view:' + v['key']]
             if instances is not None:
