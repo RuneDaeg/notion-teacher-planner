@@ -15,9 +15,12 @@
 ```text
 https://github.com/RuneDaeg/notion-teacher-planner 를 읽고
 START_HERE.md 순서대로 내 Notion에 미니 교무수첩을 만들어줘.
-학교급, 학년도와 학기, 담당 반과 교과, 추가 기능을 먼저 물어봐줘.
+docs/ONBOARDING.md의 공통 질문 문구·선택지·순서에 따라
+이미 답한 내용은 건너뛰고 필요한 질문만 2~3개씩 물어봐줘.
 Notion 연결을 확인하고 내가 지정한 페이지 아래에 만들어줘.
 ```
+
+[공통 설치 질문지](docs/ONBOARDING.md)에 학교·담당 수업·생성 위치·추가 기능·양식·시간표·급식과 학사일정의 질문을 미리 정해 두었습니다. 컴시간을 선택한 경우에만 학교 코드·교사 번호를 묻는 등 같은 분기 규칙을 따릅니다. 질문지 버전과 답변을 비공개로 기록해 이어서 진행할 때 재사용합니다. AI에 주는 공통 지침이며 모든 AI의 준수나 실행 능력을 보장하는 자동 설문 프로그램은 아닙니다.
 
 AI가 GitHub를 읽을 수 없다면 저장소를 ZIP으로 내려받아 첨부하세요. 채팅 전용 AI는 설계 안내까지 가능하며, **실제 생성에는 Notion 쓰기 도구(MCP/커넥터) 또는 아래 Python 실행 환경과 Notion 연결 토큰이 필요합니다.** 도구가 없는데 생성했다고 답하지 않도록 실행 지침을 포함했습니다.
 
@@ -177,6 +180,7 @@ Python 설치의 `양식 모음`은 상담·학부모 연락·회의록·수업�
 ## AI와 개발자를 위한 안내
 
 - [START_HERE.md](START_HERE.md): AI가 읽을 첫 문서
+- [ONBOARDING.md](docs/ONBOARDING.md): AI 공통 질문 원문·선택지·순서·조건과 설정 매핑
 - [AGENTS.md](AGENTS.md): 실행 범위와 데이터 취급 원칙
 - [INSTALL_WITH_MCP.md](docs/INSTALL_WITH_MCP.md): Notion 커넥터로 설치
 - [DESIGN.md](DESIGN.md): 요청 디자인과 Notion 네이티브 표현 기준

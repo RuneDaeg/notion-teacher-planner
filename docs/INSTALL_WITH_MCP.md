@@ -4,7 +4,7 @@
 
 ## 준비와 설계 원본
 
-1. `START_HERE.md`에서 이미 받은 학년도·학기·반·교과·선택 모듈과 상위 페이지를 확인한다. 같은 답을 다시 묻지 않는다.
+1. `START_HERE.md`와 [공통 질문지](ONBOARDING.md)에 따라 이미 받은 학년도·학기·반·교과·선택 모듈과 상위 페이지를 확인한다. 누락된 답만 고정 문구·순서·분기 규칙으로 받고 같은 답을 다시 묻지 않는다.
 2. 연결 계정과 사용자가 지정한 상위 일반 페이지를 확인한다. 기존 설치가 있으면 그 기록을 먼저 읽는다.
 3. 실제 도구의 enhanced Markdown·뷰 DSL·블록 명세를 읽는다. REST 요청 형식과 MCP DSL을 섞지 않는다.
 4. `DESIGN.md`, `docs/DEFAULT_TEMPLATE.md`, `teacher_planner/dashboard.json` 버전 5의 `workspace.pages`, `teacher_planner/blueprint.json`을 읽는다.
