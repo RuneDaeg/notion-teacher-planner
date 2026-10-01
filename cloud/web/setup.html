@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="학교와 담당 수업, 필요한 기능을 선택해 나만의 Notion 교무수첩을 만들 AI 요청문을 준비하세요.">
+  <title>나의 교무수첩 만들기 · 교무수첩 데스크</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/setup.css">
+  <script type="module" src="/setup.js"></script>
+</head>
+<body>
+  <a href="#wizard" class="skip-link">설문으로 이동</a>
+  <header class="site-header">
+    <a class="brand" href="/setup"><span class="brand-mark" aria-hidden="true">▤</span> 교무수첩 데스크 <span class="brand-tag">FOR TEACHERS</span></a>
+    <nav aria-label="사이트 메뉴"><a href="/connect">연결 · 업데이트</a><a href="https://github.com/RuneDaeg/notion-teacher-planner" target="_blank" rel="noopener noreferrer">GitHub ↗</a></nav>
+  </header>
+  <main class="workspace">
+    <section class="intro" aria-labelledby="page-title">
+      <span class="eyebrow"><span class="green-dot" aria-hidden="true"></span> 나만의 NOTION 워크스페이스</span>
+      <h1 id="page-title">선생님의 하루에 맞는<br>교무수첩을 준비하세요.</h1>
+      <p>필요한 것만 고르면, AI에게 전달할 요청문이 완성됩니다.<br>익숙한 AI와 함께 나의 Notion에 수첩을 만들어 보세요.</p>
+      <div class="intro-meta"><span>5단계 설정</span><span>API 키 입력 없음</span><span>입력 내용은 이 브라우저에서만 처리</span></div>
+    </section>
+    <div class="desk-layout">
+      <aside class="step-rail" aria-label="설정 진행 상황">
+        <div class="rail-label">수첩 설정</div>
+        <nav id="step-nav" aria-label="설문 단계"></nav>
+        <div class="rail-note"><span aria-hidden="true">↳</span><p>완벽하게 정하지 않아도<br>괜찮아요. 선택 항목은<br>나중에 연결할 수 있어요.</p></div>
+      </aside>
+      <div class="form-column">
+        <section class="wizard-card" id="wizard" aria-labelledby="step-title">
+          <div class="card-heading"><div><span class="step-count" id="step-count">STEP 01 / 05</span><h2 id="step-title" tabindex="-1">학교와 학기</h2></div><span class="paper-icon" aria-hidden="true">▤</span></div>
+          <progress id="progress" max="5" value="1" aria-label="현재 설정 단계">1 / 5</progress>
+          <form id="setup-form" novalidate>
+            <div id="form-errors" class="error-summary" role="alert" hidden></div>
+            <div id="questions"></div>
+            <div class="form-actions"><button type="button" id="previous" class="button secondary">← 이전</button><span id="navigation-caption" class="navigation-caption">입력한 내용은 돌아와서 바꿀 수 있어요.</span><button type="submit" id="next" class="button primary">다음 단계 →</button></div>
+          </form>
+          <noscript><p class="error-summary">설문을 사용하려면 JavaScript를 켜주세요. <a href="https://github.com/RuneDaeg/notion-teacher-planner/blob/main/docs/ONBOARDING.md">공통 질문지</a>를 AI에 전달해 진행할 수도 있습니다.</p></noscript>
+        </section>
+        <section id="result" class="wizard-card result-card" aria-labelledby="result-title" hidden>
+          <span class="success-mark" aria-hidden="true">✓</span><span class="step-count">READY FOR YOUR AI</span>
+          <h2 id="result-title" tabindex="-1">이제, AI에게 건네주세요.</h2>
+          <p class="result-lead">설정이 담긴 요청문을 복사해 사용하는 AI에 붙여넣으세요.<br>AI가 Notion 연결을 확인한 뒤 교무수첩 만들기를 진행합니다.</p>
+          <dl id="result-summary" class="result-summary"></dl>
+          <div class="result-actions"><button type="button" id="copy-prompt" class="button primary">AI용 요청문 복사</button><button type="button" id="edit-answers" class="button secondary">설정 다시 보기</button></div>
+          <p id="copy-status" role="status" aria-live="polite"></p>
+          <details class="prompt-details"><summary>생성된 요청문 살펴보기</summary><label class="sr-only" for="prompt-output">AI용 요청문</label><textarea id="prompt-output" readonly spellcheck="false"></textarea></details>
+          <div class="callout"><strong>Notion을 편집할 수 있는 AI가 필요해요.</strong><p>이 설문은 요청문을 준비합니다. 실제 수첩 생성은 AI의 Notion 연결 또는 로컬 설치 도구로 진행합니다. 자동 갱신을 골랐다면 수첩을 만든 후 별도로 Notion 연결을 승인합니다.</p></div>
+        </section>
+        <div class="draft-bar"><span id="draft-status" role="status">답변은 이 탭에 임시 저장됩니다.</span><button id="reset" type="button">입력 초기화</button></div>
+        <div id="reset-confirm" class="reset-confirm" hidden><p>이 설문의 입력 내용과 임시 저장을 모두 지울까요?</p><button type="button" id="reset-yes" class="button secondary">입력 내용 지우기</button><button type="button" id="reset-no" class="button text-button">계속 작성하기</button></div>
+        <p id="change-notice" class="change-notice" role="status" aria-live="polite"></p>
+      </div>
+      <aside class="summary-rail" aria-label="선택한 수첩 미리보기">
+        <div class="notebook-preview"><div class="notebook-top"><span aria-hidden="true">▤</span><span>MY TEACHER PLANNER</span></div><h2 id="preview-title">나의 교무수첩</h2><p id="preview-school">학교와 학기를 선택해 주세요.</p><div class="notebook-lines" aria-hidden="true"><span></span><span></span><span></span></div><span class="notebook-caption">선생님의 기록이 쌓일 공간</span></div>
+        <div class="selection-card"><h3>이번 수첩에는</h3><div id="selection-summary"></div><p class="small-note">선택한 기능만 준비합니다.<br>학생 명단과 실제 기록은 설치 후 입력하세요.</p></div>
+        <a class="guide-link" href="https://github.com/RuneDaeg/notion-teacher-planner/blob/main/output/pdf/%EA%B5%90%EB%AC%B4%EC%88%98%EC%B2%A9_%EC%82%AC%EC%9A%A9%EC%95%88%EB%82%B4%EC%84%9C.pdf" target="_blank" rel="noopener noreferrer"><span>처음이라면, 사용 안내서</span><span aria-hidden="true">↗</span></a>
+      </aside>
+    </div>
+    <footer><span>교무수첩 데스크 <span class="footer-dot">·</span> 공통 질문지 v1</span><span>토큰·비밀번호·학생 상담 내용은 입력하지 마세요.</span></footer>
+  </main>
+</body>
+</html>

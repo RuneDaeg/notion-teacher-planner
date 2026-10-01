@@ -10,6 +10,8 @@
     "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
     "rewrites": [
       {"source": "/api/**", "function": {"functionId": "planner_api", "region": "asia-northeast3"}},
+      {"source": "/setup", "destination": "/setup.html"},
+      {"source": "/setup/", "destination": "/setup.html"},
       {"source": "**", "destination": "/index.html"}
     ],
     "headers": [{"source": "**", "headers": [
