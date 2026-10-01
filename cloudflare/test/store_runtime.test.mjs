@@ -9,13 +9,19 @@ import { createNotionClient as realClient, syncStep as realStep, eventId, LIMITS
 // Real SQLite executes production SQL. This shim only supplies D1's binding,
 // async result shapes and atomic batch transaction; it is not a cloud test.
 class D1 {
-  constructor() { this.sql = new DatabaseSync(':memory:'); this.sql.exec(readFileSync(new URL('../migrations/0001_initial.sql', import.meta.url), 'utf8')); }
+  constructor() {
+    this.sql = new DatabaseSync(':memory:');
+    for (const migration of ['0001_initial.sql', '0002_template_updates.sql']) {
+      this.sql.exec(readFileSync(new URL('../migrations/' + migration, import.meta.url), 'utf8'));
+    }
+  }
   prepare(sql) {
     const db = this.sql;
     return { bind(...args) {
       return {
         async first() { return db.prepare(sql).get(...args) ?? null; },
         async run() { return { success: true, meta: db.prepare(sql).run(...args) }; },
+        async all() { return { success: true, results: db.prepare(sql).all(...args) }; },
         allSync() { return { success: true, results: db.prepare(sql).all(...args) }; },
       };
     } };
@@ -49,6 +55,114 @@ function fixture(options = {}) {
     register: (number = 1) => store.register(manifest(number), identity, 'encrypted') };
 }
 async function claim(f) { const global = await f.store.claimGlobal(); const work = await f.store.claimDue(global); return { global, ...work }; }
+
+const UPDATE_ID = 'student-history-v1';
+const updateTargets = () => ({ students_data_source_id: fakeId(501), counseling_data_source_id: fakeId(502), student_property_id: 'relation-id' });
+
+test('paused template update journals preserve every daily-sync field and credentials', async () => {
+  const f = fixture(), id = await f.register();
+  assert.equal((await f.run()).status, 'complete');
+  await f.store.setEnabled(id, identity.owner_id, false);
+  f.db.sql.prepare('UPDATE planner_installations SET state_json = ? WHERE id = ?').run('{"pending":{"key":"keep"},"binding":"keep-binding"}', id);
+  const before = await f.store.get(id);
+  assert.deepEqual(await f.store.getUpdates(id), []);
+  const work = await f.store.claimUpdate(id, identity.owner_id);
+  assert.equal(work.doc.enabled, false);
+  await f.store.assertUpdateLease(work.lease);
+  await f.store.saveUpdate(work.lease, UPDATE_ID, updateTargets(), { stage: 'pending' }, 'pending');
+  await f.store.saveUpdate(work.lease, UPDATE_ID, updateTargets(), { stage: 'verified', property_id: 'reverse-id' }, 'schema_applied');
+  await f.store.releaseUpdate(work.lease);
+  assert.deepEqual(await f.store.get(id), before);
+  assert.deepEqual(await f.store.getUpdates(id), [{ update_id: UPDATE_ID, targets: updateTargets(),
+    journal: { stage: 'verified', property_id: 'reverse-id' }, status: 'schema_applied', updated_at: f.clock.value }]);
+});
+
+test('template and daily-sync claims are mutually exclusive, including a candidate-selection race', async () => {
+  const f = fixture(), id = await f.register();
+  const work = await f.store.claimUpdate(id, identity.owner_id);
+  assert.equal((await f.run()).status, 'idle_or_budget');
+  assert.equal(f.calls.step, 0);
+  await assert.rejects(f.store.claimUpdate(id, identity.owner_id), BusyError);
+  await assert.rejects(f.register(), BusyError);
+  await assert.rejects(f.store.setEnabled(id, identity.owner_id, false), BusyError);
+  await f.store.releaseUpdate(work.lease);
+  const global = await f.store.claimGlobal();
+  // claimDue selects a candidate before its atomic claim. The template claim
+  // may win that gap; the subsequent sync batch must not acquire its lease.
+  const [daily, update] = await Promise.all([f.store.claimDue(global), f.store.claimUpdate(id, identity.owner_id)]);
+  assert.equal(daily, null);
+  assert.equal(f.db.sql.prepare('SELECT steps FROM planner_scheduler').get().steps, 0);
+  await f.store.releaseUpdate(update.lease);
+  const claimed = await f.store.claimDue(global);
+  assert.ok(claimed);
+  await assert.rejects(f.store.claimUpdate(id, identity.owner_id), BusyError);
+  await f.store.finish(claimed.lease);
+  await f.store.releaseGlobal(global);
+});
+
+test('template update owner and unfinished token rotation are validated before acquiring a lease', async () => {
+  const f = fixture(), id = await f.register(), before = await f.store.get(id);
+  await assert.rejects(f.store.claimUpdate(id, 'other'), error => error.code === 'installation_not_found');
+  await assert.rejects(f.store.claimUpdate('unknown', identity.owner_id), error => error.code === 'installation_not_found');
+  assert.deepEqual(await f.store.get(id), before);
+  f.db.sql.prepare('UPDATE planner_installations SET rotation_pending = 1 WHERE id = ?').run(id);
+  await assert.rejects(f.store.claimUpdate(id, identity.owner_id), error => error.code === 'update_reconnect' && error.status === 409);
+  assert.equal((await f.store.get(id)).lease_until, 0);
+});
+
+test('expired template lease cannot checkpoint, mutate targets or release a new owner', async () => {
+  const f = fixture(), id = await f.register(), old = await f.store.claimUpdate(id, identity.owner_id);
+  await f.store.saveUpdate(old.lease, UPDATE_ID, updateTargets(), { stage: 'pending' }, 'pending');
+  f.clock.value += LEASE_MS;
+  await assert.rejects(f.store.assertUpdateLease(old.lease), LeaseError);
+  await assert.rejects(f.store.saveUpdate(old.lease, UPDATE_ID, updateTargets(), { stage: 'lost' }, 'complete'), LeaseError);
+  const fresh = await f.store.claimUpdate(id, identity.owner_id);
+  await f.store.releaseUpdate(old.lease);
+  await assert.rejects(f.store.assertUpdateLease(old.lease), LeaseError);
+  await f.store.assertUpdateLease(fresh.lease);
+  await assert.rejects(f.store.saveUpdate({ ...fresh.lease, owner: 'other' }, UPDATE_ID, updateTargets(), {}, 'complete'), LeaseError);
+  assert.deepEqual((await f.store.getUpdates(id))[0].journal, { stage: 'pending' });
+  await f.store.releaseUpdate(fresh.lease);
+});
+
+test('template target registration is immutable while canonical key order permits retry', async () => {
+  const f = fixture(), id = await f.register(), work = await f.store.claimUpdate(id, identity.owner_id);
+  const targets = updateTargets();
+  await f.store.saveUpdate(work.lease, UPDATE_ID, targets, { stage: 'pending' }, 'pending');
+  await f.store.saveUpdate(work.lease, UPDATE_ID, Object.fromEntries(Object.entries(targets).reverse()), { stage: 'verified' }, 'schema_applied');
+  for (const changed of [{ ...targets, student_property_id: 'other' }, { ...targets, counseling_data_source_id: fakeId(503) }]) {
+    await assert.rejects(f.store.saveUpdate(work.lease, UPDATE_ID, changed, { stage: 'replaced' }, 'complete'),
+      error => error.code === 'update_targets_conflict' && error.status === 409);
+  }
+  assert.deepEqual((await f.store.getUpdates(id))[0], { update_id: UPDATE_ID, targets,
+    journal: { stage: 'verified' }, status: 'schema_applied', updated_at: f.clock.value });
+});
+
+test('template journals are byte bounded and invalid update metadata cannot replace a checkpoint', async () => {
+  const f = fixture(), id = await f.register(), work = await f.store.claimUpdate(id, identity.owner_id);
+  await f.store.saveUpdate(work.lease, UPDATE_ID, updateTargets(), { stage: 'pending' }, 'pending');
+  for (const journal of [null, [], { stage: '한'.repeat(4000) }, { stage: 'x'.repeat(12000) }]) {
+    await assert.rejects(f.store.saveUpdate(work.lease, UPDATE_ID, updateTargets(), journal, 'pending'));
+  }
+  for (const targets of [null, [], { extra: 'x'.repeat(4096) }]) {
+    await assert.rejects(f.store.saveUpdate(work.lease, UPDATE_ID, targets, {}, 'pending'));
+  }
+  await assert.rejects(f.store.saveUpdate(work.lease, 'unknown-release', updateTargets(), {}, 'pending'));
+  await assert.rejects(f.store.saveUpdate(work.lease, UPDATE_ID, updateTargets(), {}, 'unknown-status'));
+  const journal = (await f.store.getUpdates(id))[0];
+  assert.deepEqual(journal.journal, { stage: 'pending' });
+  assert.equal(journal.status, 'pending');
+});
+
+test('a normal reconnect preserves template update targets and completion history', async () => {
+  const f = fixture(), id = await f.register(), work = await f.store.claimUpdate(id, identity.owner_id);
+  await f.store.saveUpdate(work.lease, UPDATE_ID, updateTargets(), { stage: 'verified' }, 'complete');
+  await f.store.releaseUpdate(work.lease);
+  const before = await f.store.getUpdates(id);
+  await f.store.register(manifest(), identity, 'new-encrypted');
+  assert.deepEqual(await f.store.getUpdates(id), before);
+  assert.equal((await f.store.get(id)).credentials, 'new-encrypted');
+});
 
 test('installation cap is atomic across competing enrollments; reauthorization preserves state', async () => {
   const f = fixture({ maxInstallations: 2 });

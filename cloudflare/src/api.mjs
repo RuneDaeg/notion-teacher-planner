@@ -1,5 +1,6 @@
-import {TokenBox, ConnectionError, exchange, exchangeDiagnostic, nonce, origin, readJSON, validateManifest} from './security.mjs';
+import {TokenBox, ConnectionError, exchange, exchangeDiagnostic, nonce, origin, readJSON, validateManifest, base64url} from './security.mjs';
 import {SyncError} from './sync.mjs';
+import {UPDATE_CATALOG, validateUpdateTargets, inspectStudentHistory, applyStudentHistory} from './updates.mjs';
 
 const COOKIE = '__Host-planner';
 const NO_CACHE = {'Cache-Control':'private, no-store','Referrer-Policy':'no-referrer','X-Content-Type-Options':'nosniff'};
@@ -23,7 +24,8 @@ function callbackDiagnostic(phase, error) {
 }
 
 export function createAPI({store,publicUrl,clientId,clientSecret,encryptionKey,clientFactory,targetValidator,
-    exchangeFn=exchange,now=()=>Date.now()}) {
+    exchangeFn=exchange,now=()=>Date.now(), updateEngine={catalog:UPDATE_CATALOG,validate:validateUpdateTargets,
+      inspect:inspectStudentHistory,apply:applyStudentHistory}}) {
   const base = origin(publicUrl);
   const box = new TokenBox(encryptionKey,now);
   const callback = base+'/api/callback';
@@ -80,7 +82,8 @@ export function createAPI({store,publicUrl,clientId,clientSecret,encryptionKey,c
         return json({school_name:doc.manifest.school_name,academic_year:doc.manifest.academic_year,
           enabled:doc.enabled,status:doc.status,last_success_at:doc.last_success_at ? doc.last_success_at/1000 : null,
           schedule:'매일 오전 7시부터 순차 갱신 · 한국 시간',csrf:current.csrf,
-          notion_url:'https://www.notion.so/'+doc.manifest.root_page_id});
+          notion_url:'https://www.notion.so/'+doc.manifest.root_page_id,
+          reconnect_url:base+'/connect?reauthorize=1#'+base64url(new TextEncoder().encode(JSON.stringify(doc.manifest)))});
       }
       if (url.pathname === '/api/enabled' && request.method === 'POST') {
         sameOrigin(request);
@@ -90,6 +93,68 @@ export function createAPI({store,publicUrl,clientId,clientSecret,encryptionKey,c
         if (!data || typeof data.enabled !== 'boolean' || Object.keys(data).length !== 1) throw new ConnectionError();
         await store.setEnabled(current.installation_id,current.owner_id,data.enabled);
         return json({ok:true});
+      }
+      if (url.pathname === '/api/updates' && request.method === 'GET') {
+        const {current} = await session(request);
+        const saved = await store.getUpdates(current.installation_id);
+        return json({releases:updateEngine.catalog.map(release=>{
+          const entry=saved.find(row=>row.update_id===release.id);
+          return {...release,registered:!!entry,status:entry?.status || 'available',
+            reason:entry?.journal?.reason || null,updated_at:entry?.updated_at || null,
+            layout_confirmation:entry?.journal?.layout_confirmation || null};
+        })});
+      }
+      if (['/api/updates/apply','/api/updates/confirm-layout'].includes(url.pathname) && request.method === 'POST') {
+        sameOrigin(request);
+        const {current} = await session(request);
+        if (request.headers.get('X-CSRF-Token') !== current.csrf) throw new ConnectionError('csrf',403);
+        const data=await body(request), confirm=url.pathname.endsWith('/confirm-layout');
+        const keys=confirm ? ['update_id','layout_confirmed'] : ['update_id','targets'];
+        if (!data || Array.isArray(data) || Object.keys(data).some(k=>!keys.includes(k)) ||
+            !updateEngine.catalog.some(item=>item.id===data.update_id) ||
+            (confirm && data.layout_confirmed!==true)) throw new ConnectionError();
+        const work=await store.claimUpdate(current.installation_id,current.owner_id);
+        try {
+          const {doc,lease}=work;
+          if (doc.rotation_pending) throw new ConnectionError('reconnect',401);
+          const tokens=await box.open('notion',doc.credentials);
+          // Token rotation belongs to the daily worker. Never race a refresh grant.
+          if (!tokens.access_token || (tokens.expires_at && tokens.expires_at<=now()+60000))
+            throw new ConnectionError('reconnect',401);
+          const saved=(await store.getUpdates(current.installation_id)).find(row=>row.update_id===data.update_id);
+          const targets=updateEngine.validate(data.targets || saved?.targets);
+          if (saved && JSON.stringify(updateEngine.validate(saved.targets))!==JSON.stringify(targets))
+            throw new ConnectionError('update_targets_conflict',409);
+          if (confirm && saved?.status!=='schema_applied' && saved?.status!=='complete')
+            throw new ConnectionError('update_not_ready',409);
+          const notion=clientFactory(tokens.access_token);
+          const retainConfirmation=journal=>journal.stage==='schema_applied' && saved?.journal?.layout_confirmation &&
+            journal.reverse_property_id===saved.journal.reverse_property_id &&
+            typeof journal.reverse_property_id==='string'
+            ? {...journal,stage:'complete',reason:'layout_confirmed',layout_confirmation:saved.journal.layout_confirmation}
+            : journal;
+          // Checkpointing uses the same installation lease as daily sync, but does
+          // not modify its manifest, source journal, credentials or next run date.
+          const save=async journal=>{
+            journal=retainConfirmation(journal);
+            await store.saveUpdate(lease,data.update_id,targets,journal,journal.stage);
+            await store.assertUpdateLease(lease);
+          };
+          let journal;
+          if (confirm) {
+            const result=await updateEngine.inspect(notion,doc.manifest,targets);
+            if (result.status!=='schema_applied' || typeof result.reverse_property_id!=='string' ||
+                result.reverse_property_id!==saved.journal.reverse_property_id) throw new ConnectionError('update_not_ready',409);
+            journal={...saved.journal,stage:'complete',reason:'layout_confirmed',
+              layout_confirmation:{method:'teacher_confirmed',at:now()}};
+          } else {
+            journal=await updateEngine.apply(notion,doc.manifest,targets,saved?.journal || {},save);
+            // Rechecking an already completed update must remain idempotent.
+            journal=retainConfirmation(journal);
+          }
+          await save(journal);
+          return json({ok:true,status:journal.stage,reason:journal.reason || null});
+        } finally { await store.releaseUpdate(work.lease); }
       }
       return json({error:'요청 경로를 확인하세요.'},404);
     } catch (error) {

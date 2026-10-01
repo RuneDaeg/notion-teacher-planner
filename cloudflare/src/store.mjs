@@ -38,6 +38,12 @@ export async function installationId(workspace, root) {
   return [...new Uint8Array(bytes)].map(byte => byte.toString(16).padStart(2, '0')).join('');
 }
 function token() { return crypto.randomUUID(); }
+const UPDATE_ID = 'student-history-v1';
+const UPDATE_STATUSES = new Set(['pending', 'schema_applied', 'assistance_required', 'complete']);
+function updateObject(value, maximum) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new StoreError('invalid_update');
+  return json(Object.fromEntries(Object.keys(value).sort().map(key => [key, value[key]])), maximum);
+}
 
 export class Store {
   constructor(db, { maxInstallations, maxDailySteps, now = Date.now } = {}) {
@@ -47,6 +53,57 @@ export class Store {
   }
   stmt(sql, ...args) { return this.db.prepare(sql).bind(...args); }
   async get(id) { return record(await this.stmt('SELECT * FROM planner_installations WHERE id = ?', id).first()); }
+  async getUpdates(id) {
+    const response = await this.stmt(`SELECT update_id, targets_json, journal_json, status, updated_at
+      FROM planner_template_updates WHERE installation_id = ? ORDER BY update_id`, id).all();
+    return response.results.map(({ targets_json, journal_json, ...row }) => ({
+      ...row, targets: JSON.parse(targets_json), journal: JSON.parse(journal_json),
+    }));
+  }
+  // Updates share the installation's lease with daily sync and reauthorization,
+  // while retaining the daily schedule, sync journal and paused state verbatim.
+  async claimUpdate(id, owner) {
+    const now = this.now(), lease = { id, owner, token: token(), until: now + LEASE_MS };
+    const row = await this.stmt(`UPDATE planner_installations SET lease_token = ?, lease_until = ?
+      WHERE id = ? AND owner_id = ? AND lease_until <= ? AND rotation_pending = 0
+      RETURNING *`, lease.token, lease.until, id, owner, now).first();
+    if (!row) {
+      const previous = await this.get(id);
+      if (!previous || previous.owner_id !== owner) throw new StoreError('installation_not_found', 404);
+      if (previous.lease_until > now) throw new BusyError();
+      throw new StoreError('update_reconnect', 409);
+    }
+    return { lease, doc: record(row) };
+  }
+  async assertUpdateLease(lease) {
+    const row = await this.stmt(`SELECT id FROM planner_installations
+      WHERE id = ? AND owner_id = ? AND lease_token = ? AND lease_until > ? AND rotation_pending = 0`,
+    lease.id, lease.owner, lease.token, this.now()).first();
+    if (!row) throw new LeaseError();
+  }
+  async saveUpdate(lease, updateId, targets, journal, status) {
+    if (updateId !== UPDATE_ID || !UPDATE_STATUSES.has(status)) throw new StoreError('invalid_update');
+    const serializedTargets = updateObject(targets, 4096), serializedJournal = updateObject(journal, 12000), now = this.now();
+    const row = await this.stmt(`INSERT INTO planner_template_updates
+      (installation_id, update_id, targets_json, journal_json, status, created_at, updated_at)
+      SELECT ?, ?, ?, ?, ?, ?, ? WHERE EXISTS
+        (SELECT 1 FROM planner_installations WHERE id = ? AND owner_id = ? AND lease_token = ? AND lease_until > ? AND rotation_pending = 0)
+      ON CONFLICT(installation_id, update_id) DO UPDATE SET journal_json = excluded.journal_json,
+        status = excluded.status, updated_at = excluded.updated_at
+      WHERE planner_template_updates.targets_json = excluded.targets_json
+      RETURNING update_id`, lease.id, updateId, serializedTargets, serializedJournal, status, now, now,
+    lease.id, lease.owner, lease.token, now).first();
+    if (!row) {
+      // Distinguish stale leases from changed targets without allowing a retry
+      // to redirect a journal to another database or property.
+      await this.assertUpdateLease(lease);
+      throw new StoreError('update_targets_conflict', 409);
+    }
+  }
+  async releaseUpdate(lease) {
+    await this.stmt(`UPDATE planner_installations SET lease_token = NULL, lease_until = 0
+      WHERE id = ? AND lease_token = ?`, lease.id, lease.token).run();
+  }
   async register(manifest, identity, encryptedTokens) {
     for (const key of ['owner_id', 'workspace_id', 'bot_id']) {
       if (typeof identity?.[key] !== 'string' || !identity[key] || identity[key].length > 128) throw new StoreError('invalid_identity');

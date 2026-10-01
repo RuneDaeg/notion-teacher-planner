@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>교무수첩 · 자동 갱신 연결</title>
+  <title>교무수첩 · 연결 및 업데이트</title>
   <link rel="stylesheet" href="/style.css"><script src="/app.js" defer></script>
 </head>
 <body>
@@ -22,10 +22,19 @@
       <div class="actions"><a id="notion" class="primary" hidden>내 교무수첩 열기 ↗</a>
         <button id="toggle" class="secondary" type="button" hidden>자동 갱신 일시 정지</button></div>
     </section>
+    <section class="card update-card" aria-labelledby="updates-title">
+      <div class="row"><h2 id="updates-title">수첩 업데이트</h2><span class="tag">선택 적용</span></div>
+      <p class="small">기존 수첩에 필요한 기능을 추가합니다. 기록과 직접 꾸민 페이지는 유지합니다.</p>
+      <p id="update-message" role="status" aria-live="polite">Notion을 연결하면 내 수첩의 적용 상태를 확인할 수 있습니다.</p>
+      <div id="releases"></div>
+      <a id="reconnect" class="primary" hidden>Notion 접근 다시 연결</a>
+      <p class="small">화면 설정은 Notion에서 확인 후 완료로 기록합니다. 상담 기록이 있는 관계 변경이나 충돌은 설치를 도운 AI와 확인하며 진행합니다.</p>
+      <a class="text-link" href="https://github.com/RuneDaeg/notion-teacher-planner/blob/main/docs/UPDATES.md" target="_blank" rel="noopener noreferrer">업데이트 방법 및 AI 요청문 ↗</a>
+    </section>
     <div class="details">
       <h2>처음 한 번만 허용해 주세요.</h2>
       <p>Notion에서 이미 만든 교무수첩을 선택하고 접근을 허용하면 연결됩니다. API 키나 학교 정보를 다시 입력할 필요가 없습니다.</p>
-      <p>연결 과정에는 학교·학년도, 갱신할 페이지 위치와 Notion 접근 권한이 사용됩니다. 학생 명단과 상담 내용은 등록 정보에 포함하지 않습니다.</p>
+      <p>자동 갱신 연결에는 학교·학년도, 갱신할 페이지 위치와 Notion 접근 권한이 사용됩니다. 수첩 업데이트를 선택하면 학생·상담 데이터베이스와 관계 속성의 식별자, 적용 단계도 저장합니다. 학생 이름이나 상담 본문을 업데이트 이력에 저장하지 않습니다.</p>
       <p>갱신에 실패하면 기존 내용을 유지하고 다시 시도합니다. 학교가 아직 공개하지 않은 급식은 공개 정보가 없다고 표시합니다.</p>
     </div>
     <footer>교무수첩 자동 갱신 · 자료 출처: NEIS 교육정보 개방 포털</footer>

@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {createAPI} from '../src/api.mjs';
 import {TokenBox,base64url,exchange,origin,validateManifest,ConnectionError,RetryableConnectionError} from '../src/security.mjs';
 import {SyncError} from '../src/sync.mjs';
+import {UPDATE_CATALOG,validateUpdateTargets} from '../src/updates.mjs';
 
 const key = base64url(new Uint8Array(32).fill(19));
 const base = 'https://planner.example.com';
@@ -11,12 +12,17 @@ const manifest = {version:1,office_code:'X10',school_code:'1234567',school_name:
   root_page_id:ids[0],agenda_data_source_id:ids[1],meals_block_id:ids[2],status_block_id:ids[3]};
 const cookieOnly = response => response.headers.get('Set-Cookie').split(';')[0];
 function fixture(overrides={}) {
-  let time = 1790000000000, doc, written = 0, validated = 0;
+  let time = 1790000000000, doc, written = 0, validated = 0, updates=[], locked=false;
   const now = () => time;
   const store = {
     async register(m,identity,credentials) {written++;doc={manifest:m,...identity,credentials,enabled:true,status:'waiting'};return 'installation';},
     async get(id) {return id==='installation'? doc:null;},
-    async setEnabled(id,owner,enabled) {assert.equal(id,'installation');assert.equal(owner,'teacher');doc.enabled=enabled;doc.status=enabled?'waiting':'paused';}
+    async setEnabled(id,owner,enabled) {assert.equal(id,'installation');assert.equal(owner,'teacher');doc.enabled=enabled;doc.status=enabled?'waiting':'paused';},
+    async getUpdates(id) {assert.equal(id,'installation');return structuredClone(updates);},
+    async claimUpdate(id,owner) {assert.equal(id,'installation');assert.equal(owner,doc.owner_id);assert.equal(locked,false);locked=true;return {lease:{id,owner},doc};},
+    async assertUpdateLease() {assert.ok(locked);},
+    async saveUpdate(lease,id,targets,journal,status) {assert.ok(locked);updates=[{update_id:id,targets:structuredClone(targets),journal:structuredClone(journal),status,updated_at:time}];},
+    async releaseUpdate() {locked=false;}
   };
   const api = createAPI({store,publicUrl:base,clientId:'client',clientSecret:'secret',encryptionKey:key,now,
     clientFactory:token=>({token}),targetValidator:async (client,m)=>{assert.equal(client.token,'access');assert.deepEqual(m,manifest);validated++;},
@@ -29,8 +35,56 @@ function fixture(overrides={}) {
     return {cookie:cookieOnly(response),state:auth.searchParams.get('state'),response};
   }
   async function complete(started) {return api(request('/api/callback?'+new URLSearchParams({code:'code',state:started.state}),{cookie:started.cookie}));}
-  return {api,request,start,complete,get doc(){return doc;},get written(){return written;},get validated(){return validated;},advance:ms=>time+=ms};
+  return {api,request,start,complete,get doc(){return doc;},get written(){return written;},get validated(){return validated;},get updates(){return updates;},get locked(){return locked;},advance:ms=>time+=ms};
 }
+
+const updateTargets={version:1,students_data_source_id:'11111111-1111-4111-8111-000000000005',
+  counseling_data_source_id:'11111111-1111-4111-8111-000000000006',student_relation_property_id:'studentProp'};
+function updateFixture(overrides={}) {
+  let applications=0,checks=0;
+  const engine={catalog:UPDATE_CATALOG,validate:validateUpdateTargets,
+    inspect:async()=>{checks++;return {status:'schema_applied',reverse_property_id:'reverse'};},
+    apply:async(_n,_m,_t,journal,save)=>{applications++;const result={...journal,stage:'schema_applied',reason:'schema_verified',reverse_property_id:'reverse'};await save(result);return result;},...overrides};
+  const f=fixture({updateEngine:engine});
+  return {...f,get doc(){return f.doc;},get updates(){return f.updates;},get locked(){return f.locked;},
+    get applications(){return applications;},get checks(){return checks;}};
+}
+async function updateSession(f) {const cookie=cookieOnly(await f.complete(await f.start()));const status=await (await f.api(f.request('/api/status',{cookie}))).json();return {cookie,csrf:status.csrf};}
+test('updates require session, ownership, CSRF and exact target input before any Notion action',async()=>{
+  const f=updateFixture(),auth=await updateSession(f),data={update_id:'student-history-v1',targets:updateTargets};
+  for(const opts of [{data},{...auth,data,csrf:'bad'},{...auth,data,origin:'https://evil.example'},{...auth,data:{...data,secret:'do-not-save'}},
+    {...auth,data:{...data,update_id:'arbitrary'}},{...auth,data:{...data,targets:{...updateTargets,token:'private'}}}]) {
+    assert.ok((await f.api(f.request('/api/updates/apply',opts))).status>=400);
+    assert.equal(f.applications,0);assert.equal(f.locked,false);
+  }
+  f.doc.owner_id='different';assert.equal((await f.api(f.request('/api/updates',{...auth}))).status,401);
+});
+test('selective apply leaves layout pending, confirmation rechecks schema, repeat keeps completion',async()=>{
+  const f=updateFixture(),auth=await updateSession(f),id='student-history-v1',before=structuredClone(f.doc);
+  let view=await (await f.api(f.request('/api/updates',auth))).json();assert.equal(view.releases[0].status,'available');
+  const early=await f.api(f.request('/api/updates/confirm-layout',{...auth,data:{update_id:id,layout_confirmed:true}}));assert.equal(early.status,409);
+  const result=await f.api(f.request('/api/updates/apply',{...auth,data:{update_id:id,targets:updateTargets}}));
+  assert.equal(result.status,200);assert.equal((await result.json()).status,'schema_applied');assert.deepEqual(f.doc,before);
+  const confirm=await f.api(f.request('/api/updates/confirm-layout',{...auth,data:{update_id:id,layout_confirmed:true}}));
+  assert.equal(confirm.status,200);assert.equal(f.checks,1);assert.equal(f.updates[0].journal.layout_confirmation.method,'teacher_confirmed');
+  const recheck=await f.api(f.request('/api/updates/apply',{...auth,data:{update_id:id}}));assert.equal((await recheck.json()).status,'complete');
+  view=await (await f.api(f.request('/api/updates',auth))).json();assert.equal(view.releases[0].status,'complete');
+  assert.equal(view.releases[0].targets,undefined);assert.doesNotMatch(JSON.stringify(view),/studentProp|access_token|credentials/);
+  assert.equal(f.locked,false);
+});
+test('registered update targets cannot be silently rebound and uncertain writes remain resumable',async()=>{
+  const f=updateFixture({apply:async(_n,_m,_t,_j,save)=>{await save({stage:'pending',reason:'write_unconfirmed'});throw new Error('private credentials');}}),auth=await updateSession(f);
+  const id='student-history-v1';const failed=await f.api(f.request('/api/updates/apply',{...auth,data:{update_id:id,targets:updateTargets}}));
+  assert.doesNotMatch(await failed.text(),/private credentials/);assert.equal(f.updates[0].status,'pending');assert.equal(f.locked,false);
+  const changed=await f.api(f.request('/api/updates/apply',{...auth,data:{update_id:id,targets:{...updateTargets,student_relation_property_id:'another'}}}));
+  assert.equal(changed.status,409);assert.equal(f.updates[0].targets.student_relation_property_id,'studentProp');
+});
+test('an expired Notion token requests reconnection without rotating or mutating the update',async()=>{
+  const f=updateFixture(),auth=await updateSession(f),box=new TokenBox(key,()=>1790000000000);
+  f.doc.credentials=await box.seal('notion',{access_token:'access',refresh_token:'refresh',expires_at:1790000000000});
+  const result=await f.api(f.request('/api/updates/apply',{...auth,data:{update_id:'student-history-v1',targets:updateTargets}}));
+  assert.equal(result.status,401);assert.equal(f.applications,0);assert.equal(f.locked,false);assert.equal(f.updates.length,0);
+});
 test('enrollment validates selected targets, stores encrypted tokens, reports pending until actual success',async()=>{
   const f=fixture();const started=await f.start();assert.equal(f.written,0);
   assert.match(started.response.headers.get('Set-Cookie'),/HttpOnly; Secure; SameSite=Lax/);
@@ -182,4 +236,23 @@ test('callback token diagnostics are bounded allowlisted classifications, never 
 test('service origin disallows credentials, paths, local/IP destinations and query strings',()=>{
   assert.equal(origin(base),base);
   for(const bad of ['http://example.com','https://a:b@example.com','https://example.com/path','https://localhost','https://127.0.0.1','https://example.com?key=x','https://example.com:443']) assert.throws(()=>origin(bad));
+});
+
+test('layout confirmation rejects a replaced reciprocal even if current schema is valid',async()=>{
+  const f=updateFixture({inspect:async()=>({status:'schema_applied',reverse_property_id:'replaced'})}),auth=await updateSession(f);
+  await f.api(f.request('/api/updates/apply',{...auth,data:{update_id:'student-history-v1',targets:updateTargets}}));
+  const response=await f.api(f.request('/api/updates/confirm-layout',{...auth,data:{update_id:'student-history-v1',layout_confirmed:true}}));
+  assert.equal(response.status,409);assert.equal(f.updates[0].status,'schema_applied');assert.equal(f.updates[0].journal.layout_confirmation,undefined);
+});
+test('recheck interruption after verified checkpoint retains prior layout confirmation',async()=>{
+  let interrupt=false;
+  const f=updateFixture({apply:async(_n,_m,_t,journal,save)=>{
+    const next={...journal,stage:'schema_applied',reverse_property_id:'reverse',reason:'schema_verified'};
+    await save(next);if(interrupt)throw new Error('lost response');return next;
+  }}),auth=await updateSession(f),id='student-history-v1';
+  await f.api(f.request('/api/updates/apply',{...auth,data:{update_id:id,targets:updateTargets}}));
+  await f.api(f.request('/api/updates/confirm-layout',{...auth,data:{update_id:id,layout_confirmed:true}}));
+  const confirmation=structuredClone(f.updates[0].journal.layout_confirmation);interrupt=true;
+  const failed=await f.api(f.request('/api/updates/apply',{...auth,data:{update_id:id}}));assert.ok(failed.status>=400);
+  assert.equal(f.updates[0].status,'complete');assert.deepEqual(f.updates[0].journal.layout_confirmation,confirmation);assert.equal(f.locked,false);
 });

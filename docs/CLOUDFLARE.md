@@ -121,6 +121,16 @@ npm run deploy
 
 등록 주소는 실제 서비스의 `/connect`, OAuth 콜백은 `/api/callback`이다. `/api/start`, `/api/status`, `/api/enabled`는 연결 화면이 사용하는 서버 경로다. D1 바인딩과 공유 정적 화면이 배포에 포함되었는지 확인한 뒤에만 교사에게 실제 링크를 제공한다.
 
+### 기존 배포에 선택 업데이트 기능 추가
+
+기존 운영자는 D1이나 비밀값을 새로 만들지 않는다. 원래 개인 배포 설정과 암호화 키를 유지한 채 `npx wrangler d1 migrations apply teacher-planner --remote --config wrangler.jsonc`로 `0002_template_updates.sql`을 적용한 뒤 새 Worker와 연결 화면을 함께 배포한다. DB 이름은 기존 설정을 따른다. 이 마이그레이션은 수첩별 선택 업데이트 이력 테이블을 추가하며 기존 연결 manifest와 일일 갱신 상태를 바꾸지 않는다.
+
+관리 화면은 `GET /api/updates`, `POST /api/updates/apply`, `POST /api/updates/confirm-layout`을 사용한다. 조회는 로그인한 수첩으로 제한하고 변경은 같은 출처·세션 소유자·CSRF를 검증한다. Notion 변경은 일일 갱신과 같은 수첩 잠금을 사용한다. 템플릿 업데이트가 일일 갱신을 완료 처리하거나 다음 실행 시각을 변경하지 않으며, 일일 갱신이 일시 중지되어도 유효한 연결로 선택 업데이트를 진행할 수 있다.
+
+첫 항목 `student-history-v1`은 기존 양방향 관계를 검증하거나 상담 DB가 빈 경우에만 관계를 전환한다. 기록이 있는 단방향 관계는 `assistance_required`로 보류한다. 공통 학생 레이아웃·정렬은 서버 API가 설정하지 않으며 `schema_applied` 후 실제 화면 확인이 필요하다. `complete`는 관계 재검사와 교사의 화면 확인 기록을 뜻한다. 서버의 화면 검증 성공으로 해석하지 않는다.
+
+배포 후 [기존 수첩 업데이트](UPDATES.md)의 링크 생성·대상 등록·재시도·화면 확인 과정을 테스트 수첩으로 검증한다. 저장되는 업데이트 정보는 정확한 DB·속성 ID와 제한된 작업 기록이며 학생·상담 본문은 저장하지 않는다. 기존 설치 AI가 홈에 업데이트 링크를 한 번 추가해야 한다. 서버 배포만으로 모든 교사의 페이지에 링크나 새 화면을 일괄 추가하지 않는다.
+
 ## 기존 수첩을 연결하고 확인하기
 
 `cloud-connect` 명령은 서버 종류에 관계없이 실제 HTTPS 서비스 주소를 받는다. [공통 연결 안내](CLOUD_SYNC.md#설치-ai가-연결-링크-만들기)의 manifest와 CLI를 사용한다. 배포·링크 생성이 기존 MCP 상태를 Python 상태로 바꾸거나 Notion 블록을 자동 재구성하지 않는다.
