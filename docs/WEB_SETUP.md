@@ -2,6 +2,8 @@
 
 [교무수첩 시작하기](https://notion-teacher-planner.notion-teacher-planner-cloudflare.workers.dev/setup)는 새 수첩에 필요한 설정을 모아 AI에 전달할 설치 요청문을 만드는 화면이다. [공통 설치 질문지](ONBOARDING.md) 버전 `2`의 문구·선택지·순서를 사용한다.
 
+처음 사용하는 교사는 [웹 사용 안내서](https://notion-teacher-planner.notion-teacher-planner-cloudflare.workers.dev/guide)를 로그인 없이 읽을 수 있다. 목차로 이동하고 브라우저에서 인쇄할 수 있으며, 같은 페이지에서 PDF 바로 보기와 첨부용 HTML·PDF 다운로드를 제공한다. PDF의 화면 표시 방식은 사용하는 브라우저 설정에 따른다.
+
 ## 사용 순서
 
 1. 웹 화면에서 아래 5단계에 답한다. 선택 항목은 `나중에`로 남길 수 있다.
@@ -42,5 +44,16 @@
 - `cloud/web/setup.html`, `setup.js`, `setup.css`: 5단계 입력 화면·임시 저장·요청문 복사
 - `cloud/web/setup-model.mjs`: 공통 질문 원문·조건부 선택·요청문 생성 규칙
 - `docs/ONBOARDING.md`: 질문 ID·문구·선택지·분기 규칙의 문서 원본
+- `cloud/web/guide.html`, `guide.css`: 로그인 없이 읽는 웹 사용 안내서
+- `cloud/web/teacher-planner-guide.pdf`: 브라우저에서 열거나 내려받는 PDF
+- `output/community/교무수첩_커뮤니티_소개글.txt`: 커뮤니티에 복사할 소개글
 
-Cloudflare Worker와 Firebase Hosting은 `/setup`, `/setup/`을 `/setup.html`로 제공한다. 기존 `/connect`, `/api/*`, 매일 갱신 처리는 웹 질문지와 별도로 유지한다. 질문 변경 시 문서 원본과 웹 모델을 함께 갱신하고, 조건부 응답과 미선택 기능이 요청문에 정확히 반영되는지 검증한다.
+Cloudflare Worker와 Firebase Hosting은 `/setup`, `/setup/`을 `/setup.html`로, `/guide`, `/guide/`를 `/guide.html`로 제공한다. 기존 `/connect`, `/api/*`, 매일 갱신 처리는 웹 질문지와 별도로 유지한다. 질문 변경 시 문서 원본과 웹 모델을 함께 갱신하고, 조건부 응답과 미선택 기능이 요청문에 정확히 반영되는지 검증한다.
+
+## 설명서 갱신과 커뮤니티 첨부
+
+안내서 본문은 `scripts/build_user_guide.py`에서 관리한다. `python-docx`가 있는 환경에서 `python scripts/build_user_guide.py`를 실행하면 수정용 DOCX를 만든다. PDF로 내보낸 후 실제 페이지의 잘림·표·링크를 검수하고 `output/pdf/교무수첩_사용안내서.pdf`에 저장한다. 한국어 글꼴에 따라 페이지 배치가 달라질 수 있다.
+
+그다음 `python-docx>=1.2`와 `pypdf`가 있는 환경에서 `python scripts/export_web_guide.py`를 실행해 같은 DOCX 본문을 웹 HTML과 `output/html/교무수첩_사용안내서.html`로 내보내고 최종 PDF를 웹 배포 폴더에 복사한다. `--check`로 배포 파일이 원본과 같은지 확인할 수 있다. 첨부용 HTML에는 스타일이 포함되어 단독으로 열 수 있다. 배포용 HTML은 외부 스타일 파일을 사용해 사이트의 콘텐츠 보안 정책을 유지한다. HTML·PDF 본문이 같은 버전인지 확인하고 `cloud/web` 전체를 기존 배포 경로로 반영한다.
+
+커뮤니티가 HTML 파일 표시를 지원하면 첨부용 HTML을, PDF 미리보기를 지원하면 PDF를 올린다. 사이트에서 첨부 파일 미리보기를 지원하지 않으면 공개 `/guide` 링크를 게시하면 된다. 소개글은 텍스트 파일의 내용을 복사해 사용한다.

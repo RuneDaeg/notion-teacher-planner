@@ -21,6 +21,7 @@ export default {
       } else {
         if (url.pathname === '/connect') url.pathname = '/index.html';
         if (url.pathname === '/setup' || url.pathname === '/setup/') url.pathname = '/setup.html';
+        if (url.pathname === '/guide' || url.pathname === '/guide/') url.pathname = '/guide.html';
         response = await env.ASSETS.fetch(new Request(url,request));
       }
     } catch {

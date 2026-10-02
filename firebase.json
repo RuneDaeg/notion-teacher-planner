@@ -12,12 +12,20 @@
       {"source": "/api/**", "function": {"functionId": "planner_api", "region": "asia-northeast3"}},
       {"source": "/setup", "destination": "/setup.html"},
       {"source": "/setup/", "destination": "/setup.html"},
+      {"source": "/guide", "destination": "/guide.html"},
+      {"source": "/guide/", "destination": "/guide.html"},
       {"source": "**", "destination": "/index.html"}
     ],
     "headers": [{"source": "**", "headers": [
       {"key": "Referrer-Policy", "value": "no-referrer"},
       {"key": "X-Content-Type-Options", "value": "nosniff"},
       {"key": "Content-Security-Policy", "value": "default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'"}
+    ]}, {"source": "/teacher-planner-guide.pdf", "headers": [
+      {"key": "Content-Disposition", "value": "inline; filename=\"teacher-planner-guide.pdf\""},
+      {"key": "Cache-Control", "value": "no-cache"}
+    ]}, {"source": "/teacher-planner-guide{,.html}", "headers": [
+      {"key": "Content-Disposition", "value": "attachment; filename=\"teacher-planner-guide.html\""},
+      {"key": "Cache-Control", "value": "no-cache"}
     ]}]
   },
   "emulators": {"functions": {"port": 5001}, "firestore": {"port": 8080}, "hosting": {"port": 5000}}

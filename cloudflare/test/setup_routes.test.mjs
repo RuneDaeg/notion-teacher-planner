@@ -61,6 +61,23 @@ test('existing API routes still use the API session checks instead of the setup 
   assert.match(response.headers.get('Cache-Control'), /no-store/);
 });
 
+test('public guide routes and PDF work without a connection or installation session', async () => {
+  for (const [path, expected] of [
+    ['/guide', '/guide.html'], ['/guide/', '/guide.html'],
+    ['/guide?from=community', '/guide.html?from=community'],
+    ['/teacher-planner-guide.pdf', '/teacher-planner-guide.pdf']
+  ]) {
+    let requested;
+    const response = await worker.fetch(new Request(base + path), {
+      get DB() {assert.fail('Reading the guide must not access installation storage');},
+      ASSETS: {async fetch(request) {requested = request.url; return new Response('guide');}}
+    });
+    assert.equal(requested, base + expected);
+    assert.equal(response.status, 200);
+    assert.equal(response.headers.get('Set-Cookie'), null);
+  }
+});
+
 test('Firebase setup rewrites precede the connection fallback while keeping the API function route first', async () => {
   const {hosting} = JSON.parse(await readFile(new URL('../../firebase.json', import.meta.url), 'utf8'));
   const resolve = path => hosting.rewrites.find(rule => rule.source === path || rule.source === '**' ||
@@ -68,6 +85,8 @@ test('Firebase setup rewrites precede the connection fallback while keeping the 
   assert.equal(hosting.public, 'cloud/web');
   assert.equal(resolve('/setup').destination, '/setup.html');
   assert.equal(resolve('/setup/').destination, '/setup.html');
+  assert.equal(resolve('/guide').destination, '/guide.html');
+  assert.equal(resolve('/guide/').destination, '/guide.html');
   assert.equal(resolve('/connect').destination, '/index.html');
   assert.equal(resolve('/').destination, '/index.html');
   assert.equal(resolve('/api/status').function.functionId, 'planner_api');
