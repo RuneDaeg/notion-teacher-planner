@@ -9,7 +9,7 @@ from pathlib import Path
 from uuid import UUID
 
 from .client import NotionError
-from .model import blueprint, reciprocal_property, rich, schema, selected, values, view_payload
+from .model import academic_label, blueprint, reciprocal_property, rich, schema, selected, values, view_payload
 
 
 def page_id(text):
@@ -146,12 +146,20 @@ def install(client, c, parent, state_path):
     if j.data.get('identity') and (j.data['identity'] != identity or j.data['parent'] != parent or j.data['signature'] != signature):
         raise ValueError('기존 설치와 계정·상위 페이지·설정·설계가 다릅니다. 새 기본 템플릿은 별도 state 경로로 새 수첩을 만드세요. 기존 수첩은 자동 변경하지 않습니다.')
     client.request('GET', '/pages/' + parent)
+    if 'academic_label' not in j.data:
+        # Older installations implicitly displayed semester 1 even when config
+        # omitted it. Preserve that label through partial retries without
+        # changing the signed config, saved requests, or existing Notion blocks.
+        label_config = c
+        if j.data.get('identity') and 'semester' not in c:
+            label_config = {**c, 'semester': 1}
+        j.data['academic_label'] = academic_label(label_config)
     j.data.update(identity=identity, parent=parent, signature=signature, config=c)
     j.save()
     root = j.create('root', '/pages', {
         'parent': {'type': 'page_id', 'page_id': parent},
         'icon': {'type': 'emoji', 'emoji': '📒'},
-        'properties': {'title': {'title': rich(f"{c['academic_year']}학년도 {c.get('semester', 1)}학기 · {c['title']}")}},
+        'properties': {'title': {'title': rich(f"{j.data['academic_label']} · {c['title']}")}},
         'children': [block('paragraph', '오늘의 수업과 꼭 해야 할 일을 한곳에. 작은 기록으로 가볍게 시작하세요.')]})
     sections = {}
     for name in ('운영 자료', '학생 기록'):

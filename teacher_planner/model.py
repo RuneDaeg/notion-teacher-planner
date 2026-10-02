@@ -20,7 +20,9 @@ def config(path):
             raise ValueError(f'{key}: 1~100자 문자열이어야 합니다.')
     if type(c['academic_year']) is not int or not 2000 <= c['academic_year'] <= 2200:
         raise ValueError('academic_year는 2000~2200 정수여야 합니다.')
-    if type(c.get('semester', 1)) is not int or c.get('semester', 1) not in (1, 2):
+    # Omitted semester means one notebook for the academic year. Retain an
+    # explicitly supplied legacy value so existing config fingerprints match.
+    if 'semester' in c and (type(c['semester']) is not int or c['semester'] not in (1, 2)):
         raise ValueError('semester는 1 또는 2여야 합니다.')
     if not isinstance(c['timezone'], str):
         raise ValueError('timezone은 IANA 시간대 문자열이어야 합니다.')
@@ -53,6 +55,13 @@ def config(path):
     from .forms import selected_forms
     selected_forms(c)
     return c
+
+
+def academic_label(c):
+    label = f"{c['academic_year']}학년도"
+    if 'semester' in c:
+        label += f" {c['semester']}학기"
+    return label
 
 
 def selected(c):

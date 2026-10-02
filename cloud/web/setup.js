@@ -2,8 +2,8 @@ import {QUESTIONNAIRE_VERSION, QUESTIONS, MODULES, FORMS, createAnswers, eligibl
 
 const $ = id => document.getElementById(id);
 const STORAGE_KEY = 'teacher-planner-setup-v1';
-const STEPS = ['학교와 학기', '수업과 설치 위치', '기능과 양식', '시간표와 학교 소식', '마무리 설정'];
-const SHORT_STEPS = ['학교 · 학기', '수업 · 위치', '기능 · 양식', '학교 연동', '마무리'];
+const STEPS = ['학교와 학년도', '수업과 설치 위치', '기능과 양식', '시간표와 학교 소식', '마무리 설정'];
+const SHORT_STEPS = ['학교 · 학년도', '수업 · 위치', '기능 · 양식', '학교 연동', '마무리'];
 let answers = createAnswers(), step = 0, highestStep = 0, errors = [];
 
 function el(tag, text, className) {
@@ -18,7 +18,8 @@ function restore() {
     const raw = sessionStorage.getItem(STORAGE_KEY);
     if (!raw || raw.length > 40000) return;
     const saved = JSON.parse(raw);
-    if (saved.version !== QUESTIONNAIRE_VERSION || !saved.answers || typeof saved.answers !== 'object') return;
+    // Keep v1 drafts in the same tab; the allowlist below drops the old semester answer.
+    if (![1, QUESTIONNAIRE_VERSION].includes(saved.version) || !saved.answers || typeof saved.answers !== 'object') return;
     const defaults = createAnswers();
     for (const key of Object.keys(defaults)) {
       const value = saved.answers[key];
@@ -27,7 +28,7 @@ function restore() {
     }
     step = Number.isInteger(saved.step) ? Math.max(0, Math.min(saved.step, 4)) : 0;
     highestStep = Number.isInteger(saved.highestStep) ? Math.max(step, Math.min(saved.highestStep, 4)) : step;
-    $('draft-status').textContent = '이 탭에 저장된 답변을 불러왔습니다.';
+    $('draft-status').textContent = saved.version === 1 ? '기존 답변을 불러왔습니다. 학기 선택 없이 학년도별 수첩으로 준비합니다.' : '이 탭에 저장된 답변을 불러왔습니다.';
   } catch { $('draft-status').textContent = '이 브라우저에서는 임시 저장을 사용할 수 없습니다.'; }
 }
 
@@ -185,8 +186,8 @@ function renderQuestions() {
   if (step === 0) {
     const school = question('Q01', '학교를 알려주세요');
     school.body.append(grid(field('region', '지역', {placeholder: '예: 충남', disabled: answers.schoolDeferred}), field('schoolName', '학교명', {placeholder: '예: 예시고등학교', disabled: answers.schoolDeferred})), check('schoolDeferred', '지역·학교명은 나중에 입력할게요'), field('schoolLevel', '학교급', {options: [{value: '', label: '학교급 선택'}, '초등학교', '중학교', '고등학교', '특수학교', '기타']}));
-    const term = question('Q02', '어느 학기를 준비하시나요?');
-    term.body.append(grid(field('academicYear', '학년도', {type: 'number', placeholder: '예: 2026'}), field('semester', '학기', {options: [{value: '', label: '학기 선택'}, {value: '1', label: '1학기'}, {value: '2', label: '2학기'}]})), field('teacher', '표시할 이름 또는 별칭', {optional: true, placeholder: '교사', maxLength: 100, help: '실명 대신 별칭을 사용해도 괜찮아요. 시간은 한국 시간으로 표시합니다.'}));
+    const term = question('Q02', '어느 학년도를 준비하시나요?');
+    term.body.append(field('academicYear', '학년도', {type: 'number', placeholder: '예: 2026', help: '한 학년도에 수첩 하나를 사용해요. 3월부터 다음 해 2월까지, 1·2학기 기록을 함께 관리합니다.'}), field('teacher', '표시할 이름 또는 별칭', {optional: true, placeholder: '교사', maxLength: 100, help: '실명 대신 별칭을 사용해도 괜찮아요. 시간은 한국 시간으로 표시합니다.'}));
     host.append(school.container, term.container);
   } else if (step === 1) {
     const teaching = question('Q03', '담당 수업과 담임 학급');
@@ -230,7 +231,7 @@ function renderQuestions() {
     neis.body.append(radios('neis', QUESTIONS.Q08.options.map(option => ({...option, description: option.value === 'daily' ? '수첩 생성 후 공용 서비스의 Notion 연결을 승인해요.' : ''})), {redraw: true, label: '급식과 학사일정 가져오기'}));
     if (answers.neis && answers.neis !== 'later' && (answers.schoolDeferred || !answers.schoolName.trim() || !answers.region.trim())) {
       const missing = el('div', undefined, 'callout'); missing.append(el('strong', '학교 정보를 먼저 알려주세요.'));
-      const button = el('button', '학교와 학기로 돌아가기', 'button text-button'); button.type = 'button'; button.addEventListener('click', () => go(0));
+      const button = el('button', '학교와 학년도로 돌아가기', 'button text-button'); button.type = 'button'; button.addEventListener('click', () => go(0));
       missing.append(el('p', '중식과 학사일정을 가져오려면 지역과 학교명이 필요합니다.'), button); neis.body.append(missing);
     }
     host.append(timetable.container, neis.container);
@@ -268,7 +269,7 @@ function showErrors() {
 
 function renderSummary() {
   $('preview-title').textContent = answers.title.trim() || '나의 교무수첩';
-  $('preview-school').textContent = [answers.schoolDeferred ? '' : answers.schoolName, answers.academicYear ? `${answers.academicYear}학년도` : '', answers.semester ? `${answers.semester}학기` : ''].filter(Boolean).join(' · ') || '학교와 학기를 선택해 주세요.';
+  $('preview-school').textContent = [answers.schoolDeferred ? '' : answers.schoolName, answers.academicYear ? `${answers.academicYear}학년도` : ''].filter(Boolean).join(' · ') || '학교와 학년도를 선택해 주세요.';
   const summary = $('selection-summary'); summary.replaceChildren();
   for (const line of ['학생 명단 · 상담 기록', '할 일 · 주간/월간 캘린더', '시간표 · 수업 진도 · PARA']) summary.append(el('div', line, 'selection-item'));
   const selected = answers.moduleChoice === 'select' ? answers.modules.length : 0;
@@ -303,7 +304,7 @@ function summaryRow(label, value) { const row = el('div'); row.append(el('dt', l
 function showResult(prompt) {
   $('wizard').hidden = true; $('result').hidden = false;
   const summary = $('result-summary'); summary.replaceChildren();
-  summary.append(summaryRow('학교 · 학기', `${answers.schoolDeferred ? '학교는 나중에 확인' : answers.schoolName} · ${answers.academicYear}학년도 ${answers.semester}학기`), summaryRow('담당 수업', `${answers.subjects} / ${answers.classes}`), summaryRow('추가 기능', answers.modules.length ? MODULES.filter(m => answers.modules.includes(m.key)).map(m => m.label.replace(/^[①-⑥]\s*/, '')).join(', ') : '없음'), summaryRow('기록 양식', answers.forms.length ? FORMS.filter(f => answers.forms.includes(f.key)).map(f => f.label.replace(/^[①-⑥]\s*/, '')).join(', ') : '없음'), summaryRow('학교 소식', {daily:'중식·학사일정 하루 한 번 갱신 요청',meal:'필요할 때 중식',calendar:'필요할 때 학사일정','manual-both':'필요할 때 중식·학사일정',later:'나중에 연결'}[answers.neis]), summaryRow('설치 위치', answers.notionLocation === 'help' ? 'AI와 위치 선택' : answers.notionUrl));
+  summary.append(summaryRow('학교 · 학년도', `${answers.schoolDeferred ? '학교는 나중에 확인' : answers.schoolName} · ${answers.academicYear}학년도`), summaryRow('담당 수업', `${answers.subjects} / ${answers.classes}`), summaryRow('추가 기능', answers.modules.length ? MODULES.filter(m => answers.modules.includes(m.key)).map(m => m.label.replace(/^[①-⑥]\s*/, '')).join(', ') : '없음'), summaryRow('기록 양식', answers.forms.length ? FORMS.filter(f => answers.forms.includes(f.key)).map(f => f.label.replace(/^[①-⑥]\s*/, '')).join(', ') : '없음'), summaryRow('학교 소식', {daily:'중식·학사일정 하루 한 번 갱신 요청',meal:'필요할 때 중식',calendar:'필요할 때 학사일정','manual-both':'필요할 때 중식·학사일정',later:'나중에 연결'}[answers.neis]), summaryRow('설치 위치', answers.notionLocation === 'help' ? 'AI와 위치 선택' : answers.notionUrl));
   $('prompt-output').value = prompt;
   $('result-title').focus();
 }

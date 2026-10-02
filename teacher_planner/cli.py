@@ -10,7 +10,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from .client import Client, NotionError
 from .install import Journal, compact, fingerprint, install, locked, page_id
-from .model import blueprint, config, dashboard_views, reciprocal_property, selected
+from .model import academic_label, blueprint, config, dashboard_views, reciprocal_property, selected
 from .timetable import apply_changes, changes, read_rows
 
 
@@ -74,9 +74,11 @@ def main(argv=None):
             if args.command == 'plan' or not args.apply:
                 report = {'title': c['title'], 'academic_year': c['academic_year'], 'modules': c['modules'], 'database_count': len(ds), 'view_count': len(vs) + len(dashboard_views(c)), 'databases': ds if getattr(args, 'full', False) else [d['title'] for d in ds], 'applied': False}
                 instances = dashboard_views(c)
-                report.update(semester=c.get('semester', 1), workspace_page_count=4,
+                report.update(notebook_title=f"{academic_label(c)} · {c['title']}", workspace_page_count=4,
                               workspace_view_count=len(instances),
                               workspace_database_block_count=len({(v['workspace_page'], v['section']) for v in instances}))
+                if 'semester' in c:
+                    report['semester'] = c['semester']
                 from .forms import selected_forms
                 report['forms'] = [f['title'] for f in selected_forms(c)]
                 report['meal_display'] = '홈 급식 칸; NEIS 연결 후 날짜별 조회 결과 표시'

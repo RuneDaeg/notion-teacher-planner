@@ -4,7 +4,7 @@ import {readFile} from 'node:fs/promises';
 import {QUESTIONNAIRE_VERSION, QUESTIONS, MODULES, FORMS, createAnswers, normalizeAnswers, eligibleForms, validateStep, buildPrompt} from '../../cloud/web/setup-model.mjs';
 
 function complete(overrides = {}) {
-  return {...createAnswers(), region: '충남', schoolName: '가상고등학교', schoolLevel: '고등학교', academicYear: '2026', semester: '2',
+  return {...createAnswers(), region: '충남', schoolName: '가상고등학교', schoolLevel: '고등학교', academicYear: '2026',
     subjects: '통합과학', classes: '1학년 1~3반', homeroom: 'no', notionLocation: 'help', sharing: 'private',
     moduleChoice: 'none', formChoice: 'none', timetable: 'empty', neis: 'later', demo: 'empty', ...overrides};
 }
@@ -25,7 +25,7 @@ test('all question prompts and numbered options retain the common questionnaire 
 test('default answers never imply optional consent or infer a school year', () => {
   const first = createAnswers(), second = createAnswers();
   assert.equal(first.academicYear, '');
-  assert.equal(first.semester, '');
+  assert.equal(Object.hasOwn(first, 'semester'), false);
   assert.equal(first.moduleChoice, '');
   assert.equal(first.formChoice, '');
   assert.equal(first.neis, '');
@@ -49,6 +49,20 @@ test('valid empty installation explicitly disables all modules and forms', () =>
   assert.equal(data.classes, undefined);
   assert.match(prompt, /완성된 설치 config가 아니므로/);
   assert.match(prompt, /이미 확정된 답은 다시 묻지/);
+});
+
+test('annual onboarding needs no semester and discards the old answer in new prompts', () => {
+  for (const semester of [undefined, '', '1', '2']) {
+    const answers = complete({semester});
+    assert.deepEqual(errorsFor(answers), []);
+    const prompt = buildPrompt(answers), data = dataFrom(prompt);
+    assert.equal(data.questionnaire_version, 2);
+    assert.equal(data.notebook_scope, 'academic_year');
+    assert.deepEqual(data.Q02, {academic_year: 2026, teacher: '교사'});
+    assert.equal(Object.hasOwn(normalizeAnswers(answers), 'semester'), false);
+    assert.match(prompt, /한 학년도에 수첩 하나/);
+    assert.match(prompt, /진도 기록의 학기 속성과 1·2학기 보기/);
+  }
 });
 
 test('blank optional display name and title use documented defaults without accepting invalid types', () => {

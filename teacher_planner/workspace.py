@@ -2,7 +2,7 @@
 from .blocks import BlockJournal, children
 from .dashboard import (dashboard_config, layout_spec, matrix_table, matrix_title,
                         quick_links, section_heading)
-from .model import dashboard_views, rich, selected, view_payload
+from .model import academic_label, dashboard_views, rich, selected, view_payload
 
 
 def link(identifier):
@@ -82,7 +82,7 @@ def install_workspace(j, c, root, databases, actual_props):
             return obj
 
         append(f'layout:{key}:nav', navigation(pages, key))
-        profile = (f"{c['academic_year']}학년도 {c.get('semester', 1)}학기 · {c['teacher']} · "
+        profile = (f"{j.data.get('academic_label', academic_label(c))} · {c['teacher']} · "
                    + ' / '.join(c['subjects']))
         append(f'layout:{key}:intro', paragraph(profile + '\n' + page['description']))
         for section in page['sections']:
