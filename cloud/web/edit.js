@@ -185,3 +185,5 @@ $('edit-reset-yes').addEventListener('click', () => {
   $('feature-options').querySelector('input').focus();
 });
 renderCatalog(); restore(); renderAnswers();
+$('edit-loading').hidden = true;
+$('editor-fields').disabled = false;
