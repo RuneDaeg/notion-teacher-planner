@@ -6,3 +6,5 @@
 @media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;transition:none!important}}
 
 footer{flex-wrap:wrap}footer .site-credits{flex-basis:100%;font-size:12px;color:#787774}footer .site-credits a{text-underline-offset:3px}
+.intro>.existing-notebook{font-size:11px;margin:14px 0 0}.existing-notebook a{color:var(--green);text-underline-offset:3px}
+@media(max-width:640px){.site-header{height:auto;min-height:64px;flex-wrap:wrap;gap:10px;padding-top:14px;padding-bottom:14px}}

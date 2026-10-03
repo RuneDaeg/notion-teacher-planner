@@ -168,7 +168,7 @@ def render_document(document, css: str, *, portable: bool, version: str) -> str:
   <a class="skip-link" href="#guide-title">안내서 본문으로 건너뛰기</a>
   <header class="site-header">
     <a class="brand" href="{base}/setup"><span class="brand-mark" aria-hidden="true">▤</span> Notion 교무수첩</a>
-    <nav aria-label="사이트 메뉴"><a href="{base}/setup">내 수첩 준비하기</a><a href="{REPOSITORY}">GitHub</a></nav>
+    <nav aria-label="사이트 메뉴"><a href="{base}/setup">내 수첩 준비하기</a><a href="{base}/edit">내 수첩 수정하기</a><a href="{REPOSITORY}">GitHub</a></nav>
   </header>
   <div class="page-shell">
     <aside class="contents-rail">

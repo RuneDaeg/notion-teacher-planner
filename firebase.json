@@ -12,6 +12,8 @@
       {"source": "/api/**", "function": {"functionId": "planner_api", "region": "asia-northeast3"}},
       {"source": "/setup", "destination": "/setup.html"},
       {"source": "/setup/", "destination": "/setup.html"},
+      {"source": "/edit", "destination": "/edit.html"},
+      {"source": "/edit/", "destination": "/edit.html"},
       {"source": "/guide", "destination": "/guide.html"},
       {"source": "/guide/", "destination": "/guide.html"},
       {"source": "**", "destination": "/index.html"}
