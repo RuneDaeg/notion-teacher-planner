@@ -4,6 +4,7 @@ import re
 from datetime import date, datetime
 
 from .blocks import _same_id
+from .client import NotionError
 from .install import Journal, fingerprint
 from .school_calendar import _rich_value
 
@@ -13,13 +14,51 @@ SOURCE_URL = ('https://open.neis.go.kr/portal/data/service/selectServicePage.do'
 
 
 def checked_block(client, identifier, root):
-    block = client.request('GET', '/blocks/' + identifier)
-    parent = block.get('parent', {})
-    if (block.get('type') != 'callout' or block.get('archived') or block.get('in_trash')
-            or parent.get('type') not in ('page_id', 'block_id')
-            or not _same_id(parent.get(parent.get('type')), root)):
-        raise ValueError('급식 블록의 위치·유형·휴지통 상태가 바뀌었습니다. 기존 블록을 확인하세요.')
-    return block
+    """Keep updating the same callout after a native column layout is applied.
+
+    Only a live root and live column/column-list ancestors are accepted. A moved
+    meal in another page, a cycle, or an unbounded/malformed chain stops writes.
+    This checks ancestry without moving, replacing, or recreating any block.
+    """
+    message = '급식 블록의 위치·유형·휴지통 상태가 바뀌었습니다. 기존 블록을 확인하세요.'
+
+    def read(endpoint, expected):
+        if not isinstance(expected, str) or not expected:
+            raise ValueError(message)
+        try:
+            obj = client.request('GET', endpoint + expected)
+        except NotionError as error:
+            if error.status == 404:
+                raise ValueError(message) from None
+            raise
+        if (not isinstance(obj, dict) or not _same_id(obj.get('id'), expected)
+                or obj.get('archived') or obj.get('in_trash')):
+            raise ValueError(message)
+        return obj
+
+    read('/pages/', root)
+    block = read('/blocks/', identifier)
+    if block.get('type') != 'callout':
+        raise ValueError(message)
+    current, visited = block, set()
+    for _ in range(32):
+        key = current['id'].replace('-', '').lower()
+        if key in visited:
+            break
+        visited.add(key)
+        parent = current.get('parent', {})
+        kind = parent.get('type')
+        parent_id = parent.get(kind)
+        if kind not in ('page_id', 'block_id') or not isinstance(parent_id, str) or not parent_id:
+            break
+        if _same_id(parent_id, root):
+            return block
+        if kind != 'block_id':
+            break
+        current = read('/blocks/', parent_id)
+        if current.get('type') not in ('column', 'column_list'):
+            break
+    raise ValueError(message)
 
 
 def meal_block(snapshot, academic_year):

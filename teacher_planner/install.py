@@ -248,6 +248,15 @@ def install(client, c, parent, state_path):
     install_extras(j, c, root['id'], databases)
     seeds(j, c, definitions, databases)
     j.data['complete'] = True
+    # `complete` remains the legacy data-creation checkpoint for sync/resume.
+    # REST creation cannot prove full width, column reflow or collapsed UI state.
+    from .layout_contract import load_contract
+    contract = load_contract()
+    j.data.setdefault('layout_acceptance', {
+        'contract_id': contract['id'], 'contract_version': contract['version'],
+        'status': 'pending', 'layout_complete': False,
+        'required_command': 'verify --layout-snapshot .local/layout-snapshot.json',
+    })
     j.save()
     return root.get('url', 'https://www.notion.so/' + root['id'].replace('-', ''))
 

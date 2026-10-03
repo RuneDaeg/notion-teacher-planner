@@ -50,14 +50,21 @@ def main(argv=None):
     add_extras(commands)
     from .cloud_registration import add_commands as add_cloud
     add_cloud(commands)
+    from .layout_cli import add_commands as add_layout
+    add_layout(commands)
     verify = commands.add_parser('verify', help='설치된 원격 속성·관계·캘린더·홈 배치 확인')
     verify.add_argument('--state', default='.local/state.json')
+    verify.add_argument('--layout-snapshot', help='이 수첩의 실제 Markdown·UI 증거 JSON')
+    verify.add_argument('--core-only', action='store_true', help='기능 구조만 검사; 설치 완료를 뜻하지 않음')
     rec = commands.add_parser('recover', help='불확실한 생성 요청의 기존 Notion 객체 연결')
     rec.add_argument('--state', default='.local/state.json')
     rec.add_argument('--id', required=True, help='Notion에서 확인한 생성 객체 ID')
     args = p.parse_args(argv)
     try:
-        if args.command == 'cloud-connect':
+        if args.command in ('layout-plan', 'render-layout', 'verify-layout'):
+            from .layout_cli import run
+            return run(args)
+        elif args.command == 'cloud-connect':
             from .cloud_registration import run
             return run(args)
         elif args.command in ('setup-extras', 'neis-meals', 'meals-sync'):
@@ -82,6 +89,10 @@ def main(argv=None):
                 from .forms import selected_forms
                 report['forms'] = [f['title'] for f in selected_forms(c)]
                 report['meal_display'] = '홈 급식 칸; NEIS 연결 후 날짜별 조회 결과 표시'
+                from .layout_contract import load_contract
+                report['layout_contract'] = load_contract()['id']
+                report['page_settings'] = {'full_width': True, 'small_text': False}
+                report['layout_verification_required'] = True
                 if getattr(args, 'full', False):
                     report['views'] = vs
                     report['workspace_views'] = instances
@@ -91,8 +102,9 @@ def main(argv=None):
                 return 0
             with locked(args.state):
                 url = install(Client(os.getenv('NOTION_TOKEN')), c, args.parent, args.state)
-            print('설치 완료: ' + url)
-            print('python -m teacher_planner verify 로 원격 결과를 확인하세요.')
+            print('데이터 구조 생성 완료: ' + url)
+            print('설치 마무리 필요: layout-plan에 따라 MCP/UI로 배치·전체 너비·접기를 적용하세요.')
+            print('python -m teacher_planner verify --state ' + args.state + ' --layout-snapshot .local/layout-snapshot.json 으로 기능과 화면을 함께 검증하세요.')
         elif args.command == 'import-timetable':
             c = config(args.config)
             rows = read_rows(args.file, c)
@@ -122,11 +134,24 @@ def main(argv=None):
                 raise ValueError('아직 설치가 완료되지 않았습니다.')
             if client.request('GET', '/users/me')['id'] != j.data['identity']:
                 raise ValueError('설치 당시의 연결이 아닙니다.')
-            issues = verify_remote(client, j.data)
+            if args.core_only and args.layout_snapshot:
+                raise ValueError('--core-only와 --layout-snapshot은 함께 사용할 수 없습니다.')
+            issues = verify_remote(client, j.data, check_placement=not bool(args.layout_snapshot))
             if issues:
                 print('\n'.join(issues), file=sys.stderr)
                 return 1
-            print('원격 데이터베이스·속성·관계·뷰·홈 배치 확인 완료. 실제 화면과 공유 권한은 docs/ACCEPTANCE.md로 확인하세요.')
+            if args.core_only:
+                print('기능 구조 확인 완료. 화면 배치는 미검증이며 설치 완료가 아닙니다.')
+                return 0
+            if not args.layout_snapshot:
+                print(json.dumps({'core_complete': True, 'layout_complete': False, 'installation_complete': False,
+                                  'pending': '실제 화면을 확인한 --layout-snapshot이 필요합니다.'}, ensure_ascii=False, indent=2))
+                return 1
+            from .layout_cli import load_evidence
+            report = load_evidence(args.layout_snapshot, state=j.data, core_verified=True)
+            report['installation_complete'] = report['complete']
+            print(json.dumps(report, ensure_ascii=False, indent=2))
+            return 0 if report['installation_complete'] else 1
         elif args.command == 'recover':
             with locked(args.state):
                 client = Client(os.getenv('NOTION_TOKEN'))
@@ -275,7 +300,7 @@ def validate_recovery(pending, obj):
             raise ValueError('생성 대상 제목과 일치하지 않습니다.')
 
 
-def verify_remote(client, state):
+def verify_remote(client, state, *, check_placement=True):
     issues = []
     ds, vs = selected(state['config'])
     instances = dashboard_views(state['config']) if state.get('dashboard', {}).get('version', 0) >= 3 else None
@@ -322,4 +347,4 @@ def verify_remote(client, state):
                         issues.append(f"{key}: 캘린더 날짜/주간·월간 범위 불일치")
     from .home import verify_dashboard
     from .extras import verify_extras
-    return issues + verify_dashboard(client, state) + verify_extras(client, state)
+    return issues + verify_dashboard(client, state, check_placement=check_placement) + verify_extras(client, state)

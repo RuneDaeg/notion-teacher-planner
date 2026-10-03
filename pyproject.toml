@@ -14,7 +14,7 @@ dependencies = []
 teacher-planner = "teacher_planner.cli:main"
 
 [tool.setuptools.package-data]
-teacher_planner = ["blueprint.json", "dashboard.json"]
+teacher_planner = ["blueprint.json", "dashboard.json", "layout_contract.json"]
 
 [tool.setuptools.packages.find]
 include = ["teacher_planner*"]

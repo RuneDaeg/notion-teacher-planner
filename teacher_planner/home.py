@@ -49,13 +49,13 @@ def _plain_rich(items):
     return ''.join(x.get('plain_text', x.get('text', {}).get('content', '')) for x in items)
 
 
-def verify_dashboard(client, state):
+def verify_dashboard(client, state, *, check_placement=True):
     layout = state.get('dashboard')
     if not layout:
         return []
     if layout.get('version', 0) >= 3:
         from .workspace import verify_workspace
-        return verify_workspace(client, state)
+        return verify_workspace(client, state, check_placement=check_placement)
     issues = []
     actual = children(client, layout['root_id'])
     actual_ids = [item['id'] for item in actual]

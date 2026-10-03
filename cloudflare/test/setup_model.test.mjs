@@ -51,6 +51,22 @@ test('valid empty installation explicitly disables all modules and forms', () =>
   assert.match(prompt, /이미 확정된 답은 다시 묻지/);
 });
 
+test('every install prompt requires the common layout and real evidence independently of optional modules', () => {
+  for (const answers of [complete(), complete({moduleChoice: 'select', modules: MODULES.map(module => module.key)})]) {
+    // Even the minimal setup must preserve layout; optional modules change only the resolved columns.
+    const prompt = buildPrompt(answers);
+    for (const requirement of ['teacher_planner/layout_contract.json', 'teacher-desk-layout-v1',
+      '전체 너비 켜기·작은 텍스트 끄기', '40/60', '50/50', '55/45', '닫힌 접기', '하단 문서 보관실',
+      '실제 블록 트리·부모·순서', '실제 캡처', 'verify-layout --snapshot', '배치 확인 대기']) {
+      assert.ok(prompt.includes(requirement), `missing layout requirement: ${requirement}`);
+    }
+    assert.match(prompt, /선택하지 않은 기능만 빼고 남은 열의 폭을 정규화/);
+    assert.match(prompt, /기능 설치·배치 재현·선택 연동을 따로 보고/);
+    assert.match(prompt, /기능과 배치가 모두 확인되기 전에는 기본 템플릿 설치 완료라고 하지/);
+    assert.equal(dataFrom(prompt).Q08.connected, false);
+  }
+});
+
 test('annual onboarding needs no semester and discards the old answer in new prompts', () => {
   for (const semester of [undefined, '', '1', '2']) {
     const answers = complete({semester});

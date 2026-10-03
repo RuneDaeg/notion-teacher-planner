@@ -1,0 +1,1267 @@
+{
+  "id": "teacher-desk-layout-v1",
+  "version": 1,
+  "format": "notion-enhanced-markdown",
+  "source": "notion://docs/enhanced-markdown-spec",
+  "page_settings": {
+    "full_width": true,
+    "small_text": false,
+    "setting_method": "page_properties_or_browser_ui",
+    "verify_readback": true
+  },
+  "rules": {
+    "section_order": "rows_then_columns_then_sections",
+    "optional_sections": "omit_when_absent; never create an unselected module",
+    "optional_columns": "remove_empty_columns_and_renormalize; singleton_is_full_width",
+    "unknown_sections": "error; inventory and place existing custom content explicitly",
+    "database_views": "one_existing_linked_database_per_section; all section views are tabs on that database",
+    "database_properties": "visible properties, filters, and sorts inherit blueprint.json",
+    "preservation": "preserve supplied native page/database/block URLs, synced references, records, and selected modules",
+    "closed_toggles": "render details then confirm collapsed in browser; Markdown does not encode open state",
+    "widths": "fixed relative column ratios, no CSS; inspect at the same desktop viewport",
+    "unsupported_layout": "record blocked/incomplete; never silently downgrade to a vertical layout",
+    "visual_completion": "requires actual page settings readback and browser screenshots; rendering alone is not completion",
+    "column_ratio_tolerance_percentage_points": 0.5
+  },
+  "timetable": {
+    "source_page": "teaching",
+    "source_section": "matrix",
+    "reference_page": "home",
+    "reference_section": "matrix",
+    "same_synced_source": true,
+    "columns": [
+      "교시",
+      "수업 시간",
+      "월",
+      "화",
+      "수",
+      "목",
+      "금"
+    ],
+    "preferred_column_widths": [
+      70,
+      150,
+      184,
+      184,
+      184,
+      184,
+      184
+    ],
+    "width_policy": "relative_preference_fit_available_page_width",
+    "fit_page_width": true,
+    "header_row": true,
+    "copy_to_agenda": false
+  },
+  "pages": {
+    "home": {
+      "title": "대시보드 & 오늘 허브",
+      "full_width": true,
+      "small_text": false,
+      "sections": {
+        "nav": {
+          "title": "공통 이동 링크",
+          "required": true,
+          "heading": "공통 이동 링크",
+          "heading_aliases": [],
+          "locator": {
+            "kind": "navigation_callout",
+            "icon": "🧭",
+            "color": "gray_bg",
+            "page_link_count": 4
+          },
+          "block_style": "callout"
+        },
+        "intro": {
+          "title": "학년도·교사·담당 교과",
+          "required": true,
+          "heading": "학년도·교사·담당 교과",
+          "heading_aliases": [],
+          "locator": {
+            "kind": "academic_year_line",
+            "pattern": "\\d{4}학년도"
+          }
+        },
+        "briefing": {
+          "title": "오늘의 교무실 브리핑",
+          "required": true,
+          "heading": "오늘의 교무실 브리핑",
+          "heading_aliases": [],
+          "locator": {
+            "kind": "heading_or_callout",
+            "prefix_match": false
+          },
+          "block_style": "callout"
+        },
+        "sync_status": {
+          "title": "자동 갱신 상태",
+          "required": false,
+          "populated_only": true,
+          "heading": "자동 갱신 상태",
+          "heading_aliases": [
+            "자동 갱신"
+          ],
+          "locator": {
+            "kind": "heading_or_callout",
+            "prefix_match": true
+          }
+        },
+        "updates": {
+          "title": "수첩 업데이트",
+          "required": false,
+          "populated_only": true,
+          "heading": "수첩 업데이트",
+          "heading_aliases": [
+            "업데이트"
+          ],
+          "locator": {
+            "kind": "heading_or_callout",
+            "prefix_match": true
+          }
+        },
+        "quick": {
+          "title": "빠른 실행",
+          "required": true,
+          "cards": {
+            "min": 4,
+            "max": 4,
+            "ratios": [
+              25,
+              25,
+              25,
+              25
+            ]
+          },
+          "heading": "빠른 실행",
+          "heading_aliases": [],
+          "locator": {
+            "kind": "heading_or_callout",
+            "prefix_match": false
+          },
+          "block_style": "callout_cards"
+        },
+        "forms": {
+          "title": "자주 쓰는 양식 모음",
+          "required": false,
+          "heading": "자주 쓰는 양식 모음",
+          "heading_aliases": [],
+          "locator": {
+            "kind": "heading_or_callout",
+            "prefix_match": false
+          }
+        },
+        "matrix": {
+          "title": "오늘의 수업 · 주간 시간표",
+          "required": true,
+          "heading": "오늘의 수업 · 주간 시간표",
+          "heading_aliases": [],
+          "locator": {
+            "kind": "heading_or_callout",
+            "prefix_match": false
+          }
+        },
+        "today": {
+          "title": "오늘·변경 수업 · 관리용",
+          "required": true,
+          "view_keys": [
+            "teacher_today",
+            "teacher_changes"
+          ],
+          "default_view": "teacher_today",
+          "database_blocks": 1,
+          "visible_properties": "inherit_blueprint",
+          "toggle": true,
+          "default_open": false,
+          "collapse_verification": "browser_ui_required",
+          "heading": "오늘·변경 수업 · 관리용",
+          "heading_aliases": [
+            "오늘 수업 원본 · 목록으로 확인"
+          ],
+          "locator": {
+            "kind": "heading_or_callout",
+            "prefix_match": false
+          }
+        },
+        "meals": {
+          "title": "오늘의 중식",
+          "required": true,
+          "heading": "오늘의 중식",
+          "heading_aliases": [],
+          "locator": {
+            "kind": "heading_or_callout",
+            "prefix_match": true
+          }
+        },
+        "tasks": {
+          "title": "우선순위 To-Do",
+          "required": true,
+          "view_keys": [
+            "todo",
+            "todo_p1",
+            "todo_done",
+            "inbox"
+          ],
+          "default_view": "todo",
+          "database_blocks": 1,
+          "visible_properties": "inherit_blueprint",
+          "heading": "우선순위 To-Do",
+          "heading_aliases": [],
+          "locator": {
+            "kind": "heading_or_callout",
+            "prefix_match": false
+          }
+        },
+        "deadlines": {
+          "title": "7일 안에 마감 업무",
+          "required": true,
+          "view_keys": [
+            "due_soon"
+          ],
+          "default_view": "due_soon",
+          "database_blocks": 1,
+          "visible_properties": "inherit_blueprint",
+          "heading": "7일 안에 마감 업무",
+          "heading_aliases": [
+            "다가오는 마감"
+          ],
+          "locator": {
+            "kind": "heading_or_callout",
+            "prefix_match": false
+          }
+        },
+        "attendance": {
+          "title": "오늘 출결 확인",
+          "required": false,
+          "view_keys": [
+            "attendance_today",
+            "attendance_unconfirmed"
+          ],
+          "default_view": "attendance_today",
+          "database_blocks": 1,
+          "visible_properties": "inherit_blueprint",
+          "heading": "오늘 출결 확인",
+          "heading_aliases": [],
+          "locator": {
+            "kind": "heading_or_callout",
+            "prefix_match": false
+          }
+        },
+        "counseling": {
+          "title": "오늘 상담",
+          "required": true,
+          "view_keys": [
+            "counseling_today"
+          ],
+          "default_view": "counseling_today",
+          "database_blocks": 1,
+          "visible_properties": "inherit_blueprint",
+          "heading": "오늘 상담",
+          "heading_aliases": [],
+          "locator": {
+            "kind": "heading_or_callout",
+            "prefix_match": false
+          }
+        },
+        "progress": {
+          "title": "반별 진도 현황",
+          "required": true,
+          "view_keys": [
+            "progress_class",
+            "progress_attention"
+          ],
+          "default_view": "progress_class",
+          "database_blocks": 1,
+          "visible_properties": "inherit_blueprint",
+          "heading": "반별 진도 현황",
+          "heading_aliases": [],
+          "locator": {
+            "kind": "heading_or_callout",
+            "prefix_match": false
+          }
+        },
+        "assessment": {
+          "title": "다가오는 평가",
+          "required": false,
+          "view_keys": [
+            "assessments_upcoming"
+          ],
+          "default_view": "assessments_upcoming",
+          "database_blocks": 1,
+          "visible_properties": "inherit_blueprint",
+          "heading": "다가오는 평가",
+          "heading_aliases": [],
+          "locator": {
+            "kind": "heading_or_callout",
+            "prefix_match": false
+          }
+        },
+        "schedule": {
+          "title": "학사 캘린더",
+          "required": true,
+          "view_keys": [
+            "weekly",
+            "monthly"
+          ],
+          "default_view": "weekly",
+          "database_blocks": 1,
+          "visible_properties": "inherit_blueprint",
+          "heading": "학사 캘린더",
+          "heading_aliases": [],
+          "locator": {
+            "kind": "heading_or_callout",
+            "prefix_match": false
+          }
+        },
+        "document_storage": {
+          "title": "문서 보관실",
+          "required": true,
+          "heading": "문서 보관실",
+          "heading_aliases": [],
+          "locator": {
+            "kind": "heading_or_callout",
+            "prefix_match": false
+          }
+        },
+        "source_list": {
+          "title": "원본 데이터베이스",
+          "required": true,
+          "toggle": true,
+          "default_open": false,
+          "collapse_verification": "browser_ui_required",
+          "heading": "원본 데이터베이스",
+          "heading_aliases": [
+            "원본 데이터베이스 전체 목록"
+          ],
+          "locator": {
+            "kind": "heading_or_callout",
+            "prefix_match": false
+          }
+        }
+      },
+      "rows": [
+        {
+          "id": "nav",
+          "columns": [
+            {
+              "ratio": 100,
+              "sections": [
+                "nav"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "intro",
+          "columns": [
+            {
+              "ratio": 100,
+              "sections": [
+                "intro"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "briefing",
+          "columns": [
+            {
+              "ratio": 100,
+              "sections": [
+                "briefing"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "sync_status",
+          "columns": [
+            {
+              "ratio": 100,
+              "sections": [
+                "sync_status"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "updates",
+          "columns": [
+            {
+              "ratio": 100,
+              "sections": [
+                "updates"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "quick",
+          "columns": [
+            {
+              "ratio": 100,
+              "sections": [
+                "quick"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "forms",
+          "columns": [
+            {
+              "ratio": 100,
+              "sections": [
+                "forms"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "matrix",
+          "columns": [
+            {
+              "ratio": 100,
+              "sections": [
+                "matrix"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "today",
+          "columns": [
+            {
+              "ratio": 100,
+              "sections": [
+                "today"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "work",
+          "columns": [
+            {
+              "ratio": 40,
+              "sections": [
+                "meals"
+              ]
+            },
+            {
+              "ratio": 60,
+              "sections": [
+                "tasks",
+                "deadlines"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "students",
+          "columns": [
+            {
+              "ratio": 50,
+              "sections": [
+                "attendance"
+              ]
+            },
+            {
+              "ratio": 50,
+              "sections": [
+                "counseling"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "teaching",
+          "columns": [
+            {
+              "ratio": 55,
+              "sections": [
+                "progress"
+              ]
+            },
+            {
+              "ratio": 45,
+              "sections": [
+                "assessment"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "schedule",
+          "columns": [
+            {
+              "ratio": 100,
+              "sections": [
+                "schedule"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "document_storage",
+          "columns": [
+            {
+              "ratio": 100,
+              "sections": [
+                "document_storage"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "source_list",
+          "columns": [
+            {
+              "ratio": 100,
+              "sections": [
+                "source_list"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "classroom": {
+      "title": "학급 경영 & 학생 상담",
+      "full_width": true,
+      "small_text": false,
+      "sections": {
+        "nav": {
+          "title": "공통 이동 링크",
+          "required": true,
+          "heading": "공통 이동 링크",
+          "heading_aliases": [],
+          "locator": {
+            "kind": "navigation_callout",
+            "icon": "🧭",
+            "color": "gray_bg",
+            "page_link_count": 4
+          },
+          "block_style": "callout"
+        },
+        "intro": {
+          "title": "학년도·교사·담당 교과",
+          "required": true,
+          "heading": "학년도·교사·담당 교과",
+          "heading_aliases": [],
+          "locator": {
+            "kind": "academic_year_line",
+            "pattern": "\\d{4}학년도"
+          }
+        },
+        "students": {
+          "title": "학생 명부 & 관찰 기록",
+          "required": true,
+          "view_keys": [
+            "active_students",
+            "students_gallery",
+            "students_observation"
+          ],
+          "default_view": "active_students",
+          "database_blocks": 1,
+          "visible_properties": "inherit_blueprint",
+          "heading": "학생 명부 & 관찰 기록",
+          "heading_aliases": [],
+          "locator": {
+            "kind": "heading_or_callout",
+            "prefix_match": false
+          }
+        },
+        "attendance": {
+          "title": "출결 확인",
+          "required": false,
+          "view_keys": [
+            "attendance_today",
+            "attendance_unconfirmed",
+            "active_attendance"
+          ],
+          "default_view": "attendance_today",
+          "database_blocks": 1,
+          "visible_properties": "inherit_blueprint",
+          "heading": "출결 확인",
+          "heading_aliases": [],
+          "locator": {
+            "kind": "heading_or_callout",
+            "prefix_match": false
+          }
+        },
+        "submissions": {
+          "title": "제출물 체크",
+          "required": false,
+          "view_keys": [
+            "active_submissions"
+          ],
+          "default_view": "active_submissions",
+          "database_blocks": 1,
+          "visible_properties": "inherit_blueprint",
+          "heading": "제출물 체크",
+          "heading_aliases": [],
+          "locator": {
+            "kind": "heading_or_callout",
+            "prefix_match": false
+          }
+        },
+        "counseling": {
+          "title": "상담 기록 & 후속 조치",
+          "required": true,
+          "view_keys": [
+            "active_counseling",
+            "counseling_today"
+          ],
+          "default_view": "active_counseling",
+          "database_blocks": 1,
+          "visible_properties": "inherit_blueprint",
+          "heading": "상담 기록 & 후속 조치",
+          "heading_aliases": [],
+          "locator": {
+            "kind": "heading_or_callout",
+            "prefix_match": false
+          }
+        },
+        "contacts": {
+          "title": "학부모 연락",
+          "required": false,
+          "view_keys": [
+            "active_contacts"
+          ],
+          "default_view": "active_contacts",
+          "database_blocks": 1,
+          "visible_properties": "inherit_blueprint",
+          "heading": "학부모 연락",
+          "heading_aliases": [],
+          "locator": {
+            "kind": "heading_or_callout",
+            "prefix_match": false
+          }
+        },
+        "notes": {
+          "title": "조회·종례 관찰 메모",
+          "required": true,
+          "cards": {
+            "min": 2,
+            "max": 2,
+            "ratios": [
+              50,
+              50
+            ]
+          },
+          "heading": "조회·종례 관찰 메모",
+          "heading_aliases": [],
+          "locator": {
+            "kind": "heading_or_callout",
+            "prefix_match": false
+          },
+          "block_style": "callout_cards"
+        },
+        "school": {
+          "title": "학교 업무 바로가기",
+          "required": false,
+          "cards": {
+            "min": 1,
+            "max": 3,
+            "ratios": [
+              33.333333,
+              33.333333,
+              33.333334
+            ]
+          },
+          "heading": "학교 업무 바로가기",
+          "heading_aliases": [],
+          "locator": {
+            "kind": "heading_or_callout",
+            "prefix_match": false
+          },
+          "block_style": "callout_cards"
+        }
+      },
+      "rows": [
+        {
+          "id": "nav",
+          "columns": [
+            {
+              "ratio": 100,
+              "sections": [
+                "nav"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "intro",
+          "columns": [
+            {
+              "ratio": 100,
+              "sections": [
+                "intro"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "students",
+          "columns": [
+            {
+              "ratio": 100,
+              "sections": [
+                "students"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "attendance_submissions",
+          "columns": [
+            {
+              "ratio": 50,
+              "sections": [
+                "attendance"
+              ]
+            },
+            {
+              "ratio": 50,
+              "sections": [
+                "submissions"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "counseling",
+          "columns": [
+            {
+              "ratio": 100,
+              "sections": [
+                "counseling"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "contacts",
+          "columns": [
+            {
+              "ratio": 100,
+              "sections": [
+                "contacts"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "notes",
+          "columns": [
+            {
+              "ratio": 100,
+              "sections": [
+                "notes"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "school",
+          "columns": [
+            {
+              "ratio": 100,
+              "sections": [
+                "school"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "teaching": {
+      "title": "교과 진도표 & 시간표",
+      "full_width": true,
+      "small_text": false,
+      "sections": {
+        "nav": {
+          "title": "공통 이동 링크",
+          "required": true,
+          "heading": "공통 이동 링크",
+          "heading_aliases": [],
+          "locator": {
+            "kind": "navigation_callout",
+            "icon": "🧭",
+            "color": "gray_bg",
+            "page_link_count": 4
+          },
+          "block_style": "callout"
+        },
+        "intro": {
+          "title": "학년도·교사·담당 교과",
+          "required": true,
+          "heading": "학년도·교사·담당 교과",
+          "heading_aliases": [],
+          "locator": {
+            "kind": "academic_year_line",
+            "pattern": "\\d{4}학년도"
+          }
+        },
+        "matrix": {
+          "title": "주간 수업 시간표",
+          "required": true,
+          "heading": "주간 수업 시간표",
+          "heading_aliases": [],
+          "locator": {
+            "kind": "heading_or_callout",
+            "prefix_match": false
+          }
+        },
+        "timetable": {
+          "title": "시간표 원본 · 관리용",
+          "required": true,
+          "view_keys": [
+            "teacher_week",
+            "teacher_changes"
+          ],
+          "default_view": "teacher_week",
+          "database_blocks": 1,
+          "visible_properties": "inherit_blueprint",
+          "toggle": true,
+          "default_open": false,
+          "collapse_verification": "browser_ui_required",
+          "heading": "시간표 원본 · 관리용",
+          "heading_aliases": [
+            "시간표 원본 · 수정 및 변경 이력"
+          ],
+          "locator": {
+            "kind": "heading_or_callout",
+            "prefix_match": false
+          }
+        },
+        "progress": {
+          "title": "교과별·학급별 진도",
+          "required": true,
+          "view_keys": [
+            "progress_class",
+            "progress_subject",
+            "semester_1",
+            "semester_2",
+            "progress_attention"
+          ],
+          "default_view": "progress_class",
+          "database_blocks": 1,
+          "visible_properties": "inherit_blueprint",
+          "heading": "교과별·학급별 진도",
+          "heading_aliases": [],
+          "locator": {
+            "kind": "heading_or_callout",
+            "prefix_match": false
+          }
+        },
+        "assessment": {
+          "title": "평가·채점 현황",
+          "required": false,
+          "view_keys": [
+            "assessments_upcoming",
+            "active_assessments"
+          ],
+          "default_view": "assessments_upcoming",
+          "database_blocks": 1,
+          "visible_properties": "inherit_blueprint",
+          "heading": "평가·채점 현황",
+          "heading_aliases": [],
+          "locator": {
+            "kind": "heading_or_callout",
+            "prefix_match": false
+          }
+        },
+        "meetings": {
+          "title": "교과 협의 & 결정 사항",
+          "required": false,
+          "view_keys": [
+            "active_meetings"
+          ],
+          "default_view": "active_meetings",
+          "database_blocks": 1,
+          "visible_properties": "inherit_blueprint",
+          "heading": "교과 협의 & 결정 사항",
+          "heading_aliases": [],
+          "locator": {
+            "kind": "heading_or_callout",
+            "prefix_match": false
+          }
+        },
+        "resources": {
+          "title": "수업 자료",
+          "required": true,
+          "view_keys": [
+            "active_resources"
+          ],
+          "default_view": "active_resources",
+          "database_blocks": 1,
+          "visible_properties": "inherit_blueprint",
+          "heading": "수업 자료",
+          "heading_aliases": [],
+          "locator": {
+            "kind": "heading_or_callout",
+            "prefix_match": false
+          }
+        }
+      },
+      "rows": [
+        {
+          "id": "nav",
+          "columns": [
+            {
+              "ratio": 100,
+              "sections": [
+                "nav"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "intro",
+          "columns": [
+            {
+              "ratio": 100,
+              "sections": [
+                "intro"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "matrix",
+          "columns": [
+            {
+              "ratio": 100,
+              "sections": [
+                "matrix"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "timetable",
+          "columns": [
+            {
+              "ratio": 100,
+              "sections": [
+                "timetable"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "progress",
+          "columns": [
+            {
+              "ratio": 100,
+              "sections": [
+                "progress"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "assessment",
+          "columns": [
+            {
+              "ratio": 100,
+              "sections": [
+                "assessment"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "meetings_resources",
+          "columns": [
+            {
+              "ratio": 50,
+              "sections": [
+                "meetings"
+              ]
+            },
+            {
+              "ratio": 50,
+              "sections": [
+                "resources"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "planning": {
+      "title": "학사 캘린더 & PARA",
+      "full_width": true,
+      "small_text": false,
+      "sections": {
+        "nav": {
+          "title": "공통 이동 링크",
+          "required": true,
+          "heading": "공통 이동 링크",
+          "heading_aliases": [],
+          "locator": {
+            "kind": "navigation_callout",
+            "icon": "🧭",
+            "color": "gray_bg",
+            "page_link_count": 4
+          },
+          "block_style": "callout"
+        },
+        "intro": {
+          "title": "학년도·교사·담당 교과",
+          "required": true,
+          "heading": "학년도·교사·담당 교과",
+          "heading_aliases": [],
+          "locator": {
+            "kind": "academic_year_line",
+            "pattern": "\\d{4}학년도"
+          }
+        },
+        "schedule": {
+          "title": "학사 캘린더",
+          "required": true,
+          "view_keys": [
+            "weekly",
+            "monthly",
+            "deadlines"
+          ],
+          "default_view": "monthly",
+          "database_blocks": 1,
+          "visible_properties": "inherit_blueprint",
+          "heading": "학사 캘린더",
+          "heading_aliases": [],
+          "locator": {
+            "kind": "heading_or_callout",
+            "prefix_match": false
+          }
+        },
+        "deadlines": {
+          "title": "마감이 가까운 업무",
+          "required": true,
+          "view_keys": [
+            "due_soon",
+            "overdue"
+          ],
+          "default_view": "due_soon",
+          "database_blocks": 1,
+          "visible_properties": "inherit_blueprint",
+          "heading": "마감이 가까운 업무",
+          "heading_aliases": [],
+          "locator": {
+            "kind": "heading_or_callout",
+            "prefix_match": false
+          }
+        },
+        "para": {
+          "title": "PARA 교직 업무",
+          "required": true,
+          "cards": {
+            "min": 4,
+            "max": 4,
+            "ratios": [
+              25,
+              25,
+              25,
+              25
+            ]
+          },
+          "heading": "PARA 교직 업무",
+          "heading_aliases": [],
+          "locator": {
+            "kind": "heading_or_callout",
+            "prefix_match": false
+          },
+          "block_style": "callout_cards"
+        },
+        "projects": {
+          "title": "Projects · 프로젝트",
+          "required": true,
+          "view_keys": [
+            "projects_board",
+            "active_projects"
+          ],
+          "default_view": "projects_board",
+          "database_blocks": 1,
+          "visible_properties": "inherit_blueprint",
+          "heading": "Projects · 프로젝트",
+          "heading_aliases": [],
+          "locator": {
+            "kind": "heading_or_callout",
+            "prefix_match": false
+          }
+        },
+        "areas": {
+          "title": "Areas · 담당 영역",
+          "required": true,
+          "view_keys": [
+            "active_areas"
+          ],
+          "default_view": "active_areas",
+          "database_blocks": 1,
+          "visible_properties": "inherit_blueprint",
+          "heading": "Areas · 담당 영역",
+          "heading_aliases": [],
+          "locator": {
+            "kind": "heading_or_callout",
+            "prefix_match": false
+          }
+        },
+        "resources": {
+          "title": "Resources · 자료",
+          "required": true,
+          "view_keys": [
+            "active_resources"
+          ],
+          "default_view": "active_resources",
+          "database_blocks": 1,
+          "visible_properties": "inherit_blueprint",
+          "heading": "Resources · 자료",
+          "heading_aliases": [],
+          "locator": {
+            "kind": "heading_or_callout",
+            "prefix_match": false
+          }
+        },
+        "archive": {
+          "title": "Archives · 보관",
+          "required": true,
+          "view_keys": [
+            "archive_agenda"
+          ],
+          "default_view": "archive_agenda",
+          "database_blocks": 1,
+          "visible_properties": "inherit_blueprint",
+          "heading": "Archives · 보관",
+          "heading_aliases": [],
+          "locator": {
+            "kind": "heading_or_callout",
+            "prefix_match": false
+          }
+        },
+        "archive_links": {
+          "title": "표별 보관함",
+          "required": true,
+          "toggle": true,
+          "default_open": false,
+          "collapse_verification": "browser_ui_required",
+          "heading": "표별 보관함",
+          "heading_aliases": [
+            "다른 원본의 보관 기록 찾기"
+          ],
+          "locator": {
+            "kind": "heading_or_callout",
+            "prefix_match": false
+          }
+        }
+      },
+      "rows": [
+        {
+          "id": "nav",
+          "columns": [
+            {
+              "ratio": 100,
+              "sections": [
+                "nav"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "intro",
+          "columns": [
+            {
+              "ratio": 100,
+              "sections": [
+                "intro"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "schedule",
+          "columns": [
+            {
+              "ratio": 100,
+              "sections": [
+                "schedule"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "deadlines",
+          "columns": [
+            {
+              "ratio": 100,
+              "sections": [
+                "deadlines"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "para",
+          "columns": [
+            {
+              "ratio": 100,
+              "sections": [
+                "para"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "projects",
+          "columns": [
+            {
+              "ratio": 100,
+              "sections": [
+                "projects"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "areas_resources",
+          "columns": [
+            {
+              "ratio": 50,
+              "sections": [
+                "areas"
+              ]
+            },
+            {
+              "ratio": 50,
+              "sections": [
+                "resources"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "archive",
+          "columns": [
+            {
+              "ratio": 100,
+              "sections": [
+                "archive"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "archive_links",
+          "columns": [
+            {
+              "ratio": 100,
+              "sections": [
+                "archive_links"
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

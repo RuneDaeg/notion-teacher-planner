@@ -204,16 +204,16 @@ def verify_matrix_sharing(client, layout):
     return issues
 
 
-def verify_workspace(client, state):
+def verify_workspace(client, state, *, check_placement=True):
     layout, issues = state['dashboard'], []
     for key, parent in layout['pages'].items():
         actual = children(client, parent)
         expected = layout['page_order'][key]
         found = [item['id'] for item in actual if item['id'] in expected]
-        if found != expected:
+        if check_placement and found != expected:
             issues.append(f'{key}: 구역 또는 연결 뷰의 위치·순서가 기본 템플릿과 다릅니다.')
         nav = state['objects'].get(f'layout:{key}:nav')
-        if nav:
+        if check_placement and nav:
             block = client.request('GET', '/blocks/' + nav['id'])
             urls = {(item.get('text', {}).get('link') or {}).get('url')
                     for item in block.get('paragraph', {}).get('rich_text', [])}

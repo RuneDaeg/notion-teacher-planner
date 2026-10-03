@@ -12,6 +12,7 @@ from teacher_planner.blocks import BlockJournal
 from teacher_planner.cli import main, verify_remote
 from teacher_planner.client import NotionError
 from teacher_planner.extras_cli import watch_delay
+from teacher_planner.extras import verify_extras
 from teacher_planner.install import Journal, compact, fingerprint, install
 from teacher_planner.meals import MEAL_KEY, SOURCE_URL, meal_block, update_meals
 from teacher_planner.model import config, rich
@@ -19,6 +20,19 @@ from teacher_planner.workspace import callout
 from test_planner import FakeNotion
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+def column_reflow(api, state):
+    """Represent an external Notion UI move while preserving the owned meal ID."""
+    root = state['objects']['root']['id']
+    row = api.add_blocks(root, [{'object': 'block', 'type': 'column_list', 'column_list': {}}])[0]
+    column = api.add_blocks(row['id'], [{'object': 'block', 'type': 'column', 'column': {'width_ratio': .4}}])[0]
+    meal = state['objects'][MEAL_KEY]['id']
+    api.block_children[root].remove(meal)
+    api.block_children[column['id']] = [meal]
+    api.objects['/blocks/' + meal]['parent'] = {'type': 'block_id', 'block_id': column['id']}
+    api.objects['/blocks/' + column['id']]['has_children'] = True
+    return row, column
 
 
 class MealTests(unittest.TestCase):
@@ -152,6 +166,54 @@ class MealTests(unittest.TestCase):
                 update_meals(self.api, self.path, self.snapshot)
             self.assertEqual([], self.writes())
 
+    def test_same_owned_callout_still_updates_inside_live_home_columns(self):
+        state = self.state()
+        _, column = column_reflow(self.api, state)
+        meal = state['objects'][MEAL_KEY]['id']
+        self.api.calls.clear()
+        self.assertEqual(1, update_meals(self.api, self.path, self.snapshot))
+        self.assertEqual([('PATCH', '/blocks/' + meal)], [(m, p) for m, p, _ in self.writes()])
+        self.assertEqual(column['id'], self.api.objects['/blocks/' + meal]['parent']['block_id'])
+        self.api.calls.clear()
+        self.assertEqual(0, update_meals(self.api, self.path, self.snapshot))
+        self.assertEqual([], self.writes())
+
+    def test_column_ancestry_rejects_foreign_root_cycles_and_trashed_ancestors(self):
+        state = self.state()
+        row, column = column_reflow(self.api, state)
+        cases = [('/blocks/' + row['id'], {'parent': {'type': 'page_id', 'page_id': self.api.parent}}),
+                 ('/blocks/' + row['id'], {'parent': {'type': 'block_id', 'block_id': column['id']}}),
+                 ('/blocks/' + row['id'], {'archived': True}),
+                 ('/blocks/' + column['id'], {'in_trash': True}),
+                 ('/blocks/' + column['id'], {'type': 'toggle'}),
+                 ('/pages/' + state['objects']['root']['id'], {'in_trash': True})]
+        for path, delta in cases:
+            with self.subTest(delta=delta):
+                original = copy.deepcopy(self.api.objects[path])
+                self.api.objects[path].update(delta)
+                self.api.calls.clear()
+                before = self.path.read_bytes()
+                with self.assertRaisesRegex(ValueError, '급식 블록'):
+                    update_meals(self.api, self.path, self.snapshot)
+                self.assertEqual([], self.writes())
+                self.assertEqual(before, self.path.read_bytes())
+                self.assertLessEqual(len(self.api.calls), 6)
+                self.api.objects[path] = original
+
+    def test_column_ancestry_is_bounded(self):
+        state = self.state()
+        root = state['objects']['root']['id']
+        parent = root
+        for _ in range(35):
+            parent = self.api.add_blocks(parent, [{'object': 'block', 'type': 'column', 'column': {}}])[0]['id']
+        meal = state['objects'][MEAL_KEY]['id']
+        self.api.objects['/blocks/' + meal]['parent'] = {'type': 'block_id', 'block_id': parent}
+        self.api.calls.clear()
+        with self.assertRaisesRegex(ValueError, '급식 블록'):
+            update_meals(self.api, self.path, self.snapshot)
+        self.assertEqual([], self.writes())
+        self.assertLessEqual(len(self.api.calls), 34)
+
     def test_failed_or_lost_response_keeps_recoverable_block_without_duplicate(self):
         original = self.api.request
         def lost(method, path, body=None):
@@ -223,6 +285,65 @@ class MealTests(unittest.TestCase):
 
 
 class ExtrasSetupTests(unittest.TestCase):
+    def test_setup_after_column_reflow_preserves_ids_records_order_and_forms_link(self):
+        with tempfile.TemporaryDirectory() as folder:
+            path, cfg = Path(folder) / 'state.json', Path(folder) / 'config.json'
+            c = config(ROOT / 'config.example.json')
+            cfg.write_text(json.dumps(c))
+            api = FakeNotion()
+            install(api, c, api.parent, path)
+            j = Journal(path, api)
+            row, column = column_reflow(api, j.data)
+            meal = j.data['extras']['meal_block_id']
+            forms_link = j.data['extras']['forms_link_id']
+            # A completed UI reflow records the column row, not its nested meal,
+            # in the page's top-level order. Setup must not reverse that record.
+            order = j.data['dashboard']['page_order']['home']
+            order.remove(meal)
+            order.append(row['id'])
+            order.remove(forms_link)
+            order.insert(2, forms_link)
+            api.objects['/blocks/' + meal]['callout']['rich_text'] = rich('이미 갱신된 오늘의 중식')
+            api.objects['/blocks/' + forms_link]['paragraph']['rich_text'][0]['text']['content'] = '나의 양식 모음'
+            j.save()
+            before_objects = copy.deepcopy(api.objects)
+            before_state = copy.deepcopy(j.data)
+            api.calls.clear()
+            args = ['setup-extras', '--config', str(cfg), '--state', str(path), '--apply']
+            with patch('teacher_planner.extras_cli.Client', return_value=api), patch('sys.stdout', new=io.StringIO()):
+                self.assertEqual(0, main(args))
+            after = Journal(path, api).data
+            self.assertEqual(before_state, after)
+            self.assertEqual(before_objects, api.objects)
+            self.assertEqual(column['id'], api.objects['/blocks/' + meal]['parent']['block_id'])
+            self.assertEqual([], [call for call in api.calls if call[0] in ('POST', 'PATCH', 'DELETE')])
+            self.assertEqual([], verify_extras(api, after))
+
+    def test_setup_rejects_moved_or_retargeted_existing_forms_link_before_writes(self):
+        with tempfile.TemporaryDirectory() as folder:
+            path, cfg = Path(folder) / 'state.json', Path(folder) / 'config.json'
+            c = config(ROOT / 'config.example.json')
+            cfg.write_text(json.dumps(c))
+            api = FakeNotion()
+            install(api, c, api.parent, path)
+            state = Journal(path, api).data
+            link_path = '/blocks/' + state['extras']['forms_link_id']
+            original = copy.deepcopy(api.objects[link_path])
+            bad_target = copy.deepcopy(original['paragraph'])
+            bad_target['rich_text'][0]['text']['link']['url'] = 'https://example.org/other'
+            for delta in ({'parent': {'type': 'page_id', 'page_id': api.parent}},
+                          {'paragraph': bad_target}, {'in_trash': True}):
+                with self.subTest(delta=delta):
+                    api.objects[link_path] = {**copy.deepcopy(original), **delta}
+                    api.calls.clear()
+                    before = path.read_bytes()
+                    args = ['setup-extras', '--config', str(cfg), '--state', str(path), '--apply']
+                    with patch('teacher_planner.extras_cli.Client', return_value=api), \
+                            patch('sys.stdout', new=io.StringIO()), patch('sys.stderr', new=io.StringIO()):
+                        self.assertEqual(1, main(args))
+                    self.assertEqual(before, path.read_bytes())
+                    self.assertEqual([], [call for call in api.calls if call[0] in ('POST', 'PATCH', 'DELETE')])
+
     def test_existing_install_gets_only_additions_and_second_setup_preserves_edits(self):
         with tempfile.TemporaryDirectory() as folder:
             path = Path(folder) / 'state.json'

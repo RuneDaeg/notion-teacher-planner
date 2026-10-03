@@ -1,0 +1,103 @@
+{
+  "schema_version": 1,
+  "contract_version": 1,
+  "example": true,
+  "_instructions": [
+    "이 파일은 형식 설명용이며 verify-layout을 통과하지 않습니다. .local/에 복사하고 실제 확인 결과만 기록하세요.",
+    "example은 실제 대상 페이지를 읽고 실제 화면을 캡처한 증거 파일에서만 false로 바꾸세요. 예시를 통과시키려 값을 꾸미지 마세요.",
+    "expected_page_ids는 설치 상태에서, pages.*.page_id는 실제 fetch 결과에서 가져옵니다. 둘을 독립적으로 확인하세요.",
+    "markdown은 렌더링 계획이 아니라 실제 Notion fetch 결과의 enhanced Markdown입니다. fetch 응답 전체의 <content> 형식도 읽을 수 있습니다.",
+    "fetched_at와 captured_at에는 시간대가 포함된 ISO 8601 시각을 기록하세요. 검증 시각 기준 24시간 이내 증거만 유효합니다.",
+    "full_width=true, small_text=false는 페이지 메뉴 또는 실제 속성 읽기 결과여야 합니다. 설정을 시도한 결과만으로 채우지 마세요.",
+    "screenshots.path는 이 증거 파일 위치 기준 PNG/JPEG 경로입니다. 각 페이지는 full_page 또는 top/middle/bottom 화면을 모두 캡처하세요.",
+    "viewport는 실제 브라우저 뷰포트 크기입니다. 1280×720 이상, 네 페이지와 비교 대상에서 같은 크기로 확인하세요.",
+    "observations는 해당 캡처를 보고 확인한 결과만 pass/fail과 구체적인 note로 남깁니다. 확인하지 못한 항목은 생략하여 pending으로 유지하세요.",
+    "각 페이지의 full_width, small_text, columns, section_order, no_horizontal_overflow 관찰이 필요합니다. 접기마다 toggle:<section_id>:closed 관찰도 필요합니다.",
+    "home은 toggle:today:closed와 toggle:source_list:closed, teaching은 toggle:timetable:closed, planning은 toggle:archive_links:closed 관찰을 추가하세요.",
+    "active_sections를 생략하면 모든 공통 섹션을 기대합니다. 선택 모듈이 없는 설치는 실제 선택 목록을 페이지별로 명시하세요. 필수 섹션은 생략할 수 없습니다.",
+    "source_bindings는 기존 설치 기록의 섹션별 data_source_id와 database_id입니다. expected_data_source_ids를 함께 지정하면 예상 밖 원본을 검출합니다.",
+    "core_verification은 별도로 수행한 원본·관계·보기 검증 결과입니다. 배치 검사 통과를 기능 검사 통과로 대신 기록하지 마세요.",
+    "캡처 파일과 수첩 원문에는 학생 정보가 포함될 수 있으므로 .local/에 보관하고 공개 저장소에 올리지 마세요."
+  ],
+  "expected_page_ids": {
+    "home": "<HOME_PAGE_ID>",
+    "classroom": "<CLASSROOM_PAGE_ID>",
+    "teaching": "<TEACHING_PAGE_ID>",
+    "planning": "<PLANNING_PAGE_ID>"
+  },
+  "core_verification": {
+    "status": "pending",
+    "checked_at": null,
+    "page_ids": {}
+  },
+  "pages": {
+    "home": {
+      "page_id": "<FETCHED_HOME_PAGE_ID>",
+      "fetched_at": null,
+      "markdown": "",
+      "properties": {"full_width": null, "small_text": null},
+      "source_bindings": {},
+      "screenshots": [
+        {
+          "path": "screenshots/home-full-page.png",
+          "page_id": "<CAPTURED_HOME_PAGE_ID>",
+          "captured_at": null,
+          "viewport": {"width": null, "height": null},
+          "coverage": "full_page",
+          "observations": []
+        }
+      ]
+    },
+    "classroom": {
+      "page_id": "<FETCHED_CLASSROOM_PAGE_ID>",
+      "fetched_at": null,
+      "markdown": "",
+      "properties": {"full_width": null, "small_text": null},
+      "source_bindings": {},
+      "screenshots": [
+        {
+          "path": "screenshots/classroom-full-page.png",
+          "page_id": "<CAPTURED_CLASSROOM_PAGE_ID>",
+          "captured_at": null,
+          "viewport": {"width": null, "height": null},
+          "coverage": "full_page",
+          "observations": []
+        }
+      ]
+    },
+    "teaching": {
+      "page_id": "<FETCHED_TEACHING_PAGE_ID>",
+      "fetched_at": null,
+      "markdown": "",
+      "properties": {"full_width": null, "small_text": null},
+      "source_bindings": {},
+      "screenshots": [
+        {
+          "path": "screenshots/teaching-full-page.png",
+          "page_id": "<CAPTURED_TEACHING_PAGE_ID>",
+          "captured_at": null,
+          "viewport": {"width": null, "height": null},
+          "coverage": "full_page",
+          "observations": []
+        }
+      ]
+    },
+    "planning": {
+      "page_id": "<FETCHED_PLANNING_PAGE_ID>",
+      "fetched_at": null,
+      "markdown": "",
+      "properties": {"full_width": null, "small_text": null},
+      "source_bindings": {},
+      "screenshots": [
+        {
+          "path": "screenshots/planning-full-page.png",
+          "page_id": "<CAPTURED_PLANNING_PAGE_ID>",
+          "captured_at": null,
+          "viewport": {"width": null, "height": null},
+          "coverage": "full_page",
+          "observations": []
+        }
+      ]
+    }
+  }
+}
