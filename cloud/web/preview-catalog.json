@@ -1,0 +1,3776 @@
+{
+  "format": "teacher-planner-preview-catalog",
+  "version": 1,
+  "source_digest": "4a4392edd555b682a5832907bfebbc27255e47dd26a159a582ab4244be9133b3",
+  "contract": {
+    "id": "teacher-desk-layout-v1",
+    "version": 1,
+    "format": "notion-enhanced-markdown",
+    "source": "notion://docs/enhanced-markdown-spec",
+    "page_settings": {
+      "full_width": true,
+      "small_text": false,
+      "setting_method": "page_properties_or_browser_ui",
+      "verify_readback": true
+    },
+    "rules": {
+      "section_order": "rows_then_columns_then_sections",
+      "optional_sections": "omit_when_absent; never create an unselected module",
+      "optional_columns": "remove_empty_columns_and_renormalize; singleton_is_full_width",
+      "unknown_sections": "error; inventory and place existing custom content explicitly",
+      "database_views": "one_existing_linked_database_per_section; all section views are tabs on that database",
+      "database_properties": "visible properties, filters, and sorts inherit blueprint.json",
+      "preservation": "preserve supplied native page/database/block URLs, synced references, records, and selected modules",
+      "closed_toggles": "render details then confirm collapsed in browser; Markdown does not encode open state",
+      "widths": "fixed relative column ratios, no CSS; inspect at the same desktop viewport",
+      "unsupported_layout": "record blocked/incomplete; never silently downgrade to a vertical layout",
+      "visual_completion": "requires actual page settings readback and browser screenshots; rendering alone is not completion",
+      "column_ratio_tolerance_percentage_points": 0.5
+    },
+    "timetable": {
+      "source_page": "teaching",
+      "source_section": "matrix",
+      "reference_page": "home",
+      "reference_section": "matrix",
+      "same_synced_source": true,
+      "columns": [
+        "교시",
+        "수업 시간",
+        "월",
+        "화",
+        "수",
+        "목",
+        "금"
+      ],
+      "preferred_column_widths": [
+        70,
+        150,
+        184,
+        184,
+        184,
+        184,
+        184
+      ],
+      "width_policy": "relative_preference_fit_available_page_width",
+      "fit_page_width": true,
+      "header_row": true,
+      "copy_to_agenda": false
+    },
+    "pages": {
+      "home": {
+        "title": "대시보드 & 오늘 허브",
+        "full_width": true,
+        "small_text": false,
+        "sections": {
+          "nav": {
+            "title": "공통 이동 링크",
+            "required": true,
+            "heading": "공통 이동 링크",
+            "heading_aliases": [],
+            "locator": {
+              "kind": "navigation_callout",
+              "icon": "🧭",
+              "color": "gray_bg",
+              "page_link_count": 4
+            },
+            "block_style": "callout"
+          },
+          "intro": {
+            "title": "학년도·교사·담당 교과",
+            "required": true,
+            "heading": "학년도·교사·담당 교과",
+            "heading_aliases": [],
+            "locator": {
+              "kind": "academic_year_line",
+              "pattern": "\\d{4}학년도"
+            }
+          },
+          "briefing": {
+            "title": "오늘의 교무실 브리핑",
+            "required": true,
+            "heading": "오늘의 교무실 브리핑",
+            "heading_aliases": [],
+            "locator": {
+              "kind": "heading_or_callout",
+              "prefix_match": false
+            },
+            "block_style": "callout"
+          },
+          "sync_status": {
+            "title": "자동 갱신 상태",
+            "required": false,
+            "populated_only": true,
+            "heading": "자동 갱신 상태",
+            "heading_aliases": [
+              "자동 갱신"
+            ],
+            "locator": {
+              "kind": "heading_or_callout",
+              "prefix_match": true
+            }
+          },
+          "updates": {
+            "title": "수첩 업데이트",
+            "required": false,
+            "populated_only": true,
+            "heading": "수첩 업데이트",
+            "heading_aliases": [
+              "업데이트"
+            ],
+            "locator": {
+              "kind": "heading_or_callout",
+              "prefix_match": true
+            }
+          },
+          "quick": {
+            "title": "빠른 실행",
+            "required": true,
+            "cards": {
+              "min": 4,
+              "max": 4,
+              "ratios": [
+                25,
+                25,
+                25,
+                25
+              ]
+            },
+            "heading": "빠른 실행",
+            "heading_aliases": [],
+            "locator": {
+              "kind": "heading_or_callout",
+              "prefix_match": false
+            },
+            "block_style": "callout_cards"
+          },
+          "forms": {
+            "title": "자주 쓰는 양식 모음",
+            "required": false,
+            "heading": "자주 쓰는 양식 모음",
+            "heading_aliases": [],
+            "locator": {
+              "kind": "heading_or_callout",
+              "prefix_match": false
+            }
+          },
+          "matrix": {
+            "title": "오늘의 수업 · 주간 시간표",
+            "required": true,
+            "heading": "오늘의 수업 · 주간 시간표",
+            "heading_aliases": [],
+            "locator": {
+              "kind": "heading_or_callout",
+              "prefix_match": false
+            }
+          },
+          "today": {
+            "title": "오늘·변경 수업 · 관리용",
+            "required": true,
+            "view_keys": [
+              "teacher_today",
+              "teacher_changes"
+            ],
+            "default_view": "teacher_today",
+            "database_blocks": 1,
+            "visible_properties": "inherit_blueprint",
+            "toggle": true,
+            "default_open": false,
+            "collapse_verification": "browser_ui_required",
+            "heading": "오늘·변경 수업 · 관리용",
+            "heading_aliases": [
+              "오늘 수업 원본 · 목록으로 확인"
+            ],
+            "locator": {
+              "kind": "heading_or_callout",
+              "prefix_match": false
+            }
+          },
+          "meals": {
+            "title": "오늘의 중식",
+            "required": true,
+            "heading": "오늘의 중식",
+            "heading_aliases": [],
+            "locator": {
+              "kind": "heading_or_callout",
+              "prefix_match": true
+            }
+          },
+          "tasks": {
+            "title": "우선순위 To-Do",
+            "required": true,
+            "view_keys": [
+              "todo",
+              "todo_p1",
+              "todo_done",
+              "inbox"
+            ],
+            "default_view": "todo",
+            "database_blocks": 1,
+            "visible_properties": "inherit_blueprint",
+            "heading": "우선순위 To-Do",
+            "heading_aliases": [],
+            "locator": {
+              "kind": "heading_or_callout",
+              "prefix_match": false
+            }
+          },
+          "deadlines": {
+            "title": "7일 안에 마감 업무",
+            "required": true,
+            "view_keys": [
+              "due_soon"
+            ],
+            "default_view": "due_soon",
+            "database_blocks": 1,
+            "visible_properties": "inherit_blueprint",
+            "heading": "7일 안에 마감 업무",
+            "heading_aliases": [
+              "다가오는 마감"
+            ],
+            "locator": {
+              "kind": "heading_or_callout",
+              "prefix_match": false
+            }
+          },
+          "attendance": {
+            "title": "오늘 출결 확인",
+            "required": false,
+            "view_keys": [
+              "attendance_today",
+              "attendance_unconfirmed"
+            ],
+            "default_view": "attendance_today",
+            "database_blocks": 1,
+            "visible_properties": "inherit_blueprint",
+            "heading": "오늘 출결 확인",
+            "heading_aliases": [],
+            "locator": {
+              "kind": "heading_or_callout",
+              "prefix_match": false
+            }
+          },
+          "counseling": {
+            "title": "오늘 상담",
+            "required": true,
+            "view_keys": [
+              "counseling_today"
+            ],
+            "default_view": "counseling_today",
+            "database_blocks": 1,
+            "visible_properties": "inherit_blueprint",
+            "heading": "오늘 상담",
+            "heading_aliases": [],
+            "locator": {
+              "kind": "heading_or_callout",
+              "prefix_match": false
+            }
+          },
+          "progress": {
+            "title": "반별 진도 현황",
+            "required": true,
+            "view_keys": [
+              "progress_class",
+              "progress_attention"
+            ],
+            "default_view": "progress_class",
+            "database_blocks": 1,
+            "visible_properties": "inherit_blueprint",
+            "heading": "반별 진도 현황",
+            "heading_aliases": [],
+            "locator": {
+              "kind": "heading_or_callout",
+              "prefix_match": false
+            }
+          },
+          "assessment": {
+            "title": "다가오는 평가",
+            "required": false,
+            "view_keys": [
+              "assessments_upcoming"
+            ],
+            "default_view": "assessments_upcoming",
+            "database_blocks": 1,
+            "visible_properties": "inherit_blueprint",
+            "heading": "다가오는 평가",
+            "heading_aliases": [],
+            "locator": {
+              "kind": "heading_or_callout",
+              "prefix_match": false
+            }
+          },
+          "schedule": {
+            "title": "학사 캘린더",
+            "required": true,
+            "view_keys": [
+              "weekly",
+              "monthly"
+            ],
+            "default_view": "weekly",
+            "database_blocks": 1,
+            "visible_properties": "inherit_blueprint",
+            "heading": "학사 캘린더",
+            "heading_aliases": [],
+            "locator": {
+              "kind": "heading_or_callout",
+              "prefix_match": false
+            }
+          },
+          "document_storage": {
+            "title": "문서 보관실",
+            "required": true,
+            "heading": "문서 보관실",
+            "heading_aliases": [],
+            "locator": {
+              "kind": "heading_or_callout",
+              "prefix_match": false
+            }
+          },
+          "source_list": {
+            "title": "원본 데이터베이스",
+            "required": true,
+            "toggle": true,
+            "default_open": false,
+            "collapse_verification": "browser_ui_required",
+            "heading": "원본 데이터베이스",
+            "heading_aliases": [
+              "원본 데이터베이스 전체 목록"
+            ],
+            "locator": {
+              "kind": "heading_or_callout",
+              "prefix_match": false
+            }
+          }
+        },
+        "rows": [
+          {
+            "id": "nav",
+            "columns": [
+              {
+                "ratio": 100,
+                "sections": [
+                  "nav"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "intro",
+            "columns": [
+              {
+                "ratio": 100,
+                "sections": [
+                  "intro"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "briefing",
+            "columns": [
+              {
+                "ratio": 100,
+                "sections": [
+                  "briefing"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "sync_status",
+            "columns": [
+              {
+                "ratio": 100,
+                "sections": [
+                  "sync_status"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "updates",
+            "columns": [
+              {
+                "ratio": 100,
+                "sections": [
+                  "updates"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "quick",
+            "columns": [
+              {
+                "ratio": 100,
+                "sections": [
+                  "quick"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "forms",
+            "columns": [
+              {
+                "ratio": 100,
+                "sections": [
+                  "forms"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "matrix",
+            "columns": [
+              {
+                "ratio": 100,
+                "sections": [
+                  "matrix"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "today",
+            "columns": [
+              {
+                "ratio": 100,
+                "sections": [
+                  "today"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "work",
+            "columns": [
+              {
+                "ratio": 40,
+                "sections": [
+                  "meals"
+                ]
+              },
+              {
+                "ratio": 60,
+                "sections": [
+                  "tasks",
+                  "deadlines"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "students",
+            "columns": [
+              {
+                "ratio": 50,
+                "sections": [
+                  "attendance"
+                ]
+              },
+              {
+                "ratio": 50,
+                "sections": [
+                  "counseling"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "teaching",
+            "columns": [
+              {
+                "ratio": 55,
+                "sections": [
+                  "progress"
+                ]
+              },
+              {
+                "ratio": 45,
+                "sections": [
+                  "assessment"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "schedule",
+            "columns": [
+              {
+                "ratio": 100,
+                "sections": [
+                  "schedule"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "document_storage",
+            "columns": [
+              {
+                "ratio": 100,
+                "sections": [
+                  "document_storage"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "source_list",
+            "columns": [
+              {
+                "ratio": 100,
+                "sections": [
+                  "source_list"
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "classroom": {
+        "title": "학급 경영 & 학생 상담",
+        "full_width": true,
+        "small_text": false,
+        "sections": {
+          "nav": {
+            "title": "공통 이동 링크",
+            "required": true,
+            "heading": "공통 이동 링크",
+            "heading_aliases": [],
+            "locator": {
+              "kind": "navigation_callout",
+              "icon": "🧭",
+              "color": "gray_bg",
+              "page_link_count": 4
+            },
+            "block_style": "callout"
+          },
+          "intro": {
+            "title": "학년도·교사·담당 교과",
+            "required": true,
+            "heading": "학년도·교사·담당 교과",
+            "heading_aliases": [],
+            "locator": {
+              "kind": "academic_year_line",
+              "pattern": "\\d{4}학년도"
+            }
+          },
+          "students": {
+            "title": "학생 명부 & 관찰 기록",
+            "required": true,
+            "view_keys": [
+              "active_students",
+              "students_gallery",
+              "students_observation"
+            ],
+            "default_view": "active_students",
+            "database_blocks": 1,
+            "visible_properties": "inherit_blueprint",
+            "heading": "학생 명부 & 관찰 기록",
+            "heading_aliases": [],
+            "locator": {
+              "kind": "heading_or_callout",
+              "prefix_match": false
+            }
+          },
+          "attendance": {
+            "title": "출결 확인",
+            "required": false,
+            "view_keys": [
+              "attendance_today",
+              "attendance_unconfirmed",
+              "active_attendance"
+            ],
+            "default_view": "attendance_today",
+            "database_blocks": 1,
+            "visible_properties": "inherit_blueprint",
+            "heading": "출결 확인",
+            "heading_aliases": [],
+            "locator": {
+              "kind": "heading_or_callout",
+              "prefix_match": false
+            }
+          },
+          "submissions": {
+            "title": "제출물 체크",
+            "required": false,
+            "view_keys": [
+              "active_submissions"
+            ],
+            "default_view": "active_submissions",
+            "database_blocks": 1,
+            "visible_properties": "inherit_blueprint",
+            "heading": "제출물 체크",
+            "heading_aliases": [],
+            "locator": {
+              "kind": "heading_or_callout",
+              "prefix_match": false
+            }
+          },
+          "counseling": {
+            "title": "상담 기록 & 후속 조치",
+            "required": true,
+            "view_keys": [
+              "active_counseling",
+              "counseling_today"
+            ],
+            "default_view": "active_counseling",
+            "database_blocks": 1,
+            "visible_properties": "inherit_blueprint",
+            "heading": "상담 기록 & 후속 조치",
+            "heading_aliases": [],
+            "locator": {
+              "kind": "heading_or_callout",
+              "prefix_match": false
+            }
+          },
+          "contacts": {
+            "title": "학부모 연락",
+            "required": false,
+            "view_keys": [
+              "active_contacts"
+            ],
+            "default_view": "active_contacts",
+            "database_blocks": 1,
+            "visible_properties": "inherit_blueprint",
+            "heading": "학부모 연락",
+            "heading_aliases": [],
+            "locator": {
+              "kind": "heading_or_callout",
+              "prefix_match": false
+            }
+          },
+          "notes": {
+            "title": "조회·종례 관찰 메모",
+            "required": true,
+            "cards": {
+              "min": 2,
+              "max": 2,
+              "ratios": [
+                50,
+                50
+              ]
+            },
+            "heading": "조회·종례 관찰 메모",
+            "heading_aliases": [],
+            "locator": {
+              "kind": "heading_or_callout",
+              "prefix_match": false
+            },
+            "block_style": "callout_cards"
+          },
+          "school": {
+            "title": "학교 업무 바로가기",
+            "required": false,
+            "cards": {
+              "min": 1,
+              "max": 3,
+              "ratios": [
+                33.333333,
+                33.333333,
+                33.333334
+              ]
+            },
+            "heading": "학교 업무 바로가기",
+            "heading_aliases": [],
+            "locator": {
+              "kind": "heading_or_callout",
+              "prefix_match": false
+            },
+            "block_style": "callout_cards"
+          }
+        },
+        "rows": [
+          {
+            "id": "nav",
+            "columns": [
+              {
+                "ratio": 100,
+                "sections": [
+                  "nav"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "intro",
+            "columns": [
+              {
+                "ratio": 100,
+                "sections": [
+                  "intro"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "students",
+            "columns": [
+              {
+                "ratio": 100,
+                "sections": [
+                  "students"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "attendance_submissions",
+            "columns": [
+              {
+                "ratio": 50,
+                "sections": [
+                  "attendance"
+                ]
+              },
+              {
+                "ratio": 50,
+                "sections": [
+                  "submissions"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "counseling",
+            "columns": [
+              {
+                "ratio": 100,
+                "sections": [
+                  "counseling"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "contacts",
+            "columns": [
+              {
+                "ratio": 100,
+                "sections": [
+                  "contacts"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "notes",
+            "columns": [
+              {
+                "ratio": 100,
+                "sections": [
+                  "notes"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "school",
+            "columns": [
+              {
+                "ratio": 100,
+                "sections": [
+                  "school"
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "teaching": {
+        "title": "교과 진도표 & 시간표",
+        "full_width": true,
+        "small_text": false,
+        "sections": {
+          "nav": {
+            "title": "공통 이동 링크",
+            "required": true,
+            "heading": "공통 이동 링크",
+            "heading_aliases": [],
+            "locator": {
+              "kind": "navigation_callout",
+              "icon": "🧭",
+              "color": "gray_bg",
+              "page_link_count": 4
+            },
+            "block_style": "callout"
+          },
+          "intro": {
+            "title": "학년도·교사·담당 교과",
+            "required": true,
+            "heading": "학년도·교사·담당 교과",
+            "heading_aliases": [],
+            "locator": {
+              "kind": "academic_year_line",
+              "pattern": "\\d{4}학년도"
+            }
+          },
+          "matrix": {
+            "title": "주간 수업 시간표",
+            "required": true,
+            "heading": "주간 수업 시간표",
+            "heading_aliases": [],
+            "locator": {
+              "kind": "heading_or_callout",
+              "prefix_match": false
+            }
+          },
+          "timetable": {
+            "title": "시간표 원본 · 관리용",
+            "required": true,
+            "view_keys": [
+              "teacher_week",
+              "teacher_changes"
+            ],
+            "default_view": "teacher_week",
+            "database_blocks": 1,
+            "visible_properties": "inherit_blueprint",
+            "toggle": true,
+            "default_open": false,
+            "collapse_verification": "browser_ui_required",
+            "heading": "시간표 원본 · 관리용",
+            "heading_aliases": [
+              "시간표 원본 · 수정 및 변경 이력"
+            ],
+            "locator": {
+              "kind": "heading_or_callout",
+              "prefix_match": false
+            }
+          },
+          "progress": {
+            "title": "교과별·학급별 진도",
+            "required": true,
+            "view_keys": [
+              "progress_class",
+              "progress_subject",
+              "semester_1",
+              "semester_2",
+              "progress_attention"
+            ],
+            "default_view": "progress_class",
+            "database_blocks": 1,
+            "visible_properties": "inherit_blueprint",
+            "heading": "교과별·학급별 진도",
+            "heading_aliases": [],
+            "locator": {
+              "kind": "heading_or_callout",
+              "prefix_match": false
+            }
+          },
+          "assessment": {
+            "title": "평가·채점 현황",
+            "required": false,
+            "view_keys": [
+              "assessments_upcoming",
+              "active_assessments"
+            ],
+            "default_view": "assessments_upcoming",
+            "database_blocks": 1,
+            "visible_properties": "inherit_blueprint",
+            "heading": "평가·채점 현황",
+            "heading_aliases": [],
+            "locator": {
+              "kind": "heading_or_callout",
+              "prefix_match": false
+            }
+          },
+          "meetings": {
+            "title": "교과 협의 & 결정 사항",
+            "required": false,
+            "view_keys": [
+              "active_meetings"
+            ],
+            "default_view": "active_meetings",
+            "database_blocks": 1,
+            "visible_properties": "inherit_blueprint",
+            "heading": "교과 협의 & 결정 사항",
+            "heading_aliases": [],
+            "locator": {
+              "kind": "heading_or_callout",
+              "prefix_match": false
+            }
+          },
+          "resources": {
+            "title": "수업 자료",
+            "required": true,
+            "view_keys": [
+              "active_resources"
+            ],
+            "default_view": "active_resources",
+            "database_blocks": 1,
+            "visible_properties": "inherit_blueprint",
+            "heading": "수업 자료",
+            "heading_aliases": [],
+            "locator": {
+              "kind": "heading_or_callout",
+              "prefix_match": false
+            }
+          }
+        },
+        "rows": [
+          {
+            "id": "nav",
+            "columns": [
+              {
+                "ratio": 100,
+                "sections": [
+                  "nav"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "intro",
+            "columns": [
+              {
+                "ratio": 100,
+                "sections": [
+                  "intro"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "matrix",
+            "columns": [
+              {
+                "ratio": 100,
+                "sections": [
+                  "matrix"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "timetable",
+            "columns": [
+              {
+                "ratio": 100,
+                "sections": [
+                  "timetable"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "progress",
+            "columns": [
+              {
+                "ratio": 100,
+                "sections": [
+                  "progress"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "assessment",
+            "columns": [
+              {
+                "ratio": 100,
+                "sections": [
+                  "assessment"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "meetings_resources",
+            "columns": [
+              {
+                "ratio": 50,
+                "sections": [
+                  "meetings"
+                ]
+              },
+              {
+                "ratio": 50,
+                "sections": [
+                  "resources"
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "planning": {
+        "title": "학사 캘린더 & PARA",
+        "full_width": true,
+        "small_text": false,
+        "sections": {
+          "nav": {
+            "title": "공통 이동 링크",
+            "required": true,
+            "heading": "공통 이동 링크",
+            "heading_aliases": [],
+            "locator": {
+              "kind": "navigation_callout",
+              "icon": "🧭",
+              "color": "gray_bg",
+              "page_link_count": 4
+            },
+            "block_style": "callout"
+          },
+          "intro": {
+            "title": "학년도·교사·담당 교과",
+            "required": true,
+            "heading": "학년도·교사·담당 교과",
+            "heading_aliases": [],
+            "locator": {
+              "kind": "academic_year_line",
+              "pattern": "\\d{4}학년도"
+            }
+          },
+          "schedule": {
+            "title": "학사 캘린더",
+            "required": true,
+            "view_keys": [
+              "weekly",
+              "monthly",
+              "deadlines"
+            ],
+            "default_view": "monthly",
+            "database_blocks": 1,
+            "visible_properties": "inherit_blueprint",
+            "heading": "학사 캘린더",
+            "heading_aliases": [],
+            "locator": {
+              "kind": "heading_or_callout",
+              "prefix_match": false
+            }
+          },
+          "deadlines": {
+            "title": "마감이 가까운 업무",
+            "required": true,
+            "view_keys": [
+              "due_soon",
+              "overdue"
+            ],
+            "default_view": "due_soon",
+            "database_blocks": 1,
+            "visible_properties": "inherit_blueprint",
+            "heading": "마감이 가까운 업무",
+            "heading_aliases": [],
+            "locator": {
+              "kind": "heading_or_callout",
+              "prefix_match": false
+            }
+          },
+          "para": {
+            "title": "PARA 교직 업무",
+            "required": true,
+            "cards": {
+              "min": 4,
+              "max": 4,
+              "ratios": [
+                25,
+                25,
+                25,
+                25
+              ]
+            },
+            "heading": "PARA 교직 업무",
+            "heading_aliases": [],
+            "locator": {
+              "kind": "heading_or_callout",
+              "prefix_match": false
+            },
+            "block_style": "callout_cards"
+          },
+          "projects": {
+            "title": "Projects · 프로젝트",
+            "required": true,
+            "view_keys": [
+              "projects_board",
+              "active_projects"
+            ],
+            "default_view": "projects_board",
+            "database_blocks": 1,
+            "visible_properties": "inherit_blueprint",
+            "heading": "Projects · 프로젝트",
+            "heading_aliases": [],
+            "locator": {
+              "kind": "heading_or_callout",
+              "prefix_match": false
+            }
+          },
+          "areas": {
+            "title": "Areas · 담당 영역",
+            "required": true,
+            "view_keys": [
+              "active_areas"
+            ],
+            "default_view": "active_areas",
+            "database_blocks": 1,
+            "visible_properties": "inherit_blueprint",
+            "heading": "Areas · 담당 영역",
+            "heading_aliases": [],
+            "locator": {
+              "kind": "heading_or_callout",
+              "prefix_match": false
+            }
+          },
+          "resources": {
+            "title": "Resources · 자료",
+            "required": true,
+            "view_keys": [
+              "active_resources"
+            ],
+            "default_view": "active_resources",
+            "database_blocks": 1,
+            "visible_properties": "inherit_blueprint",
+            "heading": "Resources · 자료",
+            "heading_aliases": [],
+            "locator": {
+              "kind": "heading_or_callout",
+              "prefix_match": false
+            }
+          },
+          "archive": {
+            "title": "Archives · 보관",
+            "required": true,
+            "view_keys": [
+              "archive_agenda"
+            ],
+            "default_view": "archive_agenda",
+            "database_blocks": 1,
+            "visible_properties": "inherit_blueprint",
+            "heading": "Archives · 보관",
+            "heading_aliases": [],
+            "locator": {
+              "kind": "heading_or_callout",
+              "prefix_match": false
+            }
+          },
+          "archive_links": {
+            "title": "표별 보관함",
+            "required": true,
+            "toggle": true,
+            "default_open": false,
+            "collapse_verification": "browser_ui_required",
+            "heading": "표별 보관함",
+            "heading_aliases": [
+              "다른 원본의 보관 기록 찾기"
+            ],
+            "locator": {
+              "kind": "heading_or_callout",
+              "prefix_match": false
+            }
+          }
+        },
+        "rows": [
+          {
+            "id": "nav",
+            "columns": [
+              {
+                "ratio": 100,
+                "sections": [
+                  "nav"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "intro",
+            "columns": [
+              {
+                "ratio": 100,
+                "sections": [
+                  "intro"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "schedule",
+            "columns": [
+              {
+                "ratio": 100,
+                "sections": [
+                  "schedule"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "deadlines",
+            "columns": [
+              {
+                "ratio": 100,
+                "sections": [
+                  "deadlines"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "para",
+            "columns": [
+              {
+                "ratio": 100,
+                "sections": [
+                  "para"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "projects",
+            "columns": [
+              {
+                "ratio": 100,
+                "sections": [
+                  "projects"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "areas_resources",
+            "columns": [
+              {
+                "ratio": 50,
+                "sections": [
+                  "areas"
+                ]
+              },
+              {
+                "ratio": 50,
+                "sections": [
+                  "resources"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "archive",
+            "columns": [
+              {
+                "ratio": 100,
+                "sections": [
+                  "archive"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "archive_links",
+            "columns": [
+              {
+                "ratio": 100,
+                "sections": [
+                  "archive_links"
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    }
+  },
+  "databases": [
+    {
+      "key": "classes",
+      "title": "학급",
+      "module": "core",
+      "section": "운영 자료",
+      "properties": {
+        "이름": {
+          "type": "title"
+        },
+        "학년도": {
+          "type": "number"
+        },
+        "보관": {
+          "type": "checkbox"
+        },
+        "학년": {
+          "type": "number"
+        },
+        "반": {
+          "type": "rich_text"
+        },
+        "담당 교과": {
+          "type": "multi_select",
+          "options": [
+            "국어",
+            "영어",
+            "수학",
+            "사회",
+            "과학"
+          ]
+        },
+        "담임": {
+          "type": "checkbox"
+        }
+      }
+    },
+    {
+      "key": "students",
+      "title": "학생 명단",
+      "module": "core",
+      "section": "학생 기록",
+      "properties": {
+        "이름": {
+          "type": "title"
+        },
+        "학년도": {
+          "type": "number"
+        },
+        "보관": {
+          "type": "checkbox"
+        },
+        "학생 ID": {
+          "type": "rich_text"
+        },
+        "학급": {
+          "type": "relation",
+          "target": "classes"
+        },
+        "번호": {
+          "type": "number"
+        },
+        "재적": {
+          "type": "select",
+          "options": [
+            "재학",
+            "전출",
+            "졸업"
+          ]
+        },
+        "메모": {
+          "type": "rich_text"
+        },
+        "관찰 태그": {
+          "type": "multi_select",
+          "options": [
+            "학습",
+            "관계",
+            "생활",
+            "출결",
+            "후속 확인"
+          ]
+        },
+        "집중 관찰": {
+          "type": "checkbox"
+        }
+      }
+    },
+    {
+      "key": "areas",
+      "title": "담당 영역 · A",
+      "module": "core",
+      "section": "운영 자료",
+      "properties": {
+        "이름": {
+          "type": "title"
+        },
+        "학년도": {
+          "type": "number"
+        },
+        "보관": {
+          "type": "checkbox"
+        },
+        "분류": {
+          "type": "select",
+          "options": [
+            "수업",
+            "담임",
+            "행정",
+            "평가",
+            "상담",
+            "연수"
+          ]
+        },
+        "관리 기준": {
+          "type": "rich_text"
+        },
+        "점검 주기": {
+          "type": "select",
+          "options": [
+            "매일",
+            "매주",
+            "매월",
+            "학기"
+          ]
+        }
+      }
+    },
+    {
+      "key": "projects",
+      "title": "프로젝트 · P",
+      "module": "core",
+      "section": "운영 자료",
+      "properties": {
+        "이름": {
+          "type": "title"
+        },
+        "학년도": {
+          "type": "number"
+        },
+        "보관": {
+          "type": "checkbox"
+        },
+        "영역": {
+          "type": "relation",
+          "target": "areas"
+        },
+        "목표": {
+          "type": "rich_text"
+        },
+        "기간": {
+          "type": "date"
+        },
+        "상태": {
+          "type": "select",
+          "options": [
+            "계획",
+            "진행",
+            "완료",
+            "중단"
+          ]
+        },
+        "완료 기준": {
+          "type": "rich_text"
+        }
+      }
+    },
+    {
+      "key": "resources",
+      "title": "수업·업무 자료 · R",
+      "module": "core",
+      "section": "운영 자료",
+      "properties": {
+        "이름": {
+          "type": "title"
+        },
+        "학년도": {
+          "type": "number"
+        },
+        "보관": {
+          "type": "checkbox"
+        },
+        "영역": {
+          "type": "relation",
+          "target": "areas"
+        },
+        "프로젝트": {
+          "type": "relation",
+          "target": "projects"
+        },
+        "주제": {
+          "type": "multi_select",
+          "options": [
+            "수업자료",
+            "공문",
+            "평가",
+            "연수"
+          ]
+        },
+        "쓰임": {
+          "type": "rich_text"
+        },
+        "원문": {
+          "type": "url"
+        },
+        "즐겨찾기": {
+          "type": "checkbox"
+        }
+      }
+    },
+    {
+      "key": "agenda",
+      "title": "업무·일정",
+      "module": "core",
+      "section": "운영 자료",
+      "properties": {
+        "이름": {
+          "type": "title"
+        },
+        "학년도": {
+          "type": "number"
+        },
+        "보관": {
+          "type": "checkbox"
+        },
+        "종류": {
+          "type": "select",
+          "options": [
+            "할 일",
+            "행사",
+            "수업",
+            "상담",
+            "평가",
+            "회의",
+            "연락",
+            "제출"
+          ]
+        },
+        "상태": {
+          "type": "select",
+          "options": [
+            "수집함",
+            "예정",
+            "진행",
+            "대기",
+            "완료",
+            "취소"
+          ]
+        },
+        "우선순위": {
+          "type": "select",
+          "options": [
+            "P1 지금",
+            "P2 계획",
+            "P3 처리",
+            "P4 여유"
+          ]
+        },
+        "업무 분류": {
+          "type": "select",
+          "options": [
+            "수업",
+            "담임",
+            "행정",
+            "평가",
+            "상담",
+            "연수"
+          ]
+        },
+        "일정": {
+          "type": "date"
+        },
+        "마감": {
+          "type": "date"
+        },
+        "영역": {
+          "type": "relation",
+          "target": "areas"
+        },
+        "프로젝트": {
+          "type": "relation",
+          "target": "projects"
+        },
+        "학급": {
+          "type": "relation",
+          "target": "classes"
+        },
+        "다음 행동": {
+          "type": "rich_text"
+        },
+        "우선순위 순서": {
+          "type": "formula",
+          "expression": "if(empty(prop(\"우선순위\")), 5, toNumber(substring(prop(\"우선순위\"), 1, 2)))"
+        },
+        "지연": {
+          "type": "formula",
+          "expression": "if(or(empty(prop(\"마감\")), or(prop(\"상태\") == \"완료\", prop(\"상태\") == \"취소\")), false, dateStart(prop(\"마감\")) < today())"
+        },
+        "외부 ID": {
+          "type": "rich_text"
+        },
+        "마감 남은 일": {
+          "type": "formula",
+          "expression": "if(or(empty(prop(\"마감\")), or(prop(\"상태\") == \"완료\", prop(\"상태\") == \"취소\")), 0, dateBetween(parseDate(formatDate(dateStart(prop(\"마감\")), \"YYYY-MM-DD\")), today(), \"days\"))"
+        },
+        "마감 임박": {
+          "type": "formula",
+          "expression": "if(or(empty(prop(\"마감\")), or(prop(\"상태\") == \"완료\", prop(\"상태\") == \"취소\")), false, and(prop(\"마감 남은 일\") >= 0, prop(\"마감 남은 일\") <= 7))"
+        },
+        "D-Day": {
+          "type": "formula",
+          "expression": "if(or(empty(prop(\"마감\")), or(prop(\"상태\") == \"완료\", prop(\"상태\") == \"취소\")), \"\", if(prop(\"마감 남은 일\") == 0, \"D-Day\", if(prop(\"마감 남은 일\") > 0, \"D-\" + format(prop(\"마감 남은 일\")), \"D+\" + format(abs(prop(\"마감 남은 일\"))))))"
+        }
+      }
+    },
+    {
+      "key": "timetable",
+      "title": "교사 시간표",
+      "module": "core",
+      "section": "운영 자료",
+      "properties": {
+        "이름": {
+          "type": "title"
+        },
+        "학년도": {
+          "type": "number"
+        },
+        "보관": {
+          "type": "checkbox"
+        },
+        "외부 ID": {
+          "type": "rich_text"
+        },
+        "교사": {
+          "type": "rich_text"
+        },
+        "수업일": {
+          "type": "date"
+        },
+        "교시": {
+          "type": "number"
+        },
+        "학급": {
+          "type": "relation",
+          "target": "classes"
+        },
+        "교과": {
+          "type": "rich_text"
+        },
+        "교실": {
+          "type": "rich_text"
+        },
+        "상태": {
+          "type": "select",
+          "options": [
+            "예정",
+            "변경",
+            "휴강",
+            "완료"
+          ]
+        },
+        "출처": {
+          "type": "select",
+          "options": [
+            "직접 입력",
+            "파일 가져오기",
+            "컴시간 어댑터"
+          ]
+        },
+        "동기화 시각": {
+          "type": "date"
+        },
+        "업무·일정": {
+          "type": "relation",
+          "target": "agenda"
+        },
+        "오늘 수업": {
+          "type": "formula",
+          "expression": "if(empty(prop(\"수업일\")), false, formatDate(dateStart(prop(\"수업일\")), \"YYYY-MM-DD\") == formatDate(today(), \"YYYY-MM-DD\"))"
+        }
+      }
+    },
+    {
+      "key": "lessons",
+      "title": "수업 진도",
+      "module": "core",
+      "section": "운영 자료",
+      "properties": {
+        "이름": {
+          "type": "title"
+        },
+        "학년도": {
+          "type": "number"
+        },
+        "보관": {
+          "type": "checkbox"
+        },
+        "학급": {
+          "type": "relation",
+          "target": "classes"
+        },
+        "교과": {
+          "type": "rich_text"
+        },
+        "단원": {
+          "type": "rich_text"
+        },
+        "계획일": {
+          "type": "date"
+        },
+        "실제 수업일": {
+          "type": "date"
+        },
+        "계획 차시": {
+          "type": "number"
+        },
+        "완료 차시": {
+          "type": "number"
+        },
+        "진도율": {
+          "type": "formula",
+          "expression": "if(prop(\"계획 차시\") <= 0, 0, round(min(1, max(0, prop(\"완료 차시\") / prop(\"계획 차시\"))) * 100))"
+        },
+        "상태": {
+          "type": "select",
+          "options": [
+            "준비",
+            "진행",
+            "완료",
+            "보강 필요"
+          ]
+        },
+        "다음 수업": {
+          "type": "rich_text"
+        },
+        "자료": {
+          "type": "relation",
+          "target": "resources"
+        },
+        "시간표": {
+          "type": "relation",
+          "target": "timetable"
+        },
+        "학기": {
+          "type": "select",
+          "options": [
+            "1학기",
+            "2학기"
+          ]
+        }
+      }
+    },
+    {
+      "key": "counseling",
+      "title": "상담 기록",
+      "module": "core",
+      "section": "학생 기록",
+      "properties": {
+        "이름": {
+          "type": "title"
+        },
+        "학년도": {
+          "type": "number"
+        },
+        "보관": {
+          "type": "checkbox"
+        },
+        "학생": {
+          "type": "relation",
+          "target": "students",
+          "reciprocal": "상담 기록"
+        },
+        "상담일": {
+          "type": "date"
+        },
+        "대상": {
+          "type": "select",
+          "options": [
+            "학생",
+            "보호자",
+            "기타"
+          ]
+        },
+        "주제": {
+          "type": "rich_text"
+        },
+        "관찰 사실": {
+          "type": "rich_text"
+        },
+        "합의 사항": {
+          "type": "rich_text"
+        },
+        "후속 확인일": {
+          "type": "date"
+        },
+        "후속 업무": {
+          "type": "relation",
+          "target": "agenda"
+        },
+        "상태": {
+          "type": "select",
+          "options": [
+            "예정",
+            "진행",
+            "추적",
+            "종결"
+          ]
+        },
+        "오늘 상담": {
+          "type": "formula",
+          "expression": "if(empty(prop(\"상담일\")), false, formatDate(dateStart(prop(\"상담일\")), \"YYYY-MM-DD\") == formatDate(today(), \"YYYY-MM-DD\"))"
+        }
+      }
+    },
+    {
+      "key": "attendance",
+      "title": "출결 체크",
+      "module": "attendance",
+      "section": "학생 기록",
+      "properties": {
+        "이름": {
+          "type": "title"
+        },
+        "학년도": {
+          "type": "number"
+        },
+        "보관": {
+          "type": "checkbox"
+        },
+        "학생": {
+          "type": "relation",
+          "target": "students"
+        },
+        "학급": {
+          "type": "relation",
+          "target": "classes"
+        },
+        "날짜": {
+          "type": "date"
+        },
+        "교시": {
+          "type": "number"
+        },
+        "상태": {
+          "type": "select",
+          "options": [
+            "출석",
+            "결석",
+            "지각",
+            "조퇴",
+            "결과"
+          ]
+        },
+        "확인": {
+          "type": "checkbox"
+        },
+        "메모": {
+          "type": "rich_text"
+        },
+        "오늘 출결": {
+          "type": "formula",
+          "expression": "if(empty(prop(\"날짜\")), false, formatDate(dateStart(prop(\"날짜\")), \"YYYY-MM-DD\") == formatDate(today(), \"YYYY-MM-DD\"))"
+        }
+      }
+    },
+    {
+      "key": "submissions",
+      "title": "제출물 체크",
+      "module": "attendance",
+      "section": "학생 기록",
+      "properties": {
+        "이름": {
+          "type": "title"
+        },
+        "학년도": {
+          "type": "number"
+        },
+        "보관": {
+          "type": "checkbox"
+        },
+        "학생": {
+          "type": "relation",
+          "target": "students"
+        },
+        "학급": {
+          "type": "relation",
+          "target": "classes"
+        },
+        "항목": {
+          "type": "rich_text"
+        },
+        "마감": {
+          "type": "date"
+        },
+        "제출일": {
+          "type": "date"
+        },
+        "상태": {
+          "type": "select",
+          "options": [
+            "미제출",
+            "제출",
+            "보완 요청",
+            "확인 완료"
+          ]
+        },
+        "업무·일정": {
+          "type": "relation",
+          "target": "agenda"
+        }
+      }
+    },
+    {
+      "key": "assessments",
+      "title": "평가·채점 현황",
+      "module": "assessment",
+      "section": "운영 자료",
+      "properties": {
+        "이름": {
+          "type": "title"
+        },
+        "학년도": {
+          "type": "number"
+        },
+        "보관": {
+          "type": "checkbox"
+        },
+        "학급": {
+          "type": "relation",
+          "target": "classes"
+        },
+        "교과": {
+          "type": "rich_text"
+        },
+        "유형": {
+          "type": "select",
+          "options": [
+            "지필",
+            "수행",
+            "형성"
+          ]
+        },
+        "평가일": {
+          "type": "date"
+        },
+        "채점 마감": {
+          "type": "date"
+        },
+        "대상 인원": {
+          "type": "number"
+        },
+        "채점 완료": {
+          "type": "number"
+        },
+        "채점률": {
+          "type": "formula",
+          "expression": "if(prop(\"대상 인원\") <= 0, 0, round(min(1, max(0, prop(\"채점 완료\") / prop(\"대상 인원\"))) * 100))"
+        },
+        "상태": {
+          "type": "select",
+          "options": [
+            "준비",
+            "실시",
+            "채점",
+            "피드백",
+            "완료",
+            "취소"
+          ]
+        },
+        "업무·일정": {
+          "type": "relation",
+          "target": "agenda"
+        },
+        "기준표": {
+          "type": "relation",
+          "target": "resources"
+        },
+        "평가 남은 일": {
+          "type": "formula",
+          "expression": "if(or(empty(prop(\"평가일\")), or(prop(\"상태\") == \"완료\", prop(\"상태\") == \"취소\")), 0, dateBetween(parseDate(formatDate(dateStart(prop(\"평가일\")), \"YYYY-MM-DD\")), today(), \"days\"))"
+        },
+        "평가 예정": {
+          "type": "formula",
+          "expression": "if(or(empty(prop(\"평가일\")), or(prop(\"상태\") == \"완료\", prop(\"상태\") == \"취소\")), false, and(prop(\"평가 남은 일\") >= 0, prop(\"평가 남은 일\") <= 30))"
+        },
+        "평가 D-Day": {
+          "type": "formula",
+          "expression": "if(or(empty(prop(\"평가일\")), or(prop(\"상태\") == \"완료\", prop(\"상태\") == \"취소\")), \"\", if(prop(\"평가 남은 일\") == 0, \"D-Day\", if(prop(\"평가 남은 일\") > 0, \"D-\" + format(prop(\"평가 남은 일\")), \"D+\" + format(abs(prop(\"평가 남은 일\"))))))"
+        }
+      }
+    },
+    {
+      "key": "contacts",
+      "title": "학부모 연락",
+      "module": "contact",
+      "section": "학생 기록",
+      "properties": {
+        "이름": {
+          "type": "title"
+        },
+        "학년도": {
+          "type": "number"
+        },
+        "보관": {
+          "type": "checkbox"
+        },
+        "학생": {
+          "type": "relation",
+          "target": "students"
+        },
+        "연락일": {
+          "type": "date"
+        },
+        "수단": {
+          "type": "select",
+          "options": [
+            "전화",
+            "문자",
+            "대면",
+            "학교 앱"
+          ]
+        },
+        "요지": {
+          "type": "rich_text"
+        },
+        "합의 사항": {
+          "type": "rich_text"
+        },
+        "후속일": {
+          "type": "date"
+        },
+        "후속 업무": {
+          "type": "relation",
+          "target": "agenda"
+        },
+        "상태": {
+          "type": "select",
+          "options": [
+            "연락 예정",
+            "연락 완료",
+            "후속 필요",
+            "종결"
+          ]
+        }
+      }
+    },
+    {
+      "key": "meetings",
+      "title": "회의록·결정 사항",
+      "module": "meeting",
+      "section": "운영 자료",
+      "properties": {
+        "이름": {
+          "type": "title"
+        },
+        "학년도": {
+          "type": "number"
+        },
+        "보관": {
+          "type": "checkbox"
+        },
+        "일시": {
+          "type": "date"
+        },
+        "업무 분류": {
+          "type": "select",
+          "options": [
+            "교과",
+            "학년",
+            "부서",
+            "전체"
+          ]
+        },
+        "안건": {
+          "type": "rich_text"
+        },
+        "결정 사항": {
+          "type": "rich_text"
+        },
+        "담당": {
+          "type": "rich_text"
+        },
+        "후속 업무": {
+          "type": "relation",
+          "target": "agenda"
+        },
+        "프로젝트": {
+          "type": "relation",
+          "target": "projects"
+        }
+      }
+    },
+    {
+      "key": "staff",
+      "title": "교직원 연락망",
+      "module": "staff",
+      "section": "운영 자료",
+      "properties": {
+        "이름": {
+          "type": "title"
+        },
+        "학년도": {
+          "type": "number"
+        },
+        "보관": {
+          "type": "checkbox"
+        },
+        "부서": {
+          "type": "rich_text"
+        },
+        "직책": {
+          "type": "rich_text"
+        },
+        "교내연락처": {
+          "type": "phone_number"
+        },
+        "이메일": {
+          "type": "email"
+        },
+        "담당 업무": {
+          "type": "rich_text"
+        },
+        "메모": {
+          "type": "rich_text"
+        }
+      }
+    },
+    {
+      "key": "accounts",
+      "title": "학교 계정 관리",
+      "module": "accounts",
+      "section": "운영 자료",
+      "properties": {
+        "이름": {
+          "type": "title"
+        },
+        "학년도": {
+          "type": "number"
+        },
+        "보관": {
+          "type": "checkbox"
+        },
+        "접속 URL": {
+          "type": "url"
+        },
+        "계정 ID": {
+          "type": "rich_text"
+        },
+        "관리 담당": {
+          "type": "rich_text"
+        },
+        "보관 위치": {
+          "type": "url"
+        },
+        "메모": {
+          "type": "rich_text"
+        }
+      }
+    }
+  ],
+  "views": [
+    {
+      "key": "inbox",
+      "source": "agenda",
+      "name": "수집함",
+      "type": "table",
+      "filter": {
+        "and": [
+          {
+            "property": "보관",
+            "checkbox": {
+              "equals": false
+            }
+          },
+          {
+            "property": "상태",
+            "select": {
+              "equals": "수집함"
+            }
+          }
+        ]
+      },
+      "show": [
+        "이름",
+        "업무 분류",
+        "다음 행동"
+      ]
+    },
+    {
+      "key": "todo",
+      "source": "agenda",
+      "name": "우선순위 To Do",
+      "type": "table",
+      "filter": {
+        "and": [
+          {
+            "property": "보관",
+            "checkbox": {
+              "equals": false
+            }
+          },
+          {
+            "property": "상태",
+            "select": {
+              "does_not_equal": "완료"
+            }
+          },
+          {
+            "property": "상태",
+            "select": {
+              "does_not_equal": "취소"
+            }
+          },
+          {
+            "property": "외부 ID",
+            "rich_text": {
+              "does_not_contain": "neis:"
+            }
+          }
+        ]
+      },
+      "sorts": [
+        {
+          "property": "우선순위 순서",
+          "direction": "ascending"
+        },
+        {
+          "property": "마감",
+          "direction": "ascending"
+        }
+      ],
+      "show": [
+        "이름",
+        "우선순위",
+        "마감",
+        "업무 분류",
+        "상태",
+        "다음 행동"
+      ]
+    },
+    {
+      "key": "weekly",
+      "source": "agenda",
+      "name": "주간 캘린더",
+      "type": "calendar",
+      "date": "일정",
+      "range": "week",
+      "filter": {
+        "and": [
+          {
+            "property": "보관",
+            "checkbox": {
+              "equals": false
+            }
+          },
+          {
+            "property": "상태",
+            "select": {
+              "does_not_equal": "취소"
+            }
+          }
+        ]
+      },
+      "show": [
+        "이름",
+        "우선순위",
+        "종류"
+      ]
+    },
+    {
+      "key": "monthly",
+      "source": "agenda",
+      "name": "월간 캘린더",
+      "type": "calendar",
+      "date": "일정",
+      "range": "month",
+      "filter": {
+        "and": [
+          {
+            "property": "보관",
+            "checkbox": {
+              "equals": false
+            }
+          },
+          {
+            "property": "상태",
+            "select": {
+              "does_not_equal": "취소"
+            }
+          }
+        ]
+      },
+      "show": [
+        "이름",
+        "종류"
+      ]
+    },
+    {
+      "key": "deadlines",
+      "source": "agenda",
+      "name": "마감 캘린더",
+      "type": "calendar",
+      "date": "마감",
+      "range": "month",
+      "filter": {
+        "and": [
+          {
+            "property": "보관",
+            "checkbox": {
+              "equals": false
+            }
+          },
+          {
+            "property": "상태",
+            "select": {
+              "does_not_equal": "완료"
+            }
+          },
+          {
+            "property": "상태",
+            "select": {
+              "does_not_equal": "취소"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "key": "by_work",
+      "source": "agenda",
+      "name": "업무 분류별",
+      "type": "board",
+      "group": "업무 분류",
+      "filter": {
+        "and": [
+          {
+            "property": "보관",
+            "checkbox": {
+              "equals": false
+            }
+          },
+          {
+            "property": "상태",
+            "select": {
+              "does_not_equal": "완료"
+            }
+          },
+          {
+            "property": "상태",
+            "select": {
+              "does_not_equal": "취소"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "key": "overdue",
+      "source": "agenda",
+      "name": "지연 업무",
+      "type": "table",
+      "filter": {
+        "and": [
+          {
+            "property": "보관",
+            "checkbox": {
+              "equals": false
+            }
+          },
+          {
+            "property": "지연",
+            "formula": {
+              "checkbox": {
+                "equals": true
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "key": "undated",
+      "source": "agenda",
+      "name": "날짜 미정",
+      "type": "table",
+      "filter": {
+        "and": [
+          {
+            "property": "보관",
+            "checkbox": {
+              "equals": false
+            }
+          },
+          {
+            "property": "상태",
+            "select": {
+              "does_not_equal": "완료"
+            }
+          },
+          {
+            "property": "상태",
+            "select": {
+              "does_not_equal": "취소"
+            }
+          },
+          {
+            "property": "일정",
+            "date": {
+              "is_empty": true
+            }
+          }
+        ]
+      }
+    },
+    {
+      "key": "teacher_week",
+      "source": "timetable",
+      "name": "수업 시간표",
+      "type": "table",
+      "filter": {
+        "property": "보관",
+        "checkbox": {
+          "equals": false
+        }
+      },
+      "show": [
+        "이름",
+        "수업일",
+        "교시",
+        "학급",
+        "교과",
+        "교실",
+        "상태"
+      ],
+      "sorts": [
+        {
+          "property": "수업일",
+          "direction": "ascending"
+        },
+        {
+          "property": "교시",
+          "direction": "ascending"
+        }
+      ]
+    },
+    {
+      "key": "progress_class",
+      "source": "lessons",
+      "name": "반별 진도",
+      "type": "table",
+      "group": "학급",
+      "filter": {
+        "property": "보관",
+        "checkbox": {
+          "equals": false
+        }
+      },
+      "show": [
+        "이름",
+        "학급",
+        "교과",
+        "진도율",
+        "상태",
+        "다음 수업",
+        "단원",
+        "학기",
+        "계획일",
+        "계획 차시",
+        "완료 차시"
+      ]
+    },
+    {
+      "key": "progress_subject",
+      "source": "lessons",
+      "name": "교과별 진도",
+      "type": "table",
+      "group": "교과",
+      "filter": {
+        "property": "보관",
+        "checkbox": {
+          "equals": false
+        }
+      }
+    },
+    {
+      "key": "active_classes",
+      "source": "classes",
+      "name": "전체 · 현재 학년도",
+      "type": "table",
+      "filter": {
+        "property": "보관",
+        "checkbox": {
+          "equals": false
+        }
+      }
+    },
+    {
+      "key": "archive_classes",
+      "source": "classes",
+      "name": "보관함",
+      "type": "table",
+      "filter": {
+        "property": "보관",
+        "checkbox": {
+          "equals": true
+        }
+      }
+    },
+    {
+      "key": "active_students",
+      "source": "students",
+      "name": "전체 · 현재 학년도",
+      "type": "table",
+      "filter": {
+        "property": "보관",
+        "checkbox": {
+          "equals": false
+        }
+      },
+      "show": [
+        "이름",
+        "학급",
+        "번호",
+        "재적",
+        "관찰 태그",
+        "집중 관찰",
+        "메모"
+      ]
+    },
+    {
+      "key": "archive_students",
+      "source": "students",
+      "name": "보관함",
+      "type": "table",
+      "filter": {
+        "property": "보관",
+        "checkbox": {
+          "equals": true
+        }
+      }
+    },
+    {
+      "key": "active_areas",
+      "source": "areas",
+      "name": "전체 · 현재 학년도",
+      "type": "table",
+      "filter": {
+        "property": "보관",
+        "checkbox": {
+          "equals": false
+        }
+      }
+    },
+    {
+      "key": "archive_areas",
+      "source": "areas",
+      "name": "보관함",
+      "type": "table",
+      "filter": {
+        "property": "보관",
+        "checkbox": {
+          "equals": true
+        }
+      }
+    },
+    {
+      "key": "active_projects",
+      "source": "projects",
+      "name": "전체 · 현재 학년도",
+      "type": "table",
+      "filter": {
+        "property": "보관",
+        "checkbox": {
+          "equals": false
+        }
+      }
+    },
+    {
+      "key": "archive_projects",
+      "source": "projects",
+      "name": "보관함",
+      "type": "table",
+      "filter": {
+        "property": "보관",
+        "checkbox": {
+          "equals": true
+        }
+      }
+    },
+    {
+      "key": "active_resources",
+      "source": "resources",
+      "name": "전체 · 현재 학년도",
+      "type": "table",
+      "filter": {
+        "property": "보관",
+        "checkbox": {
+          "equals": false
+        }
+      }
+    },
+    {
+      "key": "archive_resources",
+      "source": "resources",
+      "name": "보관함",
+      "type": "table",
+      "filter": {
+        "property": "보관",
+        "checkbox": {
+          "equals": true
+        }
+      }
+    },
+    {
+      "key": "active_agenda",
+      "source": "agenda",
+      "name": "전체 · 현재 학년도",
+      "type": "table",
+      "filter": {
+        "property": "보관",
+        "checkbox": {
+          "equals": false
+        }
+      }
+    },
+    {
+      "key": "archive_agenda",
+      "source": "agenda",
+      "name": "보관함",
+      "type": "table",
+      "filter": {
+        "property": "보관",
+        "checkbox": {
+          "equals": true
+        }
+      }
+    },
+    {
+      "key": "active_timetable",
+      "source": "timetable",
+      "name": "전체 · 현재 학년도",
+      "type": "table",
+      "filter": {
+        "property": "보관",
+        "checkbox": {
+          "equals": false
+        }
+      }
+    },
+    {
+      "key": "archive_timetable",
+      "source": "timetable",
+      "name": "보관함",
+      "type": "table",
+      "filter": {
+        "property": "보관",
+        "checkbox": {
+          "equals": true
+        }
+      }
+    },
+    {
+      "key": "active_lessons",
+      "source": "lessons",
+      "name": "전체 · 현재 학년도",
+      "type": "table",
+      "filter": {
+        "property": "보관",
+        "checkbox": {
+          "equals": false
+        }
+      }
+    },
+    {
+      "key": "archive_lessons",
+      "source": "lessons",
+      "name": "보관함",
+      "type": "table",
+      "filter": {
+        "property": "보관",
+        "checkbox": {
+          "equals": true
+        }
+      }
+    },
+    {
+      "key": "active_counseling",
+      "source": "counseling",
+      "name": "전체 · 현재 학년도",
+      "type": "table",
+      "filter": {
+        "property": "보관",
+        "checkbox": {
+          "equals": false
+        }
+      },
+      "show": [
+        "이름",
+        "학생",
+        "상담일",
+        "대상",
+        "주제",
+        "상태",
+        "후속 확인일"
+      ]
+    },
+    {
+      "key": "archive_counseling",
+      "source": "counseling",
+      "name": "보관함",
+      "type": "table",
+      "filter": {
+        "property": "보관",
+        "checkbox": {
+          "equals": true
+        }
+      }
+    },
+    {
+      "key": "active_attendance",
+      "source": "attendance",
+      "name": "전체 · 현재 학년도",
+      "type": "table",
+      "filter": {
+        "property": "보관",
+        "checkbox": {
+          "equals": false
+        }
+      }
+    },
+    {
+      "key": "archive_attendance",
+      "source": "attendance",
+      "name": "보관함",
+      "type": "table",
+      "filter": {
+        "property": "보관",
+        "checkbox": {
+          "equals": true
+        }
+      }
+    },
+    {
+      "key": "active_submissions",
+      "source": "submissions",
+      "name": "전체 · 현재 학년도",
+      "type": "table",
+      "filter": {
+        "property": "보관",
+        "checkbox": {
+          "equals": false
+        }
+      }
+    },
+    {
+      "key": "archive_submissions",
+      "source": "submissions",
+      "name": "보관함",
+      "type": "table",
+      "filter": {
+        "property": "보관",
+        "checkbox": {
+          "equals": true
+        }
+      }
+    },
+    {
+      "key": "active_assessments",
+      "source": "assessments",
+      "name": "전체 · 현재 학년도",
+      "type": "table",
+      "filter": {
+        "property": "보관",
+        "checkbox": {
+          "equals": false
+        }
+      },
+      "show": [
+        "이름",
+        "학급",
+        "교과",
+        "유형",
+        "평가일",
+        "평가 D-Day",
+        "채점 마감",
+        "채점률",
+        "상태"
+      ]
+    },
+    {
+      "key": "archive_assessments",
+      "source": "assessments",
+      "name": "보관함",
+      "type": "table",
+      "filter": {
+        "property": "보관",
+        "checkbox": {
+          "equals": true
+        }
+      }
+    },
+    {
+      "key": "active_contacts",
+      "source": "contacts",
+      "name": "전체 · 현재 학년도",
+      "type": "table",
+      "filter": {
+        "property": "보관",
+        "checkbox": {
+          "equals": false
+        }
+      }
+    },
+    {
+      "key": "archive_contacts",
+      "source": "contacts",
+      "name": "보관함",
+      "type": "table",
+      "filter": {
+        "property": "보관",
+        "checkbox": {
+          "equals": true
+        }
+      }
+    },
+    {
+      "key": "active_meetings",
+      "source": "meetings",
+      "name": "전체 · 현재 학년도",
+      "type": "table",
+      "filter": {
+        "property": "보관",
+        "checkbox": {
+          "equals": false
+        }
+      }
+    },
+    {
+      "key": "archive_meetings",
+      "source": "meetings",
+      "name": "보관함",
+      "type": "table",
+      "filter": {
+        "property": "보관",
+        "checkbox": {
+          "equals": true
+        }
+      }
+    },
+    {
+      "key": "active_staff",
+      "source": "staff",
+      "name": "전체 · 현재 학년도",
+      "type": "table",
+      "filter": {
+        "property": "보관",
+        "checkbox": {
+          "equals": false
+        }
+      }
+    },
+    {
+      "key": "archive_staff",
+      "source": "staff",
+      "name": "보관함",
+      "type": "table",
+      "filter": {
+        "property": "보관",
+        "checkbox": {
+          "equals": true
+        }
+      }
+    },
+    {
+      "key": "active_accounts",
+      "source": "accounts",
+      "name": "전체 · 현재 학년도",
+      "type": "table",
+      "filter": {
+        "property": "보관",
+        "checkbox": {
+          "equals": false
+        }
+      }
+    },
+    {
+      "key": "archive_accounts",
+      "source": "accounts",
+      "name": "보관함",
+      "type": "table",
+      "filter": {
+        "property": "보관",
+        "checkbox": {
+          "equals": true
+        }
+      }
+    },
+    {
+      "key": "staff_department",
+      "source": "staff",
+      "name": "부서별 연락망",
+      "type": "table",
+      "group": "부서",
+      "filter": {
+        "property": "보관",
+        "checkbox": {
+          "equals": false
+        }
+      }
+    },
+    {
+      "key": "semester_1",
+      "source": "lessons",
+      "name": "1학기 진도",
+      "type": "table",
+      "group": "학급",
+      "filter": {
+        "and": [
+          {
+            "property": "보관",
+            "checkbox": {
+              "equals": false
+            }
+          },
+          {
+            "property": "학기",
+            "select": {
+              "equals": "1학기"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "key": "semester_2",
+      "source": "lessons",
+      "name": "2학기 진도",
+      "type": "table",
+      "group": "학급",
+      "filter": {
+        "and": [
+          {
+            "property": "보관",
+            "checkbox": {
+              "equals": false
+            }
+          },
+          {
+            "property": "학기",
+            "select": {
+              "equals": "2학기"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "key": "teacher_today",
+      "source": "timetable",
+      "name": "오늘 수업",
+      "type": "table",
+      "filter": {
+        "and": [
+          {
+            "property": "보관",
+            "checkbox": {
+              "equals": false
+            }
+          },
+          {
+            "property": "오늘 수업",
+            "formula": {
+              "checkbox": {
+                "equals": true
+              }
+            }
+          }
+        ]
+      },
+      "show": [
+        "이름",
+        "수업일",
+        "교시",
+        "학급",
+        "교과",
+        "교실",
+        "상태"
+      ],
+      "sorts": [
+        {
+          "property": "교시",
+          "direction": "ascending"
+        }
+      ]
+    },
+    {
+      "key": "teacher_changes",
+      "source": "timetable",
+      "name": "변경·휴강 수업",
+      "type": "table",
+      "filter": {
+        "and": [
+          {
+            "property": "보관",
+            "checkbox": {
+              "equals": false
+            }
+          },
+          {
+            "or": [
+              {
+                "property": "상태",
+                "select": {
+                  "equals": "변경"
+                }
+              },
+              {
+                "property": "상태",
+                "select": {
+                  "equals": "휴강"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "show": [
+        "이름",
+        "수업일",
+        "교시",
+        "학급",
+        "교과",
+        "교실",
+        "상태"
+      ],
+      "sorts": [
+        {
+          "property": "수업일",
+          "direction": "descending"
+        },
+        {
+          "property": "교시",
+          "direction": "ascending"
+        }
+      ]
+    },
+    {
+      "key": "counseling_today",
+      "source": "counseling",
+      "name": "오늘 상담",
+      "type": "table",
+      "filter": {
+        "and": [
+          {
+            "property": "보관",
+            "checkbox": {
+              "equals": false
+            }
+          },
+          {
+            "property": "오늘 상담",
+            "formula": {
+              "checkbox": {
+                "equals": true
+              }
+            }
+          }
+        ]
+      },
+      "show": [
+        "이름",
+        "학생",
+        "상담일",
+        "대상",
+        "주제",
+        "상태",
+        "후속 확인일"
+      ],
+      "sorts": [
+        {
+          "property": "상담일",
+          "direction": "ascending"
+        }
+      ]
+    },
+    {
+      "key": "attendance_today",
+      "source": "attendance",
+      "name": "오늘 출결",
+      "type": "table",
+      "filter": {
+        "and": [
+          {
+            "property": "보관",
+            "checkbox": {
+              "equals": false
+            }
+          },
+          {
+            "property": "오늘 출결",
+            "formula": {
+              "checkbox": {
+                "equals": true
+              }
+            }
+          }
+        ]
+      },
+      "show": [
+        "이름",
+        "학생",
+        "학급",
+        "교시",
+        "상태",
+        "확인",
+        "메모"
+      ],
+      "sorts": [
+        {
+          "property": "교시",
+          "direction": "ascending"
+        }
+      ]
+    },
+    {
+      "key": "attendance_unconfirmed",
+      "source": "attendance",
+      "name": "출결 확인 필요",
+      "type": "table",
+      "filter": {
+        "and": [
+          {
+            "property": "보관",
+            "checkbox": {
+              "equals": false
+            }
+          },
+          {
+            "property": "오늘 출결",
+            "formula": {
+              "checkbox": {
+                "equals": true
+              }
+            }
+          },
+          {
+            "property": "확인",
+            "checkbox": {
+              "equals": false
+            }
+          }
+        ]
+      },
+      "show": [
+        "이름",
+        "학생",
+        "학급",
+        "교시",
+        "상태",
+        "확인",
+        "메모"
+      ],
+      "sorts": [
+        {
+          "property": "교시",
+          "direction": "ascending"
+        }
+      ]
+    },
+    {
+      "key": "students_gallery",
+      "source": "students",
+      "name": "학생 카드",
+      "type": "gallery",
+      "filter": {
+        "property": "보관",
+        "checkbox": {
+          "equals": false
+        }
+      },
+      "show": [
+        "이름",
+        "학급",
+        "번호",
+        "관찰 태그",
+        "집중 관찰"
+      ],
+      "sorts": [
+        {
+          "property": "번호",
+          "direction": "ascending"
+        }
+      ]
+    },
+    {
+      "key": "students_observation",
+      "source": "students",
+      "name": "관찰 학생",
+      "type": "table",
+      "filter": {
+        "and": [
+          {
+            "property": "보관",
+            "checkbox": {
+              "equals": false
+            }
+          },
+          {
+            "or": [
+              {
+                "property": "집중 관찰",
+                "checkbox": {
+                  "equals": true
+                }
+              },
+              {
+                "property": "관찰 태그",
+                "multi_select": {
+                  "is_not_empty": true
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "show": [
+        "이름",
+        "학급",
+        "번호",
+        "재적",
+        "관찰 태그",
+        "집중 관찰",
+        "메모"
+      ],
+      "sorts": [
+        {
+          "property": "번호",
+          "direction": "ascending"
+        }
+      ]
+    },
+    {
+      "key": "todo_p1",
+      "source": "agenda",
+      "name": "P1 · 지금 할 일",
+      "type": "table",
+      "filter": {
+        "and": [
+          {
+            "property": "보관",
+            "checkbox": {
+              "equals": false
+            }
+          },
+          {
+            "property": "우선순위",
+            "select": {
+              "equals": "P1 지금"
+            }
+          },
+          {
+            "property": "상태",
+            "select": {
+              "does_not_equal": "완료"
+            }
+          },
+          {
+            "property": "상태",
+            "select": {
+              "does_not_equal": "취소"
+            }
+          }
+        ]
+      },
+      "show": [
+        "이름",
+        "우선순위",
+        "마감",
+        "D-Day",
+        "업무 분류",
+        "상태",
+        "다음 행동"
+      ],
+      "sorts": [
+        {
+          "property": "마감",
+          "direction": "ascending"
+        }
+      ]
+    },
+    {
+      "key": "todo_done",
+      "source": "agenda",
+      "name": "완료한 업무",
+      "type": "table",
+      "filter": {
+        "and": [
+          {
+            "property": "보관",
+            "checkbox": {
+              "equals": false
+            }
+          },
+          {
+            "property": "상태",
+            "select": {
+              "equals": "완료"
+            }
+          }
+        ]
+      },
+      "show": [
+        "이름",
+        "우선순위",
+        "마감",
+        "D-Day",
+        "업무 분류",
+        "상태",
+        "다음 행동"
+      ],
+      "sorts": [
+        {
+          "property": "일정",
+          "direction": "descending"
+        }
+      ]
+    },
+    {
+      "key": "due_soon",
+      "source": "agenda",
+      "name": "7일 안에 마감",
+      "type": "table",
+      "filter": {
+        "and": [
+          {
+            "property": "보관",
+            "checkbox": {
+              "equals": false
+            }
+          },
+          {
+            "property": "마감 임박",
+            "formula": {
+              "checkbox": {
+                "equals": true
+              }
+            }
+          }
+        ]
+      },
+      "show": [
+        "이름",
+        "우선순위",
+        "마감",
+        "D-Day",
+        "업무 분류",
+        "상태",
+        "다음 행동"
+      ],
+      "sorts": [
+        {
+          "property": "마감 남은 일",
+          "direction": "ascending"
+        },
+        {
+          "property": "우선순위 순서",
+          "direction": "ascending"
+        }
+      ]
+    },
+    {
+      "key": "progress_attention",
+      "source": "lessons",
+      "name": "보강이 필요한 수업",
+      "type": "table",
+      "filter": {
+        "and": [
+          {
+            "property": "보관",
+            "checkbox": {
+              "equals": false
+            }
+          },
+          {
+            "property": "상태",
+            "select": {
+              "equals": "보강 필요"
+            }
+          }
+        ]
+      },
+      "show": [
+        "이름",
+        "학급",
+        "교과",
+        "단원",
+        "학기",
+        "계획일",
+        "계획 차시",
+        "완료 차시",
+        "진도율",
+        "상태",
+        "다음 수업"
+      ],
+      "sorts": [
+        {
+          "property": "계획일",
+          "direction": "ascending"
+        }
+      ],
+      "group": "학급"
+    },
+    {
+      "key": "assessments_upcoming",
+      "source": "assessments",
+      "name": "30일 안에 평가",
+      "type": "table",
+      "filter": {
+        "and": [
+          {
+            "property": "보관",
+            "checkbox": {
+              "equals": false
+            }
+          },
+          {
+            "property": "평가 예정",
+            "formula": {
+              "checkbox": {
+                "equals": true
+              }
+            }
+          }
+        ]
+      },
+      "show": [
+        "이름",
+        "학급",
+        "교과",
+        "유형",
+        "평가일",
+        "평가 D-Day",
+        "채점 마감",
+        "채점률",
+        "상태"
+      ],
+      "sorts": [
+        {
+          "property": "평가 남은 일",
+          "direction": "ascending"
+        }
+      ]
+    },
+    {
+      "key": "projects_board",
+      "source": "projects",
+      "name": "프로젝트 진행 보드",
+      "type": "board",
+      "filter": {
+        "property": "보관",
+        "checkbox": {
+          "equals": false
+        }
+      },
+      "show": [
+        "이름",
+        "영역",
+        "기간",
+        "목표",
+        "완료 기준"
+      ],
+      "group": "상태"
+    }
+  ],
+  "workspace": {
+    "pages": [
+      {
+        "key": "home",
+        "title": "대시보드 & 오늘 허브",
+        "icon": "📒",
+        "description": "주간 수업 시간표, 학생 기록, 마감 업무를 한눈에 확인합니다.",
+        "sections": [
+          {
+            "key": "briefing",
+            "title": "오늘의 교무실 브리핑",
+            "kind": "briefing",
+            "color": "gray_background",
+            "views": []
+          },
+          {
+            "key": "quick",
+            "title": "빠른 실행",
+            "kind": "quick",
+            "color": "gray_background",
+            "views": []
+          },
+          {
+            "key": "matrix",
+            "title": "오늘의 수업 · 주간 시간표",
+            "kind": "matrix_reference",
+            "color": "blue_background",
+            "views": []
+          },
+          {
+            "key": "today",
+            "title": "오늘·변경 수업 · 관리용",
+            "kind": "views",
+            "color": "blue_background",
+            "views": [
+              "teacher_today",
+              "teacher_changes"
+            ]
+          },
+          {
+            "key": "tasks",
+            "title": "우선순위 To-Do",
+            "kind": "views",
+            "color": "gray_background",
+            "views": [
+              "todo",
+              "todo_p1",
+              "todo_done",
+              "inbox"
+            ]
+          },
+          {
+            "key": "attendance",
+            "title": "오늘 출결 확인",
+            "kind": "views",
+            "color": "green_background",
+            "views": [
+              "attendance_today",
+              "attendance_unconfirmed"
+            ]
+          },
+          {
+            "key": "counseling",
+            "title": "오늘 상담",
+            "kind": "views",
+            "color": "yellow_background",
+            "views": [
+              "counseling_today"
+            ]
+          },
+          {
+            "key": "progress",
+            "title": "반별 진도 현황",
+            "kind": "views",
+            "color": "blue_background",
+            "views": [
+              "progress_class",
+              "progress_attention"
+            ]
+          },
+          {
+            "key": "assessment",
+            "title": "다가오는 평가",
+            "kind": "views",
+            "color": "purple_background",
+            "views": [
+              "assessments_upcoming"
+            ]
+          },
+          {
+            "key": "schedule",
+            "title": "학사 캘린더",
+            "kind": "views",
+            "color": "gray_background",
+            "views": [
+              "weekly",
+              "monthly"
+            ]
+          },
+          {
+            "key": "deadlines",
+            "title": "7일 안에 마감 업무",
+            "kind": "views",
+            "color": "red_background",
+            "views": [
+              "due_soon"
+            ]
+          }
+        ]
+      },
+      {
+        "key": "classroom",
+        "title": "학급 경영 & 학생 상담",
+        "icon": "👥",
+        "description": "학생 명부부터 출결, 상담, 후속 관찰까지 한곳에서 이어갑니다.",
+        "sections": [
+          {
+            "key": "students",
+            "title": "학생 명부 & 관찰 기록",
+            "kind": "views",
+            "color": "gray_background",
+            "views": [
+              "active_students",
+              "students_gallery",
+              "students_observation"
+            ]
+          },
+          {
+            "key": "attendance",
+            "title": "출결 확인",
+            "kind": "views",
+            "color": "green_background",
+            "views": [
+              "attendance_today",
+              "attendance_unconfirmed",
+              "active_attendance"
+            ]
+          },
+          {
+            "key": "counseling",
+            "title": "상담 기록 & 후속 조치",
+            "kind": "views",
+            "color": "yellow_background",
+            "views": [
+              "active_counseling",
+              "counseling_today"
+            ]
+          },
+          {
+            "key": "contacts",
+            "title": "학부모 연락",
+            "kind": "views",
+            "color": "gray_background",
+            "views": [
+              "active_contacts"
+            ]
+          },
+          {
+            "key": "submissions",
+            "title": "제출물 체크",
+            "kind": "views",
+            "color": "gray_background",
+            "views": [
+              "active_submissions"
+            ]
+          },
+          {
+            "key": "notes",
+            "title": "조회·종례 관찰 메모",
+            "kind": "notes",
+            "color": "gray_background",
+            "views": []
+          },
+          {
+            "key": "school",
+            "title": "학교 업무 바로가기",
+            "kind": "school",
+            "color": "gray_background",
+            "views": []
+          }
+        ]
+      },
+      {
+        "key": "teaching",
+        "title": "교과 진도표 & 시간표",
+        "icon": "📚",
+        "description": "월~금 주간 시간표와 반별 진도를 확인하고 다음 수업을 준비합니다.",
+        "sections": [
+          {
+            "key": "matrix",
+            "title": "주간 수업 시간표",
+            "kind": "matrix",
+            "color": "blue_background",
+            "views": []
+          },
+          {
+            "key": "timetable",
+            "title": "시간표 원본 · 관리용",
+            "kind": "views",
+            "color": "blue_background",
+            "views": [
+              "teacher_week",
+              "teacher_changes"
+            ]
+          },
+          {
+            "key": "progress",
+            "title": "교과별·학급별 진도",
+            "kind": "views",
+            "color": "blue_background",
+            "views": [
+              "progress_class",
+              "progress_subject",
+              "semester_1",
+              "semester_2",
+              "progress_attention"
+            ]
+          },
+          {
+            "key": "assessment",
+            "title": "평가·채점 현황",
+            "kind": "views",
+            "color": "purple_background",
+            "views": [
+              "assessments_upcoming",
+              "active_assessments"
+            ]
+          },
+          {
+            "key": "meetings",
+            "title": "교과 협의 & 결정 사항",
+            "kind": "views",
+            "color": "gray_background",
+            "views": [
+              "active_meetings"
+            ]
+          },
+          {
+            "key": "resources",
+            "title": "수업 자료",
+            "kind": "views",
+            "color": "gray_background",
+            "views": [
+              "active_resources"
+            ]
+          }
+        ]
+      },
+      {
+        "key": "planning",
+        "title": "학사 캘린더 & PARA",
+        "icon": "🗂️",
+        "description": "학사 일정과 마감, 프로젝트·담당 영역·자료·보관을 연결합니다.",
+        "sections": [
+          {
+            "key": "schedule",
+            "title": "학사 캘린더",
+            "kind": "views",
+            "color": "gray_background",
+            "views": [
+              "weekly",
+              "monthly",
+              "deadlines"
+            ]
+          },
+          {
+            "key": "deadlines",
+            "title": "마감이 가까운 업무",
+            "kind": "views",
+            "color": "red_background",
+            "views": [
+              "due_soon",
+              "overdue"
+            ]
+          },
+          {
+            "key": "para",
+            "title": "PARA 교직 업무",
+            "kind": "para",
+            "color": "gray_background",
+            "views": []
+          },
+          {
+            "key": "projects",
+            "title": "Projects · 프로젝트",
+            "kind": "views",
+            "color": "purple_background",
+            "views": [
+              "projects_board",
+              "active_projects"
+            ]
+          },
+          {
+            "key": "areas",
+            "title": "Areas · 담당 영역",
+            "kind": "views",
+            "color": "green_background",
+            "views": [
+              "active_areas"
+            ]
+          },
+          {
+            "key": "resources",
+            "title": "Resources · 자료",
+            "kind": "views",
+            "color": "blue_background",
+            "views": [
+              "active_resources"
+            ]
+          },
+          {
+            "key": "archive",
+            "title": "Archives · 보관",
+            "kind": "views",
+            "color": "gray_background",
+            "views": [
+              "archive_agenda"
+            ]
+          },
+          {
+            "key": "archive_links",
+            "title": "표별 보관함",
+            "kind": "archives",
+            "color": "gray_background",
+            "views": []
+          }
+        ]
+      }
+    ]
+  }
+}

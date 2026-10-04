@@ -13,6 +13,16 @@
 
 [공통 렌더러 사용법](DEFAULT_TEMPLATE.md#같은-배치를-출력하는-렌더러)을 따라 실제 네이티브 섹션 조각을 `render-layout --page ... --sections ... --output ...`으로 조합할 수 있다. 원본·연결 DB·페이지·동기화 블록을 먼저 전부 목록화하고 실제 태그·URL을 유지한다. 생성 파일을 기존 페이지 전체에 맹목적으로 덮어쓰거나 누락된 자식 페이지를 삭제하도록 허용하지 않는다. 렌더링과 Notion 반영·실제 화면 확인은 별도 단계다.
 
+### 미리보기의 설계 파일이 첨부된 경우
+
+교사가 `/preview`에서 확인한 `reviewed-layout.json`을 전달했을 때만 [미리보기 적용 절차](PREVIEW.md)를 추가한다. 파일이 없는 기존 MCP 설치는 위 준비와 아래 생성 순서를 그대로 사용한다.
+
+1. 파일을 `.local/reviewed-layout.json`에 보관하고 `python -m teacher_planner verify-preview --bundle .local/reviewed-layout.json`으로 현재 원본 명세·버전·선택·네 페이지 배치·보기·체크섬을 검증한다. 일치하지 않으면 다른 배치를 적용하기 전에 차이를 해결한다.
+2. 생성 전에 기존 질문의 답과 설계의 추가 기능·양식·담임·학교 바로가기·교시 수가 맞는지 대조한다. 로컬 설정이 있으면 `plan --config .local/config.json --reviewed-bundle .local/reviewed-layout.json`으로 검사할 수 있다. 학교·반·생성 위치는 같은 AI 대화의 설치 답변을 재사용한다. 미리보기 파일은 그 개인 설정을 포함하지 않는다.
+3. 아래 생성 순서에서 실제 원본과 네이티브 섹션이 준비되면, 새로 조회한 조각을 `{"pages":{"home":{},"classroom":{},"teaching":{},"planning":{}}}`의 각 페이지에 필요한 섹션별로 채운다. `compile-preview --bundle .local/reviewed-layout.json --sections .local/sections.json --output-dir .local/reviewed-layout`으로 확인한 설계의 반영안을 만든다. CLI 명령 앞에는 `python -m teacher_planner`를 붙인다.
+4. 반영안의 실제 URL·ID와 대상 페이지의 현재 내용을 대조한 뒤 지원되는 MCP/UI로 배치한다. 기존 수첩에는 필요한 구역만 이동·수정하며 기록·추가 본문·동기화 원본·연동 ID를 보존한다. 미선택 기능의 기존 기록을 지우지 않는다.
+5. 실제 네 페이지를 다시 읽고 전체 너비·열 비율·닫힌 접기와 보기·필터를 확인한다. [설치 검사](ACCEPTANCE.md)의 실제 화면 증거를 남긴다. HTML 미리보기나 컴파일 파일은 이 증거를 대신하지 않으며, 검증·컴파일 자체는 Notion에 쓰지 않는다.
+
 ## 생성 순서
 
 1. 상위 페이지 아래 `{academic_year}학년도 · {title}` 형식의 루트 대시보드와 `학급 경영 & 학생 상담`, `교과 진도표 & 시간표`, `학사 캘린더 & PARA` 페이지를 만든다. 학년도마다 한 권을 해당 연도 3월부터 다음 해 2월까지 사용한다. 네 핵심 페이지 모두 전체 너비를 켜고 작은 텍스트를 끈다. 문서화된 도구 설정이 없으면 각 페이지의 실제 `•••` 메뉴에서 적용한다. 원본 DB용 `운영 자료`, `학생 기록`도 같은 수첩 안에 두되 자식 페이지 목록은 홈 하단 문서 보관실에 정리한다.

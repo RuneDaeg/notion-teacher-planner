@@ -6,7 +6,7 @@
   "scripts": {
     "test": "node --test test/*.test.mjs",
     "test:runtime": "node --test runtime-test/*.test.mjs",
-    "check": "node --check src/index.mjs && node --check src/api.mjs && node --check src/security.mjs && node --check ../cloud/web/setup.js && node --check ../cloud/web/setup-model.mjs && node --check ../cloud/web/edit.js && node --check ../cloud/web/edit-model.mjs",
+    "check": "node --check src/index.mjs && node --check src/api.mjs && node --check src/security.mjs && node --check ../cloud/web/setup.js && node --check ../cloud/web/setup-model.mjs && node --check ../cloud/web/edit.js && node --check ../cloud/web/edit-model.mjs && node --check ../cloud/web/preview.js && node --check ../cloud/web/preview-model.mjs",
     "dry-run": "wrangler deploy --dry-run --config wrangler.example.jsonc --outdir ../.local/cloudflare-build",
     "dev": "wrangler dev --config wrangler.example.jsonc --test-scheduled",
     "deploy": "node scripts/check-config.mjs && wrangler deploy --config wrangler.jsonc"

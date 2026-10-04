@@ -22,6 +22,7 @@ export default {
         if (url.pathname === '/connect') url.pathname = '/index.html';
         if (url.pathname === '/setup' || url.pathname === '/setup/') url.pathname = '/setup.html';
         if (url.pathname === '/edit' || url.pathname === '/edit/') url.pathname = '/edit.html';
+        if (url.pathname === '/preview' || url.pathname === '/preview/') url.pathname = '/preview.html';
         if (url.pathname === '/guide' || url.pathname === '/guide/') url.pathname = '/guide.html';
         response = await env.ASSETS.fetch(new Request(url,request));
       }

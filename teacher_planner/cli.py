@@ -20,11 +20,13 @@ def main(argv=None):
     plan = commands.add_parser('plan', help='오프라인 설치 명세 출력')
     plan.add_argument('--config', default='config.example.json')
     plan.add_argument('--full', action='store_true', help='AI가 읽을 속성·뷰 명세 포함')
+    plan.add_argument('--reviewed-bundle', help='웹에서 검토한 배치 JSON; 설치 설정과 일치하는지 검사')
     setup = commands.add_parser('install', help='Notion에 새 수첩 설치; 기본은 계획만 출력')
     setup.add_argument('--config', default='config.example.json')
     setup.add_argument('--parent', default=os.getenv('NOTION_PARENT_PAGE_ID', ''))
     setup.add_argument('--state', default='.local/state.json')
     setup.add_argument('--apply', action='store_true')
+    setup.add_argument('--reviewed-bundle', help='웹에서 검토한 배치 JSON; 설정이 다르면 생성 전에 중단')
     imp = commands.add_parser('import-timetable', help='날짜별 CSV/JSON 시간표 가져오기')
     imp.add_argument('file')
     imp.add_argument('--config', default='config.example.json')
@@ -52,6 +54,8 @@ def main(argv=None):
     add_cloud(commands)
     from .layout_cli import add_commands as add_layout
     add_layout(commands)
+    from .preview_cli import add_commands as add_preview
+    add_preview(commands)
     verify = commands.add_parser('verify', help='설치된 원격 속성·관계·캘린더·홈 배치 확인')
     verify.add_argument('--state', default='.local/state.json')
     verify.add_argument('--layout-snapshot', help='이 수첩의 실제 Markdown·UI 증거 JSON')
@@ -61,7 +65,10 @@ def main(argv=None):
     rec.add_argument('--id', required=True, help='Notion에서 확인한 생성 객체 ID')
     args = p.parse_args(argv)
     try:
-        if args.command in ('layout-plan', 'render-layout', 'verify-layout'):
+        if args.command in ('verify-preview', 'compile-preview'):
+            from .preview_cli import run
+            return run(args)
+        elif args.command in ('layout-plan', 'render-layout', 'verify-layout'):
             from .layout_cli import run
             return run(args)
         elif args.command == 'cloud-connect':
@@ -77,6 +84,12 @@ def main(argv=None):
             return run_comcigan(args)
         elif args.command in ('plan', 'install'):
             c = config(args.config)
+            reviewed = None
+            if args.reviewed_bundle:
+                from .preview_bundle import read_json, validate_bundle, selection_from_config
+                reviewed = validate_bundle(read_json(args.reviewed_bundle))
+                if reviewed['selection'] != selection_from_config(c):
+                    raise ValueError('미리 본 배치와 설치 설정이 다릅니다. 기능·양식·담임·바로가기·교시 설정을 맞추고 다시 검토하세요.')
             ds, vs = selected(c)
             if args.command == 'plan' or not args.apply:
                 report = {'title': c['title'], 'academic_year': c['academic_year'], 'modules': c['modules'], 'database_count': len(ds), 'view_count': len(vs) + len(dashboard_views(c)), 'databases': ds if getattr(args, 'full', False) else [d['title'] for d in ds], 'applied': False}
@@ -93,6 +106,8 @@ def main(argv=None):
                 report['layout_contract'] = load_contract()['id']
                 report['page_settings'] = {'full_width': True, 'small_text': False}
                 report['layout_verification_required'] = True
+                if reviewed:
+                    report['reviewed_bundle_digest'] = reviewed['bundle_digest']
                 if getattr(args, 'full', False):
                     report['views'] = vs
                     report['workspace_views'] = instances

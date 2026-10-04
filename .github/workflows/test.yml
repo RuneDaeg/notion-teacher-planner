@@ -15,6 +15,7 @@ jobs:
           python-version: ${{ matrix.python }}
       - run: python -m unittest discover -s tests -v
       - run: python -m teacher_planner plan
+      - run: python scripts/build_preview_catalog.py --check
   cloud:
     runs-on: ubuntu-latest
     steps:

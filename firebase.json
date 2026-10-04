@@ -14,6 +14,8 @@
       {"source": "/setup/", "destination": "/setup.html"},
       {"source": "/edit", "destination": "/edit.html"},
       {"source": "/edit/", "destination": "/edit.html"},
+      {"source": "/preview", "destination": "/preview.html"},
+      {"source": "/preview/", "destination": "/preview.html"},
       {"source": "/guide", "destination": "/guide.html"},
       {"source": "/guide/", "destination": "/guide.html"},
       {"source": "**", "destination": "/index.html"}

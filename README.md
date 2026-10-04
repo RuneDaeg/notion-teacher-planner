@@ -30,6 +30,12 @@ made by 여광재(온양고) · made with [DoRms](https://dorms.school)
 
 완성된 요청문을 복사하거나 TXT로 내려받아 **Notion 쓰기 도구가 연결된 AI**에 전달하세요. 웹은 브라우저 안에서 요청문만 만들며, API 키·학생 기록 없이 사용할 수 있습니다. 입력 초안은 현재 탭에 임시 저장되고 Notion 수정이나 자동 연동은 실행하지 않습니다. [수정 요청문 사용법](docs/WEB_SETUP.md#기존-수첩의-수정-요청문-만들기)과 [AI의 수정 절차](docs/ITERATIVE_EDITING.md)를 참고하세요.
 
+## 전체 배치를 먼저 확인하기
+
+[수첩 전체 미리보기](https://notion-teacher-planner.notion-teacher-planner-cloudflare.workers.dev/preview)에서 사용할 기능을 고르고 **홈·학급 경영·교과 진도·학사 캘린더**를 모두 확인하세요. 확인한 설계 파일 `reviewed-layout.json`과 적용 요청문을 내려받거나 복사해 AI에 전달하면, 같은 배치 계약의 순서·열 폭·접기·보기를 기준으로 Notion에 적용할 수 있습니다. 추가 기능은 기본 미선택이며, 같은 탭의 설치 질문지에서 고른 기능을 가져올 수도 있습니다.
+
+미리보기는 빈 표와 구역으로 배치를 보여 줍니다. 실제 학생 기록을 불러오거나 웹에서 바로 Notion을 수정하지 않습니다. HTML을 Notion으로 가져오는 방식이 아니라 **검증한 설계를 실제 Notion 블록과 연결 DB로 구성하는 방식**입니다. AI가 기존 기록과 ID를 유지하며 적용한 뒤 실제 네 화면을 검증합니다. [미리보기·적용 안내](docs/PREVIEW.md)를 참고하세요.
+
 ## AI에게 이렇게 말하세요
 
 ```text
@@ -113,6 +119,8 @@ python -m teacher_planner plan --config .local/config.json
 python -m teacher_planner layout-plan --config .local/config.json
 python -m teacher_planner install --config .local/config.json
 ```
+
+웹에서 배치를 먼저 확인했다면 내려받은 `reviewed-layout.json`을 `.local/`에 두고 `plan`과 `install`에 `--reviewed-bundle .local/reviewed-layout.json`을 함께 넣으세요. 선택 기능·양식·담임·바로가기·교시 수가 설치 설정과 다르면 생성 전에 중단합니다. [미리 본 배치로 새 수첩 설치하기](docs/PREVIEW.md#새-수첩을-python으로-설치할-때)를 참고하세요. 기능 설치 후 실제 배치는 MCP/UI로 마무리하고 검증합니다.
 
 [Notion 내부 연결](https://developers.notion.com/guides/get-started/create-a-notion-integration)을 만들고 읽기·삽입·수정 권한을 설정한 뒤, 대상 **일반 페이지**의 연결 메뉴에서 해당 연결을 추가합니다. 학생 기록을 쓸 경우 개인용 페이지에서 시작하세요. 토큰은 비밀 입력창 또는 로컬 환경 변수로만 제공합니다.
 

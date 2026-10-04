@@ -64,6 +64,25 @@ test('edit routes serve the prompt builder without accessing private integration
   }
 });
 
+test('preview routes serve the layout review without accessing private integration state', async () => {
+  for (const path of ['/preview', '/preview/', '/preview?from=setup']) {
+    for (const method of ['GET', 'HEAD']) {
+      let assetRequest;
+      const response = await worker.fetch(new Request(base + path, {method}), {
+        get DB() {assert.fail('Editing prompts must not access connection storage');},
+        ASSETS: {async fetch(request) {assetRequest = request; return new Response(method === 'HEAD' ? null : 'preview');}}
+      });
+      assert.equal(response.status, 200);
+      assert.equal(new URL(assetRequest.url).pathname, '/preview.html');
+      assert.equal(new URL(assetRequest.url).search, new URL(base + path).search);
+      assert.equal(assetRequest.method, method);
+      assert.equal(response.headers.get('Set-Cookie'), null);
+      assert.equal(response.headers.get('Referrer-Policy'), 'no-referrer');
+      assert.match(response.headers.get('Content-Security-Policy'), /script-src 'self'/);
+    }
+  }
+});
+
 test('existing API routes still use the API session checks instead of the setup assets', async () => {
   let assetCalls = 0;
   const response = await worker.fetch(new Request(base + '/api/status'), {
@@ -106,6 +125,8 @@ test('Firebase setup rewrites precede the connection fallback while keeping the 
   assert.equal(resolve('/setup/').destination, '/setup.html');
   assert.equal(resolve('/edit').destination, '/edit.html');
   assert.equal(resolve('/edit/').destination, '/edit.html');
+  assert.equal(resolve('/preview').destination, '/preview.html');
+  assert.equal(resolve('/preview/').destination, '/preview.html');
   assert.equal(resolve('/guide').destination, '/guide.html');
   assert.equal(resolve('/guide/').destination, '/guide.html');
   assert.equal(resolve('/connect').destination, '/index.html');

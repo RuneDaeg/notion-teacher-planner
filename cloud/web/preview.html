@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Notion 교무수첩의 네 화면을 미리 보고, 확인한 배치 파일로 AI에게 설치를 요청하세요.">
+  <title>수첩 전체 미리보기 · 교무수첩 데스크</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/setup.css"><link rel="stylesheet" href="/preview.css">
+  <script type="module" src="/preview.js"></script>
+</head>
+<body>
+  <a class="skip-link" href="#preview-frame">수첩 미리보기로 이동</a>
+  <header class="site-header"><a class="brand" href="/setup"><span class="brand-mark" aria-hidden="true">▤</span> 교무수첩 데스크</a><nav aria-label="사이트 메뉴"><a href="/setup">설치 정보 입력</a><a href="/edit">내 수첩 수정하기</a><a href="/guide">사용 안내서</a></nav></header>
+  <main class="preview-workspace">
+    <div class="preview-intro"><div><span class="eyebrow">먼저 살펴보고, 같은 배치로 시작하세요</span><h1>내 수첩, 만들기 전에 한눈에.</h1><p>홈부터 학사 캘린더까지 네 화면을 둘러보세요.<br>확인한 배치를 파일로 담아 사용하는 AI에게 전달할 수 있어요.</p></div><a class="preview-help" href="https://github.com/RuneDaeg/notion-teacher-planner/blob/main/docs/PREVIEW.md" target="_blank" rel="noopener noreferrer">미리보기와 실제 적용 안내 ↗</a></div>
+    <p id="preview-loading" class="callout" role="status">수첩의 공통 배치를 불러오는 중입니다.</p>
+    <div id="preview-error" class="error-summary" role="alert" hidden></div>
+    <div class="preview-shell" id="preview-shell" hidden>
+      <aside class="preview-options" aria-labelledby="options-title">
+        <span class="step-count">01 · 수첩 구성</span><h2 id="options-title">필요한 기능만</h2>
+        <p class="options-intro">기본 기록은 함께 준비됩니다. 추가 기능을 선택하면 네 화면에 반영돼요.</p>
+        <p id="selection-origin" class="field-help"></p>
+        <fieldset id="module-options"><legend>추가 기능</legend></fieldset>
+        <details class="more-options"><summary>양식 · 시간표 설정</summary><label class="preview-check"><input type="checkbox" id="preview-homeroom"><span>담임 수첩으로 살펴보기</span></label><fieldset id="form-options"><legend>빈 기록 양식</legend></fieldset><div class="field"><label for="preview-periods">하루에 표시할 교시</label><input type="number" id="preview-periods" min="1" max="20" value="7"></div><label class="preview-check"><input id="preview-school-links" type="checkbox"><span>학교 업무 바로가기 공간</span></label><p class="field-help">담임 학급과 실제 교시 시각·링크는 설치할 때 확인합니다.</p></details>
+        <div class="options-footer"><button type="button" id="load-setup">작성한 설치 설정 불러오기</button><label class="import-label" for="load-bundle">저장한 배치 파일 열기<input id="load-bundle" type="file" accept="application/json,.json"></label><p id="options-status" role="status" aria-live="polite"></p></div>
+      </aside>
+      <div class="preview-main">
+        <div class="preview-toolbar"><div class="preview-tabs" id="preview-tabs" role="tablist" aria-label="수첩의 네 화면"></div><span id="page-progress" class="page-progress">0 / 4 확인</span></div>
+        <p class="preview-label"><span class="preview-dot" aria-hidden="true"></span> 배치 미리보기 · 실제 기록은 비어 있습니다 <span>전체 너비 · Notion 기본 구성</span></p>
+        <div class="preview-scroll" id="preview-frame" tabindex="0" aria-label="Notion 배치 미리보기"><div id="notebook-pages"></div></div>
+        <div class="preview-fidelity"><strong>확인할 수 있어요</strong><span>구역 순서 · 열 비율 · 접기 · 표의 항목과 보기 탭</span><p>글꼴과 간격, 표의 높이는 실제 Notion 환경에서 달라질 수 있어요. 미리보기 탭 전환·접기 열기는 기본 설치 상태를 바꾸지 않습니다.</p></div>
+        <section class="review-panel" aria-labelledby="review-title"><div><span class="step-count">02 · 확인한 배치 전달</span><h2 id="review-title">이 배치로 만들고 싶다면</h2><p>네 화면을 확인한 뒤, 배치 파일과 요청문을 AI에 전달하세요.<br>AI가 실제 Notion에 구성하고 화면까지 대조하도록 요청합니다.</p><p id="bundle-summary" class="bundle-summary"></p></div><div class="review-controls"><label class="preview-check"><input type="checkbox" id="review-confirm" disabled><span>네 화면과 선택한 구성을 확인했어요.</span></label><p id="review-progress" class="field-help">위의 네 화면 탭을 모두 살펴봐 주세요.</p><div class="review-actions"><button type="button" id="download-bundle" class="button primary" disabled>① 배치 파일 저장</button><button type="button" id="copy-preview-prompt" class="button secondary" disabled>② AI 요청문 복사</button></div><button type="button" id="download-preview-html" class="html-download" disabled>네 화면을 HTML로 보관 ↓</button><p id="handoff-status" role="status" aria-live="polite"></p></div><details id="preview-prompt-details" class="prompt-details"><summary>AI에게 전달할 요청문 보기</summary><label class="sr-only" for="preview-prompt-output">미리 본 배치 적용 요청문</label><textarea id="preview-prompt-output" readonly></textarea></details><p class="apply-note">웹에서는 Notion을 직접 수정하지 않습니다. 저장한 배치 JSON 파일을 Notion 편집 도구가 연결된 AI에 첨부하고 요청문을 함께 전달하세요. <a href="/setup">설치 정보 입력</a>을 마쳤다면 학교·담당 수업이 담긴 설치 요청문도 같은 대화에 전달하세요. HTML은 보관·열람용입니다.</p></section>
+      </div>
+    </div>
+    <noscript><p class="error-summary">미리보기를 사용하려면 JavaScript를 켜 주세요. <a href="https://github.com/RuneDaeg/notion-teacher-planner/blob/main/docs/DEFAULT_TEMPLATE.md">공통 배치 설명</a>으로도 구조를 확인할 수 있습니다.</p></noscript>
+    <footer><span>교무수첩 데스크 · 수첩 전체 미리보기</span><span>실제 Notion 기록을 불러오거나 설치를 실행하지 않습니다.</span><span class="site-credits">made by 여광재(온양고) <span aria-hidden="true">·</span> made with <a href="https://dorms.school" target="_blank" rel="noopener noreferrer">DoRms</a></span></footer>
+  </main>
+</body>
+</html>

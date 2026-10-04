@@ -4,6 +4,8 @@
 
 이미 수첩이 있다면 [수첩 수정 요청문 만들기](https://notion-teacher-planner.notion-teacher-planner-cloudflare.workers.dev/edit)를 사용한다. 원하는 기능을 골라 기존 수첩을 바꿀 요청문을 만드는 별도 화면이며, 처음 설치할 때의 Q01~Q10을 다시 답하지 않는다.
 
+[전체 배치 미리보기](https://notion-teacher-planner.notion-teacher-planner-cloudflare.workers.dev/preview)는 네 페이지의 배치를 먼저 확인하고, 같은 설계 JSON과 AI 적용 요청문을 전달하는 화면이다. 설치 질문지와 수정 요청문 화면에서 이어서 열 수 있다.
+
 처음 사용하는 교사는 [웹 사용 안내서](https://notion-teacher-planner.notion-teacher-planner-cloudflare.workers.dev/guide)를 로그인 없이 읽을 수 있다. 목차로 이동하고 브라우저에서 인쇄할 수 있으며, 같은 페이지에서 PDF 바로 보기와 첨부용 HTML·PDF 다운로드를 제공한다. PDF의 화면 표시 방식은 사용하는 브라우저 설정에 따른다.
 
 ## 사용 순서
@@ -48,6 +50,12 @@
 
 기본 적용 범위는 **해당 교사의 기존 수첩**이다. 기존 DB·페이지·연결을 재사용하고 수첩 재설치·전체 덮어쓰기·기록 삭제로 처리하지 않는다. 빠진 데이터나 설정은 AI가 실제 상태를 확인한 뒤 필요한 것만 묻는다. 공통 Git 템플릿 반영, 다른 교사의 수첩 수정, 외부 연동 활성화는 이 요청문을 만든 것만으로 실행되지 않는다. AI의 세부 절차는 [AI와 수정하기](ITERATIVE_EDITING.md)를 따른다.
 
+## 전체 배치를 미리 보고 전달하기
+
+전체 배치를 확인하고 싶다면 `/preview`에서 기능을 선택하고 네 페이지를 모두 살펴본다. 추가 기능은 기본 미선택이며 같은 탭에서 작성한 설치 선택을 가져올 수 있다. 확인한 뒤 설계 JSON과 요청문을 Notion 쓰기 도구가 연결된 AI에 전달한다. 미리보기는 실제 Notion 데이터 대신 빈 표와 구역을 표시하며, 웹 자체에서 수첩을 수정하지 않는다. AI는 파일을 검증하고 같은 배치를 실제 블록·연결 DB로 구성한 뒤 화면을 검사한다. 자세한 절차와 CLI 검증은 [미리보기·적용 안내](PREVIEW.md)에 있다.
+
+네 화면을 HTML 한 파일로 저장해 다시 볼 수도 있다. HTML은 보관·열람용이며, 실제 적용에는 검증한 설계 JSON을 사용한다. 화면 확인이나 파일 저장은 Notion 적용 완료가 아니다.
+
 ## 답변 보관과 비용
 
 답변과 요청문은 브라우저 안에서 처리한다. 요청문은 정해진 규칙으로 만들어지며 서버로 답변을 제출하거나 LLM API를 호출하지 않는다. 따라서 이 웹 질문지 자체에는 AI API 사용 비용이 없다. 복사한 요청문을 사용할 AI 서비스의 요금과 사용 한도는 별도다.
@@ -70,12 +78,19 @@
 - `cloud/web/setup-model.mjs`: 공통 질문 원문·조건부 선택·요청문 생성 규칙
 - `cloud/web/edit.html`, `edit.js`, `edit.css`: 기존 수첩 기능 선택·맞춤 요청·임시 저장·복사·TXT 다운로드
 - `cloud/web/edit-model.mjs`: 기능 후보와 기존 수첩 수정 요청문 생성 규칙
+- `cloud/web/preview.html`, `preview.js`, `preview.css`: 네 페이지 미리보기·선택·확인·설계 JSON과 HTML 내보내기
+- `cloud/web/preview-model.mjs`: 같은 배치와 보기의 브라우저 해석·설계 검증·적용 요청문 생성
+- `cloud/web/preview-catalog.json`: 공통 배치·데이터·보기 설계에서 생성한 미리보기 원본
+- `teacher_planner/preview_bundle.py`, `preview_cli.py`: 확인한 설계 파일 검증과 실제 Notion 섹션의 배치 컴파일
+- `docs/PREVIEW.md`: 미리보기에서 실제 적용·검증까지의 절차
 - `docs/ONBOARDING.md`: 질문 ID·문구·선택지·분기 규칙의 문서 원본
 - `cloud/web/guide.html`, `guide.css`: 로그인 없이 읽는 웹 사용 안내서
 - `cloud/web/teacher-planner-guide.pdf`: 브라우저에서 열거나 내려받는 PDF
 - `output/community/교무수첩_커뮤니티_소개글.txt`: 커뮤니티에 복사할 소개글
 
-Cloudflare Worker와 Firebase Hosting은 `/setup`, `/setup/`을 `/setup.html`로, `/edit`, `/edit/`를 `/edit.html`로, `/guide`, `/guide/`를 `/guide.html`로 제공한다. 기존 `/connect`, `/api/*`, 매일 갱신 처리는 요청문 화면과 별도로 유지한다. 설치 질문 변경 시 문서 원본과 웹 모델을 함께 갱신하고, 조건부 응답과 미선택 기능이 요청문에 정확히 반영되는지 검증한다. 수정 기능을 바꿀 때는 기존 데이터·배치 보존과 선택 범위, 미확인 값의 처리를 함께 검사한다.
+Cloudflare Worker와 Firebase Hosting은 `/setup`, `/setup/`을 `/setup.html`로, `/edit`, `/edit/`를 `/edit.html`로, `/preview`, `/preview/`를 `/preview.html`로, `/guide`, `/guide/`를 `/guide.html`로 제공한다. 기존 `/connect`, `/api/*`, 매일 갱신 처리는 요청문 화면과 별도로 유지한다. 설치 질문 변경 시 문서 원본과 웹 모델을 함께 갱신하고, 조건부 응답과 미선택 기능이 요청문에 정확히 반영되는지 검증한다. 수정 기능을 바꿀 때는 기존 데이터·배치 보존과 선택 범위, 미확인 값의 처리를 함께 검사한다. 공통 설계 변경 시 미리보기 원본도 재생성하며, 이전 설계 파일을 다른 버전의 배치로 조용히 바꿔 적용하지 않는다.
+
+미리보기 원본은 `python scripts/build_preview_catalog.py`로 생성하고 `python scripts/build_preview_catalog.py --check`로 저장소의 현재 설계와 같은지 확인한다. 원본 JSON의 배치나 보기를 웹 전용으로 직접 고치지 않는다.
 
 ## 설명서 갱신과 커뮤니티 첨부
 

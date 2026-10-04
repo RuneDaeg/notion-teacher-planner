@@ -22,6 +22,7 @@
       <p>필요한 것만 고르면, AI에게 전달할 요청문이 완성됩니다.<br>익숙한 AI와 함께 나의 Notion에 수첩을 만들어 보세요.</p>
       <div class="intro-meta"><span>5단계 설정</span><span>API 키 입력 없음</span><span>입력 내용은 이 브라우저에서만 처리</span></div>
       <p class="existing-notebook">이미 수첩이 있다면 <a href="/edit">필요한 기능만 추가·수정하기 →</a></p>
+      <p class="existing-notebook">만들기 전에 <a href="/preview">네 화면의 전체 배치 미리보기 →</a></p>
     </section>
     <div class="desk-layout">
       <aside class="step-rail" aria-label="설정 진행 상황">
@@ -45,6 +46,7 @@
           <h2 id="result-title" tabindex="-1">이제, AI에게 건네주세요.</h2>
           <p class="result-lead">설정이 담긴 요청문을 복사해 사용하는 AI에 붙여넣으세요.<br>AI가 Notion 연결을 확인한 뒤 교무수첩 만들기를 진행합니다.</p>
           <dl id="result-summary" class="result-summary"></dl>
+          <p><a href="/preview?from=setup">이 설정으로 네 화면 미리 보고 배치 파일 받기 →</a></p>
           <div class="result-actions"><button type="button" id="copy-prompt" class="button primary">AI용 요청문 복사</button><button type="button" id="edit-answers" class="button secondary">설정 다시 보기</button></div>
           <p id="copy-status" role="status" aria-live="polite"></p>
           <details class="prompt-details"><summary>생성된 요청문 살펴보기</summary><label class="sr-only" for="prompt-output">AI용 요청문</label><textarea id="prompt-output" readonly spellcheck="false"></textarea></details>
