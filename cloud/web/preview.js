@@ -1,5 +1,5 @@
 import {MODULES, FORMS} from './setup-model.mjs';
-import {createSelection, selectionFromSetupAnswers, resolvePreview, buildReviewedBundle, verifyReviewedBundle, buildPreviewPrompt, movePreviewSection, setPreviewRowRatio, reconcilePreviewOverrides} from './preview-model.mjs';
+import {createSelection, selectionFromSetupAnswers, resolvePreview, buildReviewedBundle, verifyReviewedBundle, buildPreviewPrompt, movePreviewSection, setPreviewRowRatio, setPreviewRowColumns, resizePreviewColumn, reconcilePreviewOverrides} from './preview-model.mjs';
 
 const $ = id => document.getElementById(id);
 const PAGE_NAMES = {home:'홈',classroom:'학급 · 상담',teaching:'수업 · 시간표',planning:'캘린더 · PARA'};
@@ -7,7 +7,7 @@ const PAGE_ICONS = {home:'📒',classroom:'👥',teaching:'📚',planning:'🗂�
 const STORAGE_KEY = 'teacher-planner-preview-v1';
 let catalog, selection = createSelection(), plan, reviewedBundle, activePage = 'home', revision = 0;
 let visited = new Set(), htmlStyles = '', viewChoices = {};
-let layoutOverrides = {}, undoHistory = [], editMode = true, picked = null, dragState = null, dragTarget = null, ignoreClickUntil = 0;
+let layoutOverrides = {}, undoHistory = [], editMode = true, picked = null, dragState = null, dragTarget = null, ignoreClickUntil = 0, editingRow = null;
 const copy = value => JSON.parse(JSON.stringify(value));
 const node = (tag, text, className) => {
   const el = document.createElement(tag);
@@ -52,7 +52,6 @@ function rowClass(ratios) {
   else if (ratios.join(',') === '60,40') result.push('row-ratio-60-40');
   else if (ratios.join(',') === '45,55') result.push('row-ratio-45-55');
   else if (ratios.join(',') === '55,45') result.push('row-ratio-55-45');
-  else if (ratios.some(ratio => Math.abs(ratio - 100 / ratios.length) > .00001)) throw new Error('이 배치의 열 비율을 표시하는 코드가 필요합니다.');
   return result.join(' ');
 }
 
@@ -187,7 +186,8 @@ function renderPage(pageKey,editable = editMode) {
     const firstKey=row.columns[0].sections[0];
     if(editable && !['nav','intro'].includes(firstKey))page.append(rowDrop(pageKey,firstKey,'row-before'));
     const group=node('div',undefined,rowClass(row.columns.map(col=>col.ratio)));group.dataset.row=row.id;
-    if(editable && row.columns.length===2)group.append(ratioControl(pageKey,row));
+    group.style.gridTemplateColumns=row.columns.map(col=>col.ratio+'fr').join(' ');
+    if(editable && !['nav','intro'].includes(firstKey) && !definition.sections[firstKey].cards)group.append(ratioControl(pageKey,row));
     for (const col of row.columns) {const column=node('div',undefined,'preview-column');column.dataset.ratio=String(col.ratio);for(const key of col.sections)column.append(section(pageKey,key,definition.sections[key],editable));group.append(column);}
     page.append(group);
   }
@@ -196,7 +196,7 @@ function renderPage(pageKey,editable = editMode) {
 }
 
 function showPage(key,scroll=true) {
-  if(activePage!==key){picked=null;clearDrag();}
+  if(activePage!==key){picked=null;editingRow=null;clearDrag();}
   activePage=key;visited.add(key);
   for(const page of Object.keys(PAGE_NAMES)) {
     $('notebook-'+page).hidden=page!==key;
@@ -274,6 +274,7 @@ function clearDrag() {
   dragState=null;dragTarget=null;
   $('preview-frame').classList.remove('is-dragging');
   for(const item of document.querySelectorAll('[data-drop]'))delete item.dataset.drop;
+  hideDropPreview();
 }
 
 function addSectionHandle(element,page,key,spec) {
@@ -281,7 +282,7 @@ function addSectionHandle(element,page,key,spec) {
   const handle=node('button','⠿','section-handle');handle.type='button';handle.draggable=true;
   handle.id='move-handle-'+page+'-'+key;handle.setAttribute('aria-label',spec.title+' 위치 이동');
   handle.title='드래그로 이동 · 클릭해 위치 선택 · ↑↓ 순서 이동';
-  handle.addEventListener('click',()=>{if(Date.now()<ignoreClickUntil)return;picked={page,section:key};updateEditor();$('move-target').focus({preventScroll:true});});
+  handle.addEventListener('click',()=>{if(Date.now()<ignoreClickUntil)return;picked={page,section:key};editingRow=null;updateEditor();$('move-target').focus({preventScroll:true});});
   handle.addEventListener('dragstart',event=>{
     if(!editMode)return event.preventDefault();
     dragState={page,section:key};picked=dragState;
@@ -310,12 +311,98 @@ function rowDrop(page,target,position) {
 }
 
 function ratioControl(page,row) {
-  const label=node('label',undefined,'ratio-control'),select=node('select');
-  select.setAttribute('aria-label',plan.pages[page].sections[row.columns[0].sections[0]].title+' 행 열 너비');
-  for(const left of [40,45,50,55,60]){const option=node('option',left+' : '+(100-left));option.value=String(left);select.append(option);}
-  select.value=String(row.columns[0].ratio);
-  select.addEventListener('change',()=>{try{const left=Number(select.value);commitLayout(setPreviewRowRatio(catalog,selection,layoutOverrides,page,row.id,[left,100-left]),'열 너비를 변경했습니다.');}catch(error){editorMessage(error.message);select.value=String(row.columns[0].ratio);}});
-  label.append(node('span','열 너비'),select);return label;
+  const button=node('button','⊞ '+row.columns.length+'열 · 편집','ratio-control');button.type='button';
+  button.setAttribute('aria-label',plan.pages[page].sections[row.columns[0].sections[0]].title+' 행 열 편집');
+  button.addEventListener('click',()=>{editingRow={page,id:row.id};picked=null;updateEditor();$('columns-panel').scrollIntoView({block:'nearest',behavior:'smooth'});});
+  return button;
+}
+
+function editableRow() {
+  if(!editingRow || editingRow.page!==activePage)return null;
+  return plan?.pages[activePage].rows.find(row=>row.id===editingRow.id) || null;
+}
+
+function equalWidths(count) {
+  const width=Math.floor(100000000/count)/1000000;
+  return Array.from({length:count},(_,i)=>i===count-1?Number((100-width*(count-1)).toFixed(6)):width);
+}
+
+function updateColumnEditor() {
+  const row=editableRow();
+  if(!row)editingRow=null;
+  $('columns-panel').hidden=!row || !editMode;
+  if(!row || !editMode)return;
+  const keys=row.columns.flatMap(column=>column.sections),page=plan.pages[activePage];
+  $('columns-title').textContent=page.sections[keys[0]].title+' 행';
+  $('columns-summary').textContent=keys.length+'개 구역 · '+row.columns.length+'열';
+  for(const button of $('column-counts').querySelectorAll('button')){
+    const count=Number(button.dataset.count);button.disabled=count>keys.length;
+    button.setAttribute('aria-pressed',String(count===row.columns.length));
+    button.title=count>keys.length?'열마다 구역이 필요합니다. 아래에서 다른 구역을 추가하세요.':'';
+  }
+  $('equal-columns').disabled=row.columns.length===1;
+  const select=$('add-column-section'),old=select.value;select.replaceChildren();
+  for(const other of page.rows)for(const column of other.columns)for(const key of column.sections){
+    if(['nav','intro',...keys].includes(key) || page.sections[key].cards)continue;
+    const option=node('option',page.sections[key].title);option.value=key;select.append(option);
+  }
+  if([...select.options].some(option=>option.value===old))select.value=old;
+  select.disabled=row.columns.length===4 || !select.options.length;
+  $('add-column').disabled=select.disabled;
+  $('column-widths').replaceChildren();
+  row.columns.forEach((column,index)=>{
+    const label=node('label',undefined,'column-width'),input=node('input');
+    input.type='number';input.min=row.columns.length===1?'100':'10';input.max=String(100-10*(row.columns.length-1));input.step='any';input.value=column.ratio;input.disabled=row.columns.length===1;
+    input.setAttribute('aria-label',(index+1)+'열 너비 퍼센트');
+    input.addEventListener('change',()=>{try{commitLayout(resizePreviewColumn(catalog,selection,layoutOverrides,activePage,row.id,index,Number(input.value)),'열 너비를 변경했습니다. 나머지 열은 비율에 맞춰 조정했습니다.');}catch(error){editorMessage(error.message);input.value=column.ratio;}});
+    label.append(node('span',(index+1)+'열'),input,node('span','%'));$('column-widths').append(label);
+  });
+}
+
+function initColumnEditor() {
+  $('close-columns').addEventListener('click',()=>{editingRow=null;updateEditor();});
+  for(const button of $('column-counts').querySelectorAll('button'))button.addEventListener('click',()=>{
+    const row=editableRow();if(!row)return;
+    try{const count=Number(button.dataset.count);commitLayout(setPreviewRowColumns(catalog,selection,layoutOverrides,activePage,row.id,count),count===1?'한 열로 합쳤습니다. 구역은 순서대로 유지됩니다.':count+'열로 나눴습니다.');}catch(error){editorMessage(error.message);}
+  });
+  $('equal-columns').addEventListener('click',()=>{const row=editableRow();if(row)commitLayout(setPreviewRowRatio(catalog,selection,layoutOverrides,activePage,row.id,equalWidths(row.columns.length)),'열 너비를 같게 맞췄습니다.');});
+  $('add-column').addEventListener('click',()=>{
+    const row=editableRow();if(!row || !$('add-column-section').value)return;
+    moveSection({page:activePage,section:$('add-column-section').value,target:row.columns.at(-1).sections.at(-1),position:'right'});
+  });
+}
+
+function hideDropPreview() { $('drop-preview').setAttribute('hidden','');$('drop-preview').replaceChildren(); }
+
+function showDropPreview(candidate,overrides) {
+  const frame=$('preview-frame'),svg=$('drop-preview'),bounds=frame.getBoundingClientRect();
+  const preview=resolvePreview(catalog,selection,overrides),page=preview.pages[activePage];
+  const row=page.rows.find(item=>item.columns.some(col=>col.sections.includes(candidate.section)));
+  const target=document.querySelector('#notebook-'+activePage+' [data-section="'+candidate.target+'"]');
+  const targetRow=target.closest('.preview-row'),rowBounds=targetRow.getBoundingClientRect(),targetBounds=target.getBoundingClientRect();
+  const offsetX=-bounds.left+frame.scrollLeft-frame.clientLeft,offsetY=-bounds.top+frame.scrollTop-frame.clientTop;
+  const ghost=(tag,attributes,text)=>{const el=document.createElementNS('http://www.w3.org/2000/svg',tag);for(const [key,value] of Object.entries(attributes))el.setAttribute(key,value);if(text!==undefined)el.textContent=text;svg.append(el);return el;};
+  svg.replaceChildren();svg.setAttribute('width',Math.max($('notebook-pages').scrollWidth,frame.clientWidth));svg.setAttribute('height',$('notebook-pages').scrollHeight);
+  svg.removeAttribute('hidden');svg.setAttribute('aria-label',page.sections[candidate.section].title+' 놓일 위치 미리보기');
+  function card(x,y,width,height,label,active){
+    ghost('rect',{x,y,width:Math.max(1,width),height,rx:7,class:active?'ghost-card ghost-active':'ghost-card ghost-neighbor'});
+    const capacity=Math.max(3,Math.floor((width-24)/11));
+    ghost('text',{x:x+12,y:y+25,class:active?'ghost-title':'ghost-neighbor-title'},Array.from(label).slice(0,capacity).join('')+(label.length>capacity?'…':''));
+    if(active && height>55)ghost('text',{x:x+12,y:y+47,class:'ghost-caption'},'이 위치에 놓기');
+  }
+  const title=page.sections[candidate.section].title;
+  if(['left','right'].includes(candidate.position)){
+    const gap=22,available=rowBounds.width-gap*(row.columns.length-1),height=Math.max(82,Math.min(180,rowBounds.height));
+    let x=rowBounds.left+offsetX;
+    for(const column of row.columns){const width=available*column.ratio/100,active=column.sections.includes(candidate.section);card(x,rowBounds.top+offsetY,width,height,active?title:page.sections[column.sections[0]].title,active);x+=width+gap;}
+  }else{
+    const whole=candidate.position.startsWith('row-'),after=candidate.position.endsWith('after');
+    let x=rowBounds.left+offsetX,width=rowBounds.width;
+    if(!whole){const columnIndex=row.columns.findIndex(column=>column.sections.includes(candidate.section)),available=rowBounds.width-22*(row.columns.length-1);for(let index=0;index<columnIndex;index++)x+=available*row.columns[index].ratio/100+22;width=available*row.columns[columnIndex].ratio/100;}
+    const boundary=(whole?(after?rowBounds.bottom:rowBounds.top):(after?targetBounds.bottom:targetBounds.top))+offsetY;
+    card(x,Math.max(0,boundary-31),width,62,title+' · '+(whole?'새 줄':after?'아래':'위'),true);
+    ghost('line',{x1:x,y1:boundary,x2:x+width,y2:boundary,class:'ghost-insertion'});
+  }
 }
 
 function updateEditor() {
@@ -324,6 +411,7 @@ function updateEditor() {
   $('preview-frame').classList.toggle('layout-editing',editMode);
   if(picked && (picked.page!==activePage || !plan?.pages[activePage].sections[picked.section]))picked=null;
   for(const section of document.querySelectorAll('.editable-section'))section.classList.toggle('section-picked',!!picked && section.dataset.section===picked.section && section.closest('article').id==='notebook-'+picked.page);
+  updateColumnEditor();
   $('move-panel').hidden=!picked || !editMode;
   if(!picked || !editMode)return;
   $('picked-section').textContent=plan.pages[picked.page].sections[picked.section].title;
@@ -350,7 +438,7 @@ function updateMovePositions() {
 function dragOperation(event) {
   if(!dragState || dragState.page!==activePage)return null;
   const row=event.target.closest('.row-drop');
-  if(row)return {...dragState,target:row.dataset.target,position:row.dataset.position,element:row};
+  if(row)return row.dataset.target===dragState.section?null:{...dragState,target:row.dataset.target,position:row.dataset.position,element:row};
   const area=event.target.closest('.editable-section');if(!area)return null;
   const target=area.dataset.section;if(target===dragState.section)return null;
   const rect=area.getBoundingClientRect(),spec=plan.pages[activePage].sections[target];
@@ -364,30 +452,32 @@ function dragOperation(event) {
 
 function initEditor() {
   $('edit-layout').addEventListener('change',()=>{
-    editMode=$('edit-layout').checked;picked=null;clearDrag();
+    editMode=$('edit-layout').checked;picked=null;editingRow=null;clearDrag();
     $('notebook-pages').replaceChildren(...Object.keys(PAGE_NAMES).map(key=>renderPage(key)));showPage(activePage,false);
   });
   $('undo-layout').addEventListener('click',()=>{
     const previous=undoHistory.pop();if(!previous)return;
-    selection=previous.selection;layoutOverrides=previous.overrides;picked=null;clearDrag();save();editorMessage('이전 구성으로 되돌렸습니다.');void refresh();
+    selection=previous.selection;layoutOverrides=previous.overrides;picked=null;editingRow=null;clearDrag();save();editorMessage('이전 구성으로 되돌렸습니다.');void refresh();
   });
   $('reset-layout').addEventListener('click',()=>{const next=copy(layoutOverrides);delete next[activePage];commitLayout(next,'이 페이지를 기본 배치로 돌렸습니다. 되돌리기로 취소할 수 있습니다.');});
   $('cancel-move').addEventListener('click',()=>{picked=null;clearDrag();updateEditor();});
   $('move-target').addEventListener('change',updateMovePositions);
+  initColumnEditor();
   $('apply-move').addEventListener('click',()=>{if(picked)moveSection({...picked,target:$('move-target').value,position:$('move-position').value});});
   const frame=$('preview-frame');
   frame.addEventListener('dragover',event=>{
     if(!dragState)return;
     for(const item of frame.querySelectorAll('[data-drop]'))delete item.dataset.drop;
-    dragTarget=null;const candidate=dragOperation(event);
-    if(candidate){try{const {element,...operation}=candidate;movePreviewSection(catalog,selection,layoutOverrides,operation);dragTarget=operation;element.dataset.drop=operation.position;event.preventDefault();event.dataTransfer.dropEffect='move';}catch{event.dataTransfer.dropEffect='none';}}
+    dragTarget=null;hideDropPreview();const candidate=dragOperation(event);
+    if(candidate){try{const {element,...operation}=candidate;const next=movePreviewSection(catalog,selection,layoutOverrides,operation);dragTarget=operation;element.dataset.drop=operation.position;showDropPreview(candidate,next);event.preventDefault();event.dataTransfer.dropEffect='move';}catch{event.dataTransfer.dropEffect='none';}}
     const bounds=frame.getBoundingClientRect();
     if(event.clientY<bounds.top+55)frame.scrollTop-=22;
     else if(event.clientY>bounds.bottom-55)frame.scrollTop+=22;
   });
   frame.addEventListener('drop',event=>{if(!dragState)return;event.preventDefault();const candidate=dragOperation(event);const operation=candidate?(({element,...op})=>op)(candidate):dragTarget;clearDrag();ignoreClickUntil=Date.now()+250;if(operation)moveSection(operation);});
-  frame.addEventListener('dragleave',event=>{if(event.relatedTarget && !frame.contains(event.relatedTarget)){dragTarget=null;for(const item of frame.querySelectorAll('[data-drop]'))delete item.dataset.drop;}});
-  document.addEventListener('keydown',event=>{if(event.key==='Escape'){picked=null;clearDrag();updateEditor();}});
+  frame.addEventListener('dragleave',event=>{const next=event.relatedTarget || document.elementFromPoint(event.clientX,event.clientY);if(!frame.contains(next)){dragTarget=null;for(const item of frame.querySelectorAll('[data-drop]'))delete item.dataset.drop;hideDropPreview();}});
+  window.addEventListener('blur',()=>{if(dragState)hideDropPreview();});
+  document.addEventListener('keydown',event=>{if(event.key==='Escape'){picked=null;editingRow=null;clearDrag();updateEditor();}});
 }
 
 async function init() {

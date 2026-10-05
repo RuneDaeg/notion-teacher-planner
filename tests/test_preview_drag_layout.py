@@ -34,9 +34,9 @@ def reversed_body_rows(bundle, page='home'):
 
 
 class DragLayoutBundleTests(unittest.TestCase):
-    def test_version_two_contains_default_empty_overrides(self):
+    def test_version_three_contains_default_empty_overrides(self):
         bundle = create_bundle()
-        self.assertEqual(2, bundle['version'])
+        self.assertEqual(3, bundle['version'])
         self.assertEqual({}, bundle['layout_overrides'])
         self.assertEqual(bundle, validate_bundle(bundle))
 

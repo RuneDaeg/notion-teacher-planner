@@ -6,13 +6,14 @@ import {fileURLToPath} from 'node:url';
 import {createHash} from 'node:crypto';
 import {PREVIEW_FORMAT, PREVIEW_VERSION, createSelection, selectionFromSetupAnswers, resolvePreview,
   canonicalJSON, buildReviewedBundle, verifyReviewedBundle, buildPreviewPrompt, getPreviewStats,
-  movePreviewSection, setPreviewRowRatio, reconcilePreviewOverrides} from '../../cloud/web/preview-model.mjs';
+  movePreviewSection, setPreviewRowRatio, setPreviewRowColumns, resizePreviewColumn, reconcilePreviewOverrides} from '../../cloud/web/preview-model.mjs';
 
 const catalog = JSON.parse(await readFile(new URL('../../cloud/web/preview-catalog.json', import.meta.url), 'utf8'));
 const repository = fileURLToPath(new URL('../../', import.meta.url));
 const modules = ['accounts', 'assessment', 'attendance', 'contact', 'meeting', 'staff'];
 const allForms = ['assessment', 'counseling', 'guardian', 'homeroom', 'lesson', 'meeting'];
-const baseDigest = 'd802313b15a775c72181b79c43ca5610d9a6643365ebd4cf09bc1b212a95daa5';
+const baseDigest = 'c83b626d0e68c54974e168e9490020e7f6bcddc20c605a2f62757997b786a97c';
+const version2Digest = 'd802313b15a775c72181b79c43ca5610d9a6643365ebd4cf09bc1b212a95daa5';
 const legacyDigest = 'df636473880331d93c25c82d85d61a583a6ceea58638ad182c88a14af7f290ce';
 function eligibleForms(selected, homeroom) {
   return allForms.filter(key => !({assessment: 'assessment', guardian: 'contact', meeting: 'meeting'}[key]) ||
@@ -65,6 +66,25 @@ test('version 1 reviewed bundles remain strict imports and can be upgraded witho
     assert.equal((await verifyReviewedBundle(catalog, rehash(changed))).valid, false);
   }
   assert.deepEqual((await buildReviewedBundle(catalog, signed.selection)).pages, signed.pages);
+});
+
+test('version 2 imports keep their original hash and reject newly allowed v3 widths and column counts', async () => {
+  const bundle = await buildReviewedBundle(catalog);
+  const legacy = rehash({...bundle, version: 2});
+  assert.equal(legacy.bundle_digest, version2Digest);
+  assert.deepEqual(await verifyReviewedBundle(catalog, legacy), {valid: true, errors: []});
+  assert.match(buildPreviewPrompt(legacy), /버전 2/);
+  const original = setPreviewRowRatio(catalog, createSelection(), {}, 'home', 'work', [45, 55]);
+  const legacyCustom = rehash({...await buildReviewedBundle(catalog, createSelection(), original), version: 2});
+  assert.equal((await verifyReviewedBundle(catalog, legacyCustom)).valid, true);
+  for (const overrides of [
+    setPreviewRowRatio(catalog, createSelection(), {}, 'home', 'work', [30, 70]),
+    setPreviewRowColumns(catalog, createSelection(), {}, 'home', 'work', 3),
+  ]) {
+    const current = await buildReviewedBundle(catalog, createSelection(), overrides);
+    assert.equal((await verifyReviewedBundle(catalog, current)).valid, true);
+    assert.equal((await verifyReviewedBundle(catalog, rehash({...current, version: 2}))).valid, false);
+  }
 });
 
 test('web and Python produce the exact same reviewed bundle for every optional-module combination', async () => {
@@ -276,14 +296,85 @@ test('moving to a new row cleans empty columns and rows, preserves cards, and al
   assert.deepEqual(right.home.find(row => row.id === 'briefing').columns.map(column => column.sections), [['briefing'], ['progress']]);
 });
 
+test('side placement inserts next to the target column, retaining stacked sections and up to four columns', () => {
+  let overrides = move({}, 'progress', 'tasks', 'right');
+  let row = overrides.home.find(item => item.id === 'work');
+  assert.deepEqual(row.columns.map(column => column.sections), [['meals'], ['tasks', 'deadlines'], ['progress']]);
+  assert.deepEqual(row.columns.map(column => column.ratio), [33.333333, 33.333333, 33.333334]);
+  overrides = move(overrides, 'counseling', 'tasks', 'left');
+  row = overrides.home.find(item => item.id === 'work');
+  assert.deepEqual(row.columns.map(column => column.sections), [['meals'], ['counseling'], ['tasks', 'deadlines'], ['progress']]);
+  assert.deepEqual(row.columns.map(column => column.ratio), [25, 25, 25, 25]);
+  assert.throws(() => move(overrides, 'schedule', 'tasks', 'right'), /네 열/);
+  const reordered = move(overrides, 'progress', 'meals', 'left');
+  assert.deepEqual(reordered.home.find(item => item.id === 'work').columns.map(column => column.sections),
+    [['progress'], ['meals'], ['counseling'], ['tasks', 'deadlines']]);
+  const original = structuredClone(overrides);
+  const stacked = move(overrides, 'tasks', 'meals', 'before');
+  assert.deepEqual(stacked.home.find(item => item.id === 'work').columns.map(column => column.sections),
+    [['tasks', 'meals'], ['counseling'], ['deadlines'], ['progress']]);
+  assert.deepEqual(overrides, original);
+});
+
+test('split and merge preserve reading order and deterministically balance populated columns', () => {
+  let overrides = setPreviewRowColumns(catalog, createSelection(), {}, 'home', 'work', 2);
+  assert.deepEqual(overrides.home.find(row => row.id === 'work').columns, [
+    {ratio: 50, sections: ['meals', 'tasks']}, {ratio: 50, sections: ['deadlines']},
+  ]);
+  overrides = move(overrides, 'progress', 'deadlines', 'after');
+  const original = structuredClone(overrides);
+  overrides = setPreviewRowColumns(catalog, createSelection(), overrides, 'home', 'work', 4);
+  assert.deepEqual(overrides.home.find(row => row.id === 'work').columns.map(column => column.sections),
+    [['meals'], ['tasks'], ['deadlines'], ['progress']]);
+  const merged = setPreviewRowColumns(catalog, createSelection(), overrides, 'home', 'work', 1);
+  assert.deepEqual(merged.home.find(row => row.id === 'work').columns, [{ratio: 100, sections: ['meals', 'tasks', 'deadlines', 'progress']}]);
+  assert.deepEqual(original.home.find(row => row.id === 'work').columns[0].sections, ['meals', 'tasks']);
+  for (const count of [0, 5, 1.5, true, '2', NaN]) assert.throws(() => setPreviewRowColumns(catalog, createSelection(), {}, 'home', 'work', count));
+  assert.throws(() => setPreviewRowColumns(catalog, createSelection(), {}, 'home', 'work', 4), /빈 열/);
+  assert.throws(() => setPreviewRowColumns(catalog, createSelection(), {}, 'home', 'quick', 2));
+  assert.throws(() => setPreviewRowColumns(catalog, createSelection(), {}, 'missing', 'work', 2));
+});
+
+test('custom ratios validate four populated columns, exact precision, bounds, and sum', () => {
+  let overrides = move({}, 'progress', 'deadlines', 'after');
+  overrides = setPreviewRowColumns(catalog, createSelection(), overrides, 'home', 'work', 4);
+  const changed = setPreviewRowRatio(catalog, createSelection(), overrides, 'home', 'work', [10, 20.125, 30.125, 39.75]);
+  assert.deepEqual(changed.home.find(row => row.id === 'work').columns.map(column => column.ratio), [10, 20.125, 30.125, 39.75]);
+  for (const ratios of [[10, 10, 10, 71], [9.999999, 20, 30, 40.000001], [10.0000001, 20, 30, 39.9999999],
+    [NaN, 20, 30, 40], [Infinity, 20, 30, 40], [true, 20, 30, 49], [10, 20, 70], [], null]) {
+    assert.throws(() => setPreviewRowRatio(catalog, createSelection(), overrides, 'home', 'work', ratios));
+  }
+});
+
+test('resizing a column keeps the others above their floor and preserves their relative excess widths', () => {
+  const selection = createSelection();
+  let overrides = setPreviewRowColumns(catalog, selection, {}, 'home', 'work', 3);
+  overrides = setPreviewRowRatio(catalog, selection, overrides, 'home', 'work', [20, 50, 30]);
+  const original = structuredClone(overrides);
+  const resized = resizePreviewColumn(catalog, selection, overrides, 'home', 'work', 0, 40);
+  assert.deepEqual(resized.home.find(row => row.id === 'work').columns.map(column => column.ratio), [40, 36.666667, 23.333333]);
+  assert.deepEqual(overrides, original);
+  overrides = move(overrides, 'progress', 'tasks', 'right');
+  overrides = resizePreviewColumn(catalog, selection, overrides, 'home', 'work', 0, 70);
+  assert.deepEqual(overrides.home.find(row => row.id === 'work').columns.map(column => column.ratio), [70, 10, 10, 10]);
+  overrides = resizePreviewColumn(catalog, selection, overrides, 'home', 'work', 0, 10);
+  assert.deepEqual(overrides.home.find(row => row.id === 'work').columns.map(column => column.ratio), [10, 30, 30, 30]);
+  for (const percent of [9.999999, 70.000001, 50.1234567, Infinity, NaN, '25', true]) {
+    assert.throws(() => resizePreviewColumn(catalog, selection, overrides, 'home', 'work', 0, percent));
+  }
+  for (const index of [-1, 4, 1.5, true, '0']) assert.throws(() => resizePreviewColumn(catalog, selection, overrides, 'home', 'work', index, 25));
+  assert.throws(() => resizePreviewColumn(catalog, selection, {}, 'home', 'briefing', 0, 40));
+  assert.equal(resizePreviewColumn(catalog, selection, {}, 'home', 'briefing', 0, 100).home.find(row => row.id === 'briefing').columns[0].ratio, 100);
+});
+
 test('invalid moves cannot move anchors, put cards inside columns, duplicate sections, or create nested layouts', () => {
   for (const [section, target, position] of [
     ['nav', 'briefing', 'row-after'], ['briefing', 'intro', 'row-after'], ['quick', 'tasks', 'before'],
-    ['tasks', 'quick', 'left'], ['schedule', 'tasks', 'right'], ['missing', 'briefing', 'before'],
+    ['tasks', 'quick', 'left'], ['missing', 'briefing', 'before'],
     ['schedule', 'resources', 'before'], ['schedule', 'briefing', 'arbitrary'],
   ]) assert.throws(() => move({}, section, target, position), undefined, `${section}/${target}/${position}`);
   assert.throws(() => movePreviewSection(catalog, createSelection(), {}, {page: 'home', section: ['briefing'], target: 'tasks', position: 'before'}));
-  assert.throws(() => setPreviewRowRatio(catalog, createSelection(), {}, 'home', 'work', [30, 70]));
+  assert.throws(() => setPreviewRowRatio(catalog, createSelection(), {}, 'home', 'work', [5, 95]));
   assert.throws(() => setPreviewRowRatio(catalog, createSelection(), {}, 'home', 'briefing', [50, 50]));
   assert.throws(() => setPreviewRowRatio(catalog, createSelection(), {}, 'missing', 'work', [40, 60]));
 });
@@ -306,8 +397,8 @@ test('reviewed layout validation rejects malformed overrides even with matching 
     candidate => { candidate[2].columns[0].sections.push('resources'); },
     candidate => { candidate.pop(); },
     candidate => { const quick = candidate.find(row => row.id === 'quick'); quick.columns[0].sections.push('briefing'); candidate.splice(2, 1); },
-    candidate => { const work = candidate.find(row => row.id === 'work'); work.columns = [{ratio: 30, sections: ['meals']}, {ratio: 30, sections: ['tasks']}, {ratio: 40, sections: ['deadlines']}]; },
-    candidate => { const work = candidate.find(row => row.id === 'work'); work.columns[0].ratio = 10; work.columns[1].ratio = 90; },
+    candidate => { const work = candidate.find(row => row.id === 'work'); work.columns = [{ratio: 30, sections: ['meals']}, {ratio: 30, sections: ['tasks']}, {ratio: 30, sections: ['deadlines']}]; },
+    candidate => { const work = candidate.find(row => row.id === 'work'); work.columns[0].ratio = 9; work.columns[1].ratio = 91; },
   ];
   for (const mutate of invalidRows) {
     const changed = structuredClone(rows);
@@ -335,6 +426,39 @@ test('optional module changes retain custom placement, prune removed sections an
   assert.deepEqual(restored.home[3].columns[0].sections, ['schedule']);
   for (const key of ['assessment', 'attendance', 'forms']) assert.equal(flattened(restored.home).filter(section => section === key).length, 1);
   assert.deepEqual(reconcilePreviewOverrides(catalog, all, {}), {});
+});
+
+test('removing optional columns normalizes surviving multi-column ratios without losing other sections', () => {
+  const all = createSelection({modules: ['assessment', 'attendance']});
+  let overrides = move({}, 'assessment', 'tasks', 'right', 'home', all);
+  overrides = move(overrides, 'attendance', 'meals', 'left', 'home', all);
+  const three = reconcilePreviewOverrides(catalog, createSelection({modules: ['assessment']}), overrides);
+  assert.deepEqual(three.home.find(row => row.id === 'work').columns.map(column => column.ratio), [33.333333, 33.333333, 33.333334]);
+  assert.deepEqual(three.home.find(row => row.id === 'work').columns.map(column => column.sections), [['meals'], ['tasks', 'deadlines'], ['assessment']]);
+  const two = reconcilePreviewOverrides(catalog, createSelection(), overrides);
+  assert.deepEqual(two.home.find(row => row.id === 'work').columns.map(column => column.ratio), [50, 50]);
+});
+
+test('v3 three and four column exports with arbitrary widths compile identically in Python', async () => {
+  const selection = createSelection(), cases = [];
+  let overrides = setPreviewRowColumns(catalog, selection, {}, 'home', 'work', 3);
+  cases.push({selection, overrides});
+  overrides = setPreviewRowRatio(catalog, selection, overrides, 'home', 'work', [20.123456, 30.654321, 49.222223]);
+  cases.push({selection, overrides});
+  overrides = move(overrides, 'progress', 'tasks', 'right');
+  cases.push({selection, overrides});
+  overrides = setPreviewRowRatio(catalog, selection, overrides, 'home', 'work', [10, 20.5, 30.123456, 39.376544]);
+  cases.push({selection, overrides});
+  overrides = resizePreviewColumn(catalog, selection, overrides, 'home', 'work', 2, 55.123456);
+  cases.push({selection, overrides});
+  const expected = JSON.parse(execFileSync(process.env.PYTHON ?? 'python3', ['-c', [
+    'import json, sys', 'from teacher_planner.preview_bundle import create_bundle, validate_bundle',
+    'cases = json.load(sys.stdin)', 'bundles = [create_bundle(c["selection"], c["overrides"]) for c in cases]',
+    'for bundle in bundles: validate_bundle(bundle)', 'print(json.dumps(bundles))',
+  ].join('\n')], {cwd: repository, input: JSON.stringify(cases), encoding: 'utf8'}));
+  const bundles = await Promise.all(cases.map(item => buildReviewedBundle(catalog, item.selection, item.overrides)));
+  assert.deepEqual(bundles, expected);
+  for (const bundle of bundles) assert.deepEqual(await verifyReviewedBundle(catalog, bundle), {valid: true, errors: []});
 });
 
 test('custom drag and ratio bundle digests match the Python compiler for all selected modules', async () => {

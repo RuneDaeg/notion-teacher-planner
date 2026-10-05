@@ -97,7 +97,11 @@ def build_catalog():
     })
 
 
-def create_bundle(selection=None, layout_overrides=None):
+def create_bundle(selection=None, layout_overrides=None, *, bundle_version=3):
+    if type(bundle_version) is not int or bundle_version not in (1, 2, 3):
+        raise ValueError('지원하는 미리보기 설계 버전은 1, 2 또는 3입니다.')
+    if bundle_version == 1 and layout_overrides is not None:
+        raise ValueError('버전 1은 기본 배치만 지원합니다.')
     selection = validate_selection(default_selection() if selection is None else selection)
     catalog = build_catalog()
     config = _config(selection)
@@ -105,7 +109,8 @@ def create_bundle(selection=None, layout_overrides=None):
     overrides = {} if layout_overrides is None else layout_overrides
     if not isinstance(overrides, dict) or set(overrides) - set(PAGE_KEYS):
         raise ValueError('배치 변경에는 네 페이지의 키만 사용할 수 있습니다.')
-    overrides = {key: validate_layout_rows(pages[key], rows) for key, rows in overrides.items()}
+    overrides = {key: validate_layout_rows(pages[key], rows, layout_version=bundle_version)
+                 for key, rows in overrides.items()}
     for key, rows in overrides.items():
         pages[key]['rows'] = rows
     referenced = {view_key for page in pages.values() for section in page['sections'].values()
@@ -114,11 +119,13 @@ def create_bundle(selection=None, layout_overrides=None):
     if referenced != set(views):
         raise ValueError('배치 계약의 보기와 원본 명세가 일치하지 않습니다.')
     bundle = _json_values({
-        'format': 'teacher-planner-reviewed-layout', 'version': 2,
+        'format': 'teacher-planner-reviewed-layout', 'version': bundle_version,
         'source_digest': catalog['source_digest'], 'selection': selection,
         'page_settings': catalog['contract']['page_settings'], 'pages': pages,
         'views': views, 'applied': False, 'layout_overrides': overrides,
     })
+    if bundle_version == 1:
+        del bundle['layout_overrides']
     bundle['bundle_digest'] = digest(bundle)
     return bundle
 
@@ -129,14 +136,11 @@ make_bundle = create_bundle
 def validate_bundle(bundle):
     if not isinstance(bundle, dict):
         raise ValueError('미리보기 설계는 JSON 객체여야 합니다.')
-    if type(bundle.get('version')) is not int or bundle['version'] not in (1, 2):
-        raise ValueError('지원하는 미리보기 설계 버전은 1 또는 2입니다.')
-    expected = create_bundle(bundle.get('selection'), bundle.get('layout_overrides') if bundle['version'] == 2 else None)
-    if bundle['version'] == 1:
-        expected['version'] = 1
-        del expected['layout_overrides']
-        del expected['bundle_digest']
-        expected['bundle_digest'] = digest(expected)
+    if type(bundle.get('version')) is not int or bundle['version'] not in (1, 2, 3):
+        raise ValueError('지원하는 미리보기 설계 버전은 1, 2 또는 3입니다.')
+    expected = create_bundle(bundle.get('selection'),
+                             bundle.get('layout_overrides') if bundle['version'] >= 2 else None,
+                             bundle_version=bundle['version'])
     if bundle.get('source_digest') != expected['source_digest']:
         raise ValueError('공통 설계 버전이 달라졌습니다. 현재 웹에서 다시 미리보기를 확인하세요.')
     # Reconstruct all values. A caller recomputing a hash cannot legitimize a

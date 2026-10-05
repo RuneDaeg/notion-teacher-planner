@@ -8,7 +8,7 @@
 
 [전체 배치 미리보기](https://notion-teacher-planner.notion-teacher-planner-cloudflare.workers.dev/preview)의 `reviewed-layout.json`을 받으면 [미리보기 적용 절차](docs/PREVIEW.md)를 먼저 따릅니다. 파일을 `.local/reviewed-layout.json`에 보관하고 `verify-preview --bundle .local/reviewed-layout.json`으로 출처·버전·선택·네 페이지 배치·보기·체크섬을 검증합니다. 새 Python 설치의 `plan`·`install`에는 `--reviewed-bundle .local/reviewed-layout.json`을 전달해 설정이 같은지 생성 전에 검사합니다. 교사가 확인한 같은 설계를 MCP/UI로 마무리하며, 미리보기 확인과 실제 Notion 적용 완료를 혼동하지 않습니다. 기존 수첩은 재설치하지 않으며 미선택 기능도 삭제하지 않고 현재 기록·ID·추가 본문을 보존합니다.
 
-교사가 미리보기에서 드래그해 바꾼 배치는 버전 `2` 파일의 `layout_overrides`에 담깁니다. 검증한 사용자 지정 행·열·폭은 아래에 적힌 기본 배치보다 우선합니다. 기본값으로 되돌리거나 `render-layout`의 기본 출력으로 바꾸지 않고 `compile-preview`를 사용합니다. 최종 `verify-layout` 또는 `verify --layout-snapshot`에도 같은 `--reviewed-bundle` 파일을 전달합니다. 전체 너비·작은 텍스트·카드 내부 구성·닫힌 접기·원본 연결은 유지합니다. 이전 버전 `1`의 기본 배치 파일도 검증할 수 있습니다.
+교사가 미리보기에서 드래그나 열 편집으로 바꾼 배치는 버전 `3` 파일의 `layout_overrides`에 담깁니다. 한 행은 실제 구역을 가진 최대 네 열로 구성하며, 열마다 최소 10%의 상대 폭을 사용합니다. 빈 열을 추가하거나 같은 구역을 복제하지 않습니다. 검증한 사용자 지정 행·열·폭은 아래에 적힌 기본 배치보다 우선합니다. 기본값으로 되돌리거나 `render-layout`의 기본 출력으로 바꾸지 않고 `compile-preview`를 사용합니다. 최종 `verify-layout` 또는 `verify --layout-snapshot`에도 같은 `--reviewed-bundle` 파일을 전달합니다. 전체 너비·작은 텍스트·카드 내부 구성·닫힌 접기·원본 연결은 유지합니다. 이전 버전 `1`·`2` 파일은 각각의 원래 규칙으로 검증하며, 버전 숫자만 고쳐 허용 범위를 넓히지 않습니다.
 
 ## 1. 요청과 자료를 구분한다
 

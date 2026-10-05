@@ -77,13 +77,16 @@ def resolve_page_layout(page_key, active_sections=None):
     return page
 
 
-def validate_layout_rows(page, rows):
+def validate_layout_rows(page, rows, *, layout_version=3):
     """Validate an explicitly reviewed arrangement without changing its content.
 
     Sections stay on their original page. Navigation and profile anchors remain
     first; internal card grids retain their native full-width parent row. Only
-    ordinary sections can be stacked or placed in a two-column row.
+    ordinary sections can be stacked or placed in up to four populated columns.
+    Version 2 keeps the previously reviewed two-column width presets unchanged.
     """
+    if type(layout_version) is not int or layout_version not in (1, 2, 3):
+        raise LayoutContractError('지원하지 않는 배치 버전입니다.')
     if not isinstance(rows, list) or not rows or len(rows) > len(page['sections']):
         raise LayoutContractError('배치 행은 비어 있지 않은 구역 수 이내의 목록이어야 합니다.')
     ids, found = set(), []
@@ -97,12 +100,15 @@ def validate_layout_rows(page, rows):
             raise LayoutContractError('행 ID는 중복 없는 영문자로 시작하는 64자 이내의 이름이어야 합니다.')
         ids.add(identity)
         columns = row['columns']
-        if not isinstance(columns, list) or not 1 <= len(columns) <= 2:
-            raise LayoutContractError('배치 행은 한 열 또는 두 열이어야 합니다.')
+        max_columns = 4 if layout_version >= 3 else 2
+        if not isinstance(columns, list) or not 1 <= len(columns) <= max_columns:
+            raise LayoutContractError(f'배치 행은 내용이 있는 1~{max_columns}개 열이어야 합니다.')
         for column in columns:
             if not isinstance(column, dict) or set(column) != {'ratio', 'sections'}:
                 raise LayoutContractError('배치 열에는 ratio와 sections만 필요합니다.')
-            if type(column['ratio']) not in (int, float):
+            ratio = column['ratio']
+            if (type(ratio) not in (int, float) or not 0 <= ratio <= 100
+                    or round(ratio, 6) != ratio):
                 raise LayoutContractError('열 폭은 지원하는 숫자 비율이어야 합니다.')
             keys = column['sections']
             if not isinstance(keys, list) or not keys or any(
@@ -113,8 +119,13 @@ def validate_layout_rows(page, rows):
                 raise LayoutContractError('카드 모음은 단독 전체 너비 행을 유지해야 합니다.')
             found.extend(keys)
         ratios = tuple(column['ratio'] for column in columns)
-        if (len(columns) == 1 and ratios != (100,)) or (len(columns) == 2 and ratios not in allowed_pairs):
-            raise LayoutContractError('지원하는 열 폭은 100 또는 50/50, 40/60, 60/40, 55/45, 45/55입니다.')
+        if layout_version < 3:
+            if (len(columns) == 1 and ratios != (100,)) or (len(columns) == 2 and ratios not in allowed_pairs):
+                raise LayoutContractError('지원하는 열 폭은 100 또는 50/50, 40/60, 60/40, 55/45, 45/55입니다.')
+        elif ((len(columns) == 1 and ratios != (100,))
+              or (len(columns) > 1 and (any(not 10 <= ratio <= 90 for ratio in ratios)
+                                       or abs(sum(ratios) - 100) > 0.000001))):
+            raise LayoutContractError('한 열은 100%, 여러 열은 각각 10~90%이며 합계가 100%여야 합니다.')
     if len(found) != len(set(found)) or set(found) != set(page['sections']):
         raise LayoutContractError('선택한 모든 구역은 해당 페이지에 정확히 한 번 있어야 합니다.')
     if rows[:2] != page['rows'][:2]:
