@@ -6,7 +6,7 @@ made by 여광재(온양고) · made with [DoRms](https://dorms.school)
 
 기본 템플릿은 **대시보드·학급 경영·교과 진도·학사 일정**의 네 Notion 페이지로 구성됩니다. 오늘 필요한 기록을 대시보드에서 확인하고 각 업무 페이지로 이동합니다. **수첩은 학년도마다 한 권**을 사용합니다. 해당 연도 3월부터 다음 해 2월까지의 기록을 담고, 2학기에도 같은 수첩을 이어 씁니다. 수업 진도의 학기는 필요한 기록에서 선택해 구분합니다.
 
-교사용 사용 안내서: [웹에서 읽기](https://notion-teacher-planner.notion-teacher-planner-cloudflare.workers.dev/guide) · [PDF 바로 보기](https://notion-teacher-planner.notion-teacher-planner-cloudflare.workers.dev/teacher-planner-guide.pdf) · [첨부용 HTML](output/html/교무수첩_사용안내서.html) · [수정용 Word](output/docx/교무수첩_사용안내서.docx). 웹 질문지로 시작하는 방법, 학년도 한 권 운영, 학생별 상담 이력, 여섯 가지 기록 양식, 시간표·진도, 캘린더·PARA, 급식·학사일정 갱신, 문제 해결과 기존 수첩의 선택 업데이트를 설명합니다. 문서 버전은 1.3, 기준일은 2026년 10월 2일입니다.
+교사용 사용 안내서: [웹에서 읽기](https://notion-teacher-planner.notion-teacher-planner-cloudflare.workers.dev/guide) · [PDF 바로 보기](https://notion-teacher-planner.notion-teacher-planner-cloudflare.workers.dev/teacher-planner-guide.pdf) · [첨부용 HTML](output/html/교무수첩_사용안내서.html) · [수정용 Word](output/docx/교무수첩_사용안내서.docx). 웹 질문지로 시작하는 방법, 학년도 한 권 운영, 학생별 상담 이력, 여섯 가지 기록 양식, 시간표·진도, 캘린더·PARA, 급식·학사일정 갱신, 문제 해결과 기존 수첩의 선택 업데이트를 설명합니다. 전체 배치 미리보기·드래그·1~4열 편집과 기존 수첩 수정 요청문 사용법도 포함합니다. 문서 버전은 1.4, 기준일은 2026년 10월 6일입니다.
 
 커뮤니티 공유용 [개조식 소개글](output/community/교무수첩_커뮤니티_소개글.txt)과 [첨부용 PDF](output/pdf/교무수첩_사용안내서.pdf)도 제공합니다. HTML 안내서는 별도 로그인 없이 읽을 수 있으며, 웹에서 PDF를 열거나 HTML·PDF 파일을 내려받을 수 있습니다.
 

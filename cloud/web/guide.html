@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="guide-version" content="1.3">
-  <meta name="description" content="Notion 교무수첩의 시작 방법부터 학생 상담, 시간표, 중식·학사일정, 기존 수첩 업데이트까지 읽는 교사용 안내서.">
+  <meta name="guide-version" content="1.4">
+  <meta name="description" content="Notion 교무수첩의 설치, 학생 상담, 시간표, 중식·학사일정부터 드래그 배치 미리보기와 AI 수정 요청까지 읽는 교사용 안내서.">
   <title>Notion 교무수첩 사용 안내서</title>
   <link rel="stylesheet" href="/guide.css">
 </head>
@@ -26,7 +26,9 @@
 <li><a href="#chapter-5">5  오늘 중식과 학사일정 갱신</a></li>
 <li><a href="#chapter-6">6  PARA와 주간 정리</a></li>
 <li><a href="#chapter-7">7  자주 막히는 부분 해결하기</a></li>
-<li><a href="#chapter-8">8  기존 수첩에 새 기능 적용하기</a></li></ol></nav>
+<li><a href="#chapter-8">8  기존 수첩에 새 기능 적용하기</a></li>
+<li><a href="#chapter-9">9  수첩 배치를 미리 보고 꾸미기</a></li>
+<li><a href="#chapter-10">10  기존 수첩을 AI와 함께 수정하기</a></li></ol></nav>
       </details>
       <p class="rail-note">필요한 항목부터 읽어도 좋아요.<br>파일로 받아 두면 오프라인에서도 볼 수 있습니다.</p>
     </aside>
@@ -44,11 +46,11 @@
 <section class="guide-section introduction" id="start" aria-label="시작 안내">
 <h1 id="guide-title">노션 교무수첩 사용 안내서</h1>
 <p class="subtitle">일과 확인부터 학생 상담과 수업 기록까지</p>
-<p class="document-meta">2026년 10월 2일 기준  ·  문서 버전 1.3  ·  교사용</p>
+<p class="document-meta">2026년 10월 6일 기준  ·  문서 버전 1.4  ·  교사용</p>
 <p>이 안내서는 학년도마다 한 권의 Notion 교무수첩을 사용하는 방법을 설명합니다. 해당 연도 3월부터 다음 해 2월까지 같은 수첩에서 학생·수업·일정 기록을 관리합니다. 같은 원본을 여러 보기에서 사용하므로 한곳에서 수정한 기록이 연결된 화면에도 반영됩니다.</p>
 <h2>새 수첩은 웹 질문지에서 준비하기</h2>
-<p>5단계 질문지에서 학교·학년도·담당 수업과 필요한 기능을 선택합니다. 완성된 AI 요청문을 복사해 Notion에 페이지를 만들고 수정할 수 있는 AI에 전달하세요. 질문지는 브라우저 안에서 요청문을 만들며, 실제 수첩 생성은 연결된 AI가 진행합니다.</p>
-<p><a href="https://notion-teacher-planner.notion-teacher-planner-cloudflare.workers.dev/setup">웹 질문지 열기</a>  ·  <a href="https://notion-teacher-planner.notion-teacher-planner-cloudflare.workers.dev/guide">HTML 안내서 읽기</a>  ·  <a href="https://notion-teacher-planner.notion-teacher-planner-cloudflare.workers.dev/teacher-planner-guide.pdf">PDF 안내서 열기</a></p>
+<p>5단계 질문지에서 학교·학년도·담당 수업과 필요한 기능을 선택합니다. 배치 미리보기에서 화면을 꾸민 뒤 AI에게 적용을 요청할 수도 있습니다. 실제 수첩 생성·수정은 Notion 편집 도구가 연결된 AI가 진행합니다.</p>
+<p><a href="https://notion-teacher-planner.notion-teacher-planner-cloudflare.workers.dev/setup">웹 질문지</a>  ·  <a href="https://notion-teacher-planner.notion-teacher-planner-cloudflare.workers.dev/preview">배치 미리보기</a>  ·  <a href="https://notion-teacher-planner.notion-teacher-planner-cloudflare.workers.dev/edit">수정 요청문</a>  ·  <a href="https://notion-teacher-planner.notion-teacher-planner-cloudflare.workers.dev/guide">HTML 안내서</a>  ·  <a href="https://notion-teacher-planner.notion-teacher-planner-cloudflare.workers.dev/teacher-planner-guide.pdf">PDF 안내서</a></p>
 <h2>처음 5분 안에 시작하기</h2>
 <ol class="written-steps">
 <li><strong>1. 홈을 즐겨찾기에 넣기  </strong>교무수첩 첫 페이지를 열고 학년도·담당 반을 확인합니다.</li>
@@ -59,7 +61,8 @@
 <h2>어느 화면에서 무엇을 하나요</h2>
 <div class="table-scroll" tabindex="0" role="region" aria-label="어느 화면에서 무엇을 하나요 표"><table><thead><tr><th scope="col"><p><strong>화면</strong></p></th><th scope="col"><p><strong>주로 하는 일</strong></p></th></tr></thead><tbody><tr><td><p>홈 대시보드</p></td><td><p>주간 수업표, 오늘 중식, 우선 업무, 상담·출결과 다가오는 일정 확인</p></td></tr><tr><td><p>학급 경영 &amp; 학생 상담</p></td><td><p>학생 명단, 상담 이력, 관찰 메모, 출결·제출물, 학부모 연락 관리</p></td></tr><tr><td><p>교과 진도표 &amp; 시간표</p></td><td><p>주간 시간표 확인, 반별·교과별 진도와 평가·채점 기록</p></td></tr><tr><td><p>학사 캘린더 &amp; PARA</p></td><td><p>주간·월간·마감 보기, 프로젝트·영역·자료·보관 관리</p></td></tr></tbody></table></div>
 <p>빠른 찾기  2쪽 일과와 할 일  ·  3쪽 학생과 상담  ·  4쪽 시간표와 진도<br>
-5쪽 기록 양식  ·  6쪽 급식과 학사일정  ·  7쪽 주간 정리  ·  8쪽 문제 해결  ·  9쪽 기존 수첩 업데이트</p>
+5쪽 기록 양식  ·  6쪽 급식과 학사일정  ·  7쪽 주간 정리  ·  8쪽 문제 해결<br>
+9쪽 기존 수첩 업데이트  ·  10쪽 배치 미리보기  ·  11쪽 수정 요청문</p>
 <p>이 안내서의 선택 기능은 설치된 경우에 사용할 수 있습니다. 현재 예시 수첩에는 여섯 기록 양식과 학생별 상담 이력 보기를 등록했습니다. 새 수첩을 만들 때는 사용할 기능과 연결 상태를 확인하세요.</p>
 </section><section class="guide-section" id="chapter-1" aria-labelledby="chapter-1-title">
 <h2 id="chapter-1-title">1  아침 일과와 할 일 관리</h2>
@@ -189,7 +192,7 @@
 <h3>다른 교사가 새 수첩을 만들 때</h3>
 <p>웹 질문지의 5단계 답변을 마친 뒤 생성된 요청문을 복사해 AI에 전달합니다. AI가 Notion 쓰기 권한과 생성 위치를 확인하고 선택한 기능으로 수첩을 만듭니다. 직접 시작하려면 저장소 링크와 “START_HERE.md 순서대로 내 Notion에 교무수첩을 만들어줘”라는 요청을 전달해도 됩니다. Notion 쓰기 연결이나 실행 도구가 없으면 설정 준비까지만 가능합니다.</p>
 <p><a href="https://notion-teacher-planner.notion-teacher-planner-cloudflare.workers.dev/setup">웹 질문지</a>  ·  <a href="https://github.com/RuneDaeg/notion-teacher-planner">공개 저장소</a>  ·  <a href="https://github.com/RuneDaeg/notion-teacher-planner/tree/main/docs">상세 사용법과 기록 양식</a></p>
-<p>기능 기준  2026년 10월 2일, 업데이트 목록 2026.10.1. 선택 기능의 설치 여부와 Notion 언어·보기 설정에 따라 화면 위치와 메뉴 이름은 다를 수 있습니다.</p>
+<p>기능 기준  2026년 10월 6일, 업데이트 목록 2026.10.1. 선택 기능의 설치 여부와 Notion 언어·보기 설정에 따라 화면 위치와 메뉴 이름은 다를 수 있습니다.</p>
 </section><section class="guide-section" id="chapter-8" aria-labelledby="chapter-8-title">
 <h2 id="chapter-8-title">8  기존 수첩에 새 기능 적용하기</h2>
 <p>새 기능은 홈의 ‘업데이트 확인’에서 선택해 적용합니다. 이미 만든 수첩의 학생 기록과 직접 꾸민 페이지는 유지합니다.</p>
@@ -207,6 +210,46 @@
 <h3>자동 적용 범위와 보존 원칙</h3>
 <p>기존 양방향 관계는 확인만 합니다. 빈 상담 DB만 자동 전환하며, 기존 상담이 있으면 AI가 관계 목록을 보관하고 비교하며 진행합니다. 다른 속성을 덮어쓰지 않으며, 불확실하면 중단합니다.</p>
 <p>급식·학사일정의 매일 갱신은 별개입니다. 버전은 기능별로 관리하며, 적용 이력에는 위치와 단계만 저장합니다. 학생 이름·상담 본문은 넣지 않습니다.</p>
+</section><section class="guide-section" id="chapter-9" aria-labelledby="chapter-9-title">
+<h2 id="chapter-9-title">9  수첩 배치를 미리 보고 꾸미기</h2>
+<p>배치 미리보기에서는 홈·학급 경영·교과 진도·학사 캘린더 네 화면을 먼저 살펴보고 구역을 옮길 수 있습니다. 실제 학생 기록을 읽어 오지 않으며, 빈 표와 구역으로 구성과 위치를 보여 줍니다.</p>
+<p><a href="https://notion-teacher-planner.notion-teacher-planner-cloudflare.workers.dev/preview">전체 배치 미리보기 열기</a></p>
+<h3>구역을 끌어서 원하는 곳에 놓기</h3>
+<p>구역의 이동 손잡이를 끌면 놓일 자리가 반투명하게 표시됩니다. 행 사이에 놓으면 새 줄이 되고, 다른 구역의 위아래에 놓으면 같은 열에 쌓입니다. 좌우 가장자리에 놓으면 열을 나눌 수 있습니다. 드래그가 어렵다면 손잡이를 클릭해 기준 구역과 놓을 위치를 고르세요.</p>
+<h3>행마다 열 수와 너비 바꾸기</h3>
+<div class="table-scroll" tabindex="0" role="region" aria-label="행마다 열 수와 너비 바꾸기 표"><table><thead><tr><th scope="col"><p><strong>하고 싶은 일</strong></p></th><th scope="col"><p><strong>행의 열 편집에서 할 일</strong></p></th></tr></thead><tbody><tr><td><p>2·3·4열로 나누기</p></td><td><p>그 행의 구역을 선택한 열 수로 나눕니다. 열마다 들어갈 구역이 필요합니다.</p></td></tr><tr><td><p>다른 구역을 새 열로</p></td><td><p>같은 페이지의 구역을 골라 ‘열 추가’를 누릅니다. 한 행은 최대 네 열입니다.</p></td></tr><tr><td><p>한 열로 합치기</p></td><td><p>‘1열로 합치기’로 기존 구역을 순서대로 쌓습니다.</p></td></tr><tr><td><p>너비 조절하기</p></td><td><p>열별 %를 입력하거나 ‘너비 같게’를 누릅니다. 각 열은 최소 10%입니다.</p></td></tr><tr><td><p>편집 되돌리기</p></td><td><p>‘되돌리기’로 직전 편집을 취소하거나 ‘이 화면 기본 배치’로 복원합니다.</p></td></tr></tbody></table></div>
+<h3>확인한 배치를 AI에게 전달하기</h3>
+<ol class="written-steps">
+<li><strong>1. 선택하고 살펴보기  </strong>사용할 기능을 고르고 네 화면을 모두 확인합니다. 배치를 바꾼 뒤에는 다시 확인합니다.</li>
+<li><strong>2. 파일과 요청문 받기  </strong>확인 항목을 체크하고 ‘배치 파일 저장’과 ‘AI 요청문 복사’를 사용합니다.</li>
+<li><strong>3. 같은 대화에 전달하기  </strong>Notion 편집 도구가 연결된 AI에 요청문을 붙이고 reviewed-layout.json 파일을 첨부합니다. 새 설치라면 학교·수업 정보가 담긴 설치 요청문도 전달합니다.</li>
+<li><strong>4. 실제 화면 확인하기  </strong>AI가 같은 배치로 적용하고 실제 네 화면을 대조하도록 요청합니다. ‘네 화면을 HTML로 보관’은 나중에 다시 볼 파일을 저장하는 기능입니다.</li>
+</ol>
+<p>기본값은 전체 너비 켜기·작은 텍스트 끄기입니다. 확인한 순서·열 비율·접기 구조를 적용 기준으로 쓰며, 글꼴·간격은 실제 Notion에서 달라질 수 있습니다. 웹에서 편집하거나 HTML을 저장한 것만으로 Notion이 바뀌지는 않습니다.</p>
+</section><section class="guide-section" id="chapter-10" aria-labelledby="chapter-10-title">
+<h2 id="chapter-10-title">10  기존 수첩을 AI와 함께 수정하기</h2>
+<p>사용하다 필요한 기능이 생기면 수첩을 새로 만들지 않고 기존 페이지의 변경을 요청할 수 있습니다. 수정 요청문 화면에서 원하는 결과를 고르면 AI에게 전달할 문장을 준비해 줍니다.</p>
+<p><a href="https://notion-teacher-planner.notion-teacher-planner-cloudflare.workers.dev/edit">내 수첩 수정 요청문 만들기</a></p>
+<h3>원하는 기능을 고르고 요청하기</h3>
+<ol class="written-steps">
+<li><strong>1. 수정할 화면 알려주기  </strong>기존 Notion 수첩의 페이지 링크와 원하는 변경을 적습니다. 새 설치 질문에 다시 답할 필요는 없습니다.</li>
+<li><strong>2. 필요한 결과 선택하기  </strong>학생 상담 이력, 미제출자 보기, 이번 주 할 일, 회의 후속 업무, 기록 양식, 수업 진도, 홈 보기와 배치 중에서 고릅니다. 다른 기능은 직접 설명합니다.</li>
+<li><strong>3. 요청문을 읽고 전달하기  </strong>내용을 확인한 뒤 복사하거나 TXT로 저장해 Notion 편집 도구가 연결된 AI에 전달합니다. 학생 이름·상담 본문·API 키 대신 필요한 기능을 설명하세요.</li>
+<li><strong>4. 기존 기록과 결과 확인하기  </strong>AI가 현재 수첩을 읽고 필요한 부분을 바꾼 뒤 확인하도록 요청합니다. 이미 작성한 기록과 직접 꾸민 다른 부분은 유지합니다.</li>
+</ol>
+<h3>이렇게 요청할 수 있어요</h3>
+<ul>
+<li>“상담 기록 양식에 다음 상담에서 확인할 질문을 추가해줘. 이미 작성한 상담 내용은 유지해줘.”</li>
+<li>“이번 주에 마감되는 미완료 업무를 홈에서 보고 싶어. 기존 업무 원본을 사용하는 보기로 추가해줘.”</li>
+<li>“미리보기에서 확인한 배치 파일대로 구역을 옮겨줘. 학생·상담 기록과 시간표·중식 연결은 유지해줘.”</li>
+</ul>
+<h3>꾸준히 바꾸면서 사용할 때</h3>
+<p>수정 요청문은 본인의 수첩을 바꾸는 요청입니다. 공개 템플릿에도 같은 개선을 넣고 싶다면 그 범위를 따로 알려 주세요. 공통 템플릿이 바뀌어도 이미 만든 다른 교사의 수첩이 자동으로 바뀌지는 않습니다.</p>
+<p>전체 배치를 바꿀 때는 앞쪽의 미리보기 절차를 사용합니다. 이동 링크는 맨 위에, 빠른 실행·PARA 등 카드 묶음은 내부 구성을 유지합니다. 주간·월간 캘린더는 같은 일정 원본을, 홈과 교과 페이지는 같은 주간 시간표를 계속 사용합니다.</p>
+<p>웹은 요청문을 만드는 도구입니다. 실제 수정에는 AI의 Notion 접근·편집 권한이 필요합니다. 적용을 마친 뒤에는 바뀐 페이지 링크와 확인 결과, 아직 마무리하지 못한 부분을 함께 받으세요.</p>
+<h3>웹과 안내서 바로가기</h3>
+<p><a href="https://github.com/RuneDaeg/notion-teacher-planner">공개 GitHub 저장소</a>  ·  <a href="https://notion-teacher-planner.notion-teacher-planner-cloudflare.workers.dev/guide">HTML 안내서</a>  ·  <a href="https://notion-teacher-planner.notion-teacher-planner-cloudflare.workers.dev/teacher-planner-guide.pdf">PDF 안내서</a></p>
+<p>made by 여광재(온양고)  ·  made with <a href="https://dorms.school">DoRms</a></p>
 </section>
       </article>
       <footer class="document-footer">

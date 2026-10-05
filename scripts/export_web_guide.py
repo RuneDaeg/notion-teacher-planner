@@ -160,7 +160,7 @@ def render_document(document, css: str, *, portable: bool, version: str) -> str:
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="guide-version" content="{escape(version, quote=True)}">
-  <meta name="description" content="Notion 교무수첩의 시작 방법부터 학생 상담, 시간표, 중식·학사일정, 기존 수첩 업데이트까지 읽는 교사용 안내서.">
+  <meta name="description" content="Notion 교무수첩의 설치, 학생 상담, 시간표, 중식·학사일정부터 드래그 배치 미리보기와 AI 수정 요청까지 읽는 교사용 안내서.">
   <title>Notion 교무수첩 사용 안내서</title>
   {style}
 </head>
