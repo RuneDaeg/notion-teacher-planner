@@ -34,6 +34,7 @@ def add_commands(commands):
     check = commands.add_parser('verify-layout', help='실제 구조·UI 증거 검사; 미확인은 실패')
     check.add_argument('--snapshot', required=True)
     check.add_argument('--report')
+    check.add_argument('--reviewed-bundle', help='검토한 기본/변경 배치 JSON; 실제 증거의 지문과 대조')
 
 
 def write_text(path, content):
@@ -43,11 +44,19 @@ def write_text(path, content):
     target.chmod(0o600)
 
 
-def load_evidence(path, *, state=None, core_verified=False):
+def load_evidence(path, *, state=None, core_verified=False, reviewed_bundle=None):
     """Bind evidence to this installation, not a different notebook's screenshots."""
     from .layout_verify import verify_layout_snapshot
     source = Path(path).resolve()
     snapshot = json.loads(source.read_text(encoding='utf-8'))
+    reviewed = None
+    if reviewed_bundle is None and state is not None:
+        reviewed_bundle = state.get('reviewed_layout')
+    if reviewed_bundle is not None:
+        from .preview_bundle import read_json, validate_bundle, selection_from_config
+        reviewed = validate_bundle(reviewed_bundle if isinstance(reviewed_bundle, dict) else read_json(reviewed_bundle))
+        if state is not None and reviewed['selection'] != selection_from_config(state['config']):
+            raise ValueError('검토한 배치의 선택이 이 설치 기록의 설정과 다릅니다.')
     if core_verified and state is None:
         raise ValueError('기능 검증 결과를 반영하려면 같은 설치 기록이 필요합니다.')
     if state is not None:
@@ -98,7 +107,7 @@ def load_evidence(path, *, state=None, core_verified=False):
                 'status': 'pass', 'checked_at': datetime.now(timezone.utc).isoformat(),
                 'page_ids': dict(expected),
             }
-    return verify_layout_snapshot(snapshot, base_dir=source.parent)
+    return verify_layout_snapshot(snapshot, base_dir=source.parent, reviewed_bundle=reviewed)
 
 
 def run(args):
@@ -111,7 +120,7 @@ def run(args):
         from .model import config
         report = layout_plan(config(args.config))
     else:
-        report = load_evidence(args.snapshot)
+        report = load_evidence(args.snapshot, reviewed_bundle=getattr(args, 'reviewed_bundle', None))
     content = json.dumps(report, ensure_ascii=False, indent=2) + '\n'
     output = getattr(args, 'output', None) or getattr(args, 'report', None)
     if output:

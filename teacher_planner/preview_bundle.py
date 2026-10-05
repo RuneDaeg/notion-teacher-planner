@@ -9,7 +9,8 @@ from pathlib import Path
 
 from .dashboard import dashboard_config, layout_spec
 from .forms import selected_forms
-from .layout_contract import active_sections_for_config, load_contract, render_page, resolve_page_layout
+from .layout_contract import (active_sections_for_config, load_contract, render_page,
+                              resolve_page_layout, validate_layout_rows)
 from .model import blueprint
 
 
@@ -96,21 +97,27 @@ def build_catalog():
     })
 
 
-def create_bundle(selection=None):
+def create_bundle(selection=None, layout_overrides=None):
     selection = validate_selection(default_selection() if selection is None else selection)
     catalog = build_catalog()
     config = _config(selection)
     pages = {key: resolve_page_layout(key, active_sections_for_config(config, key)) for key in PAGE_KEYS}
+    overrides = {} if layout_overrides is None else layout_overrides
+    if not isinstance(overrides, dict) or set(overrides) - set(PAGE_KEYS):
+        raise ValueError('배치 변경에는 네 페이지의 키만 사용할 수 있습니다.')
+    overrides = {key: validate_layout_rows(pages[key], rows) for key, rows in overrides.items()}
+    for key, rows in overrides.items():
+        pages[key]['rows'] = rows
     referenced = {view_key for page in pages.values() for section in page['sections'].values()
                   for view_key in section.get('view_keys', [])}
     views = {view['key']: view for view in catalog['views'] if view['key'] in referenced}
     if referenced != set(views):
         raise ValueError('배치 계약의 보기와 원본 명세가 일치하지 않습니다.')
     bundle = _json_values({
-        'format': 'teacher-planner-reviewed-layout', 'version': 1,
+        'format': 'teacher-planner-reviewed-layout', 'version': 2,
         'source_digest': catalog['source_digest'], 'selection': selection,
         'page_settings': catalog['contract']['page_settings'], 'pages': pages,
-        'views': views, 'applied': False,
+        'views': views, 'applied': False, 'layout_overrides': overrides,
     })
     bundle['bundle_digest'] = digest(bundle)
     return bundle
@@ -122,7 +129,14 @@ make_bundle = create_bundle
 def validate_bundle(bundle):
     if not isinstance(bundle, dict):
         raise ValueError('미리보기 설계는 JSON 객체여야 합니다.')
-    expected = create_bundle(bundle.get('selection'))
+    if type(bundle.get('version')) is not int or bundle['version'] not in (1, 2):
+        raise ValueError('지원하는 미리보기 설계 버전은 1 또는 2입니다.')
+    expected = create_bundle(bundle.get('selection'), bundle.get('layout_overrides') if bundle['version'] == 2 else None)
+    if bundle['version'] == 1:
+        expected['version'] = 1
+        del expected['layout_overrides']
+        del expected['bundle_digest']
+        expected['bundle_digest'] = digest(expected)
     if bundle.get('source_digest') != expected['source_digest']:
         raise ValueError('공통 설계 버전이 달라졌습니다. 현재 웹에서 다시 미리보기를 확인하세요.')
     # Reconstruct all values. A caller recomputing a hash cannot legitimize a
@@ -168,5 +182,5 @@ def compile_bundle(bundle, sections):
         for value in supplied.values():
             if value == '' or value == [] or (isinstance(value, str) and not value.strip()):
                 raise ValueError(f'{key}: 검토한 구역의 빈 내용은 생략할 수 없습니다.')
-        rendered[key] = render_page(key, supplied)
+        rendered[key] = render_page(key, supplied, reviewed_rows=reviewed['pages'][key]['rows'])
     return rendered

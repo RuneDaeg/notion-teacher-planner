@@ -26,6 +26,10 @@
       </aside>
       <div class="preview-main">
         <div class="preview-toolbar"><div class="preview-tabs" id="preview-tabs" role="tablist" aria-label="수첩의 네 화면"></div><span id="page-progress" class="page-progress">0 / 4 확인</span></div>
+        <div class="layout-editor-bar"><label class="preview-check"><input type="checkbox" id="edit-layout" checked>배치 편집</label><span>⠿ 손잡이로 구역을 옮겨 보세요</span><div class="layout-editor-actions"><button id="undo-layout" type="button" disabled>↶ 되돌리기</button><button id="reset-layout" type="button" disabled>이 화면 기본 배치</button></div></div>
+        <p class="layout-hint">구역 위아래로 순서를 바꾸고, 가장자리에 놓으면 두 열로 나눌 수 있어요. ‘새 줄’에 놓으면 전체 너비가 됩니다. 손잡이를 클릭하면 위치를 선택할 수도 있어요.</p>
+        <div id="move-panel" class="move-panel" hidden><strong id="picked-section"></strong><label for="move-target">기준 구역</label><select id="move-target"></select><label for="move-position">놓을 위치</label><select id="move-position"><option value="before">같은 열 · 앞</option><option value="after">같은 열 · 뒤</option><option value="row-before">새 줄 · 위</option><option value="row-after">새 줄 · 아래</option><option value="left">왼쪽 열</option><option value="right">오른쪽 열</option></select><button id="apply-move" type="button">옮기기</button><button id="cancel-move" type="button">닫기</button></div>
+        <p id="layout-status" class="layout-status" role="status" aria-live="polite">페이지 이동 링크와 학년도 소개는 맨 위에 유지됩니다. 빠른 실행·PARA 등 카드 묶음은 한 줄로 이동합니다.</p>
         <p class="preview-label"><span class="preview-dot" aria-hidden="true"></span> 배치 미리보기 · 실제 기록은 비어 있습니다 <span>전체 너비 · Notion 기본 구성</span></p>
         <div class="preview-scroll" id="preview-frame" tabindex="0" aria-label="Notion 배치 미리보기"><div id="notebook-pages"></div></div>
         <div class="preview-fidelity"><strong>확인할 수 있어요</strong><span>구역 순서 · 열 비율 · 접기 · 표의 항목과 보기 탭</span><p>글꼴과 간격, 표의 높이는 실제 Notion 환경에서 달라질 수 있어요. 미리보기 탭 전환·접기 열기는 기본 설치 상태를 바꾸지 않습니다.</p></div>

@@ -51,7 +51,8 @@ def run(args):
             '3. 네 Markdown을 전체 페이지 덮어쓰기 명령으로 사용하지 마세요. 기존 원본과 ID를 유지하며 요청한 구역만 MCP/UI로 이동·수정하세요.\n'
             '4. 전체 너비 켜기·작은 텍스트 끄기·상대 열 폭·닫힌 접기는 실제 Notion에서 적용·확인하세요. 도구가 미지원하면 확인 대기로 남기세요.\n'
             '5. 시간표 원본과 홈 동기화 참조를 유지하고 수업을 업무·일정에 복사하지 마세요. 주간·월간 캘린더는 같은 원본의 보기입니다.\n'
-            '6. 변경 후 실제 네 페이지와 원본·보기·ID를 재조회하고 화면 증거로 verify-layout 검사를 수행하세요. 로컬 검사는 실제 설치 완료를 뜻하지 않습니다.\n'
+            '6. 변경 후 실제 네 페이지와 원본·보기·ID를 재조회하고 화면 증거의 reviewed_bundle_digest에 위 설계 지문을 기록하세요. '
+            'verify-layout --snapshot 실제증거.json --reviewed-bundle plan.json으로 검사하세요. 로컬 검사는 실제 설치 완료를 뜻하지 않습니다.\n'
             '자세한 절차: START_HERE.md, docs/PREVIEW.md, docs/ITERATIVE_EDITING.md, docs/ACCEPTANCE.md\n'
         )
         _write_private(target / 'apply-instructions.txt', instructions)

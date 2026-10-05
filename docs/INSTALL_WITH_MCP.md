@@ -7,7 +7,7 @@
 1. `START_HERE.md`와 [공통 질문지](ONBOARDING.md)에 따라 이미 받은 학년도·반·교과·선택 모듈과 상위 페이지를 확인한다. 새 설치에서 수첩 전체의 학기는 묻지 않는다. 누락된 답만 고정 문구·순서·분기 규칙으로 받고 같은 답을 다시 묻지 않는다.
 2. 연결 계정과 사용자가 지정한 상위 일반 페이지를 확인한다. 기존 설치가 있으면 그 기록을 먼저 읽는다.
 3. 실제 도구의 enhanced Markdown·뷰 DSL·블록 명세를 읽는다. REST 요청 형식과 MCP DSL을 섞지 않는다.
-4. `DESIGN.md`, `docs/DEFAULT_TEMPLATE.md`, `teacher_planner/dashboard.json` 버전 5의 `workspace.pages`, `teacher_planner/blueprint.json`, `teacher_planner/layout_contract.json`의 `teacher-desk-layout-v1`을 읽는다. dashboard는 논리 섹션, layout_contract는 실제 행·열·폭·접기의 기준이며 둘 다 따른다.
+4. `DESIGN.md`, `docs/DEFAULT_TEMPLATE.md`, `teacher_planner/dashboard.json` 버전 5의 `workspace.pages`, `teacher_planner/blueprint.json`, `teacher_planner/layout_contract.json`의 `teacher-desk-layout-v1`을 읽는다. dashboard는 논리 섹션, layout_contract는 실제 행·열·폭·접기의 기본 기준이며 둘 다 따른다. 교사가 확인한 사용자 지정 배치 파일이 있다면 검증한 행·열·폭이 기본값보다 우선한다.
 
 로컬 실행이 가능하면 `python -m teacher_planner plan --config .local/config.json --full`과 `python -m teacher_planner layout-plan --config .local/config.json`으로 선택 모듈에 따른 기능·배치 명세를 확인한다. `database_id`, `data_source_id`, `page_id`, `view_id`와 화면·섹션별 연결 DB ID를 각각 저장한다. MCP 기록은 `.local/mcp-install.json` 등에 보관하고 Python 상태와 섞지 않는다.
 
@@ -15,13 +15,13 @@
 
 ### 미리보기의 설계 파일이 첨부된 경우
 
-교사가 `/preview`에서 확인한 `reviewed-layout.json`을 전달했을 때만 [미리보기 적용 절차](PREVIEW.md)를 추가한다. 파일이 없는 기존 MCP 설치는 위 준비와 아래 생성 순서를 그대로 사용한다.
+교사가 `/preview`에서 확인한 `reviewed-layout.json`을 전달했을 때만 [미리보기 적용 절차](PREVIEW.md)를 추가한다. 파일이 없는 기존 MCP 설치는 위 준비와 아래 생성 순서를 그대로 사용한다. 버전 `2`의 `layout_overrides`는 교사가 드래그나 이동 버튼으로 고른 배치다. 검증한 변경은 아래 생성 순서의 기본 순서·비율보다 우선하며, 전체 너비·카드 내부 구성·닫힌 접기·원본 연결은 유지한다. 이전 버전 `1`의 기본 배치 파일도 검증할 수 있다.
 
 1. 파일을 `.local/reviewed-layout.json`에 보관하고 `python -m teacher_planner verify-preview --bundle .local/reviewed-layout.json`으로 현재 원본 명세·버전·선택·네 페이지 배치·보기·체크섬을 검증한다. 일치하지 않으면 다른 배치를 적용하기 전에 차이를 해결한다.
 2. 생성 전에 기존 질문의 답과 설계의 추가 기능·양식·담임·학교 바로가기·교시 수가 맞는지 대조한다. 로컬 설정이 있으면 `plan --config .local/config.json --reviewed-bundle .local/reviewed-layout.json`으로 검사할 수 있다. 학교·반·생성 위치는 같은 AI 대화의 설치 답변을 재사용한다. 미리보기 파일은 그 개인 설정을 포함하지 않는다.
 3. 아래 생성 순서에서 실제 원본과 네이티브 섹션이 준비되면, 새로 조회한 조각을 `{"pages":{"home":{},"classroom":{},"teaching":{},"planning":{}}}`의 각 페이지에 필요한 섹션별로 채운다. `compile-preview --bundle .local/reviewed-layout.json --sections .local/sections.json --output-dir .local/reviewed-layout`으로 확인한 설계의 반영안을 만든다. CLI 명령 앞에는 `python -m teacher_planner`를 붙인다.
 4. 반영안의 실제 URL·ID와 대상 페이지의 현재 내용을 대조한 뒤 지원되는 MCP/UI로 배치한다. 기존 수첩에는 필요한 구역만 이동·수정하며 기록·추가 본문·동기화 원본·연동 ID를 보존한다. 미선택 기능의 기존 기록을 지우지 않는다.
-5. 실제 네 페이지를 다시 읽고 전체 너비·열 비율·닫힌 접기와 보기·필터를 확인한다. [설치 검사](ACCEPTANCE.md)의 실제 화면 증거를 남긴다. HTML 미리보기나 컴파일 파일은 이 증거를 대신하지 않으며, 검증·컴파일 자체는 Notion에 쓰지 않는다.
+5. 실제 네 페이지를 다시 읽고 확인한 설계의 행·열·폭, 전체 너비·닫힌 접기와 보기·필터를 확인한다. [설치 검사](ACCEPTANCE.md)의 실제 화면 증거를 남기고 `verify-layout --snapshot ... --reviewed-bundle .local/reviewed-layout.json`으로 같은 설계와 대조한다. Python의 최종 `verify --layout-snapshot`에도 같은 `--reviewed-bundle`을 전달한다. HTML 미리보기나 컴파일 파일은 이 증거를 대신하지 않으며, 검증·컴파일 자체는 Notion에 쓰지 않는다.
 
 ## 생성 순서
 
@@ -74,7 +74,7 @@ UI로 범위를 설정할 때는 대상 보기의 `설정 → 레이아웃 → �
 
 ## Notion 네이티브 배치와 동작
 
-공통 배치 계약은 어느 설치 경로에도 동일하다. 전체 너비 켜기·작은 텍스트 끄기, 실제 열 비율, 홈의 다단 표와 하단 문서 보관실, 관리용 목록의 닫힌 접기는 선택 사항이 아니다. 사용할 수 있는 기능을 먼저 확인하고 지원되는 도구와 UI로 완성한다. REST가 만든 페이지 직속 연결 DB를 그대로 두고 모든 섹션을 세로로 쌓는 것은 기능 설치의 중간 결과다.
+공통 배치 계약은 어느 설치 경로에도 동일한 기본값이다. 교사가 확인한 사용자 지정 파일이 있으면 그 행·열·폭을 적용하고, 전체 너비 켜기·작은 텍스트 끄기·관리용 목록의 닫힌 접기는 유지한다. 사용할 수 있는 기능을 먼저 확인하고 지원되는 도구와 UI로 완성한다. 목표가 다단인데 REST가 만든 페이지 직속 연결 DB를 그대로 두고 모든 섹션을 세로로 쌓는 것은 기능 설치의 중간 결과다. 교사가 설계 파일에서 직접 고른 전폭 행은 해당 설계대로 검증한다.
 
 MCP의 열·접기·연결 DB 구문은 **발견한 도구의 문서**를 따른다. `full_width`, 비율, 기본 닫힘 같은 계약 값을 지원되지 않는 API 필드로 추측해 보내지 않는다. 구조를 쓰고 바로 다시 읽어 실제 부모·자식·형제 순서를 확인한다. 비율이 도구 응답에 없으면 데스크톱 실제 화면에서 열의 경계를 비교해 계약의 허용오차 안으로 조정한다. 제목·링크만 놓은 상태를 실제 데이터 표로 보고하지 않는다.
 

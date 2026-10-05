@@ -59,6 +59,7 @@ def main(argv=None):
     verify = commands.add_parser('verify', help='설치된 원격 속성·관계·캘린더·홈 배치 확인')
     verify.add_argument('--state', default='.local/state.json')
     verify.add_argument('--layout-snapshot', help='이 수첩의 실제 Markdown·UI 증거 JSON')
+    verify.add_argument('--reviewed-bundle', help='검토한 배치 JSON; 실제 화면 증거를 이 배치와 대조')
     verify.add_argument('--core-only', action='store_true', help='기능 구조만 검사; 설치 완료를 뜻하지 않음')
     rec = commands.add_parser('recover', help='불확실한 생성 요청의 기존 Notion 객체 연결')
     rec.add_argument('--state', default='.local/state.json')
@@ -116,9 +117,14 @@ def main(argv=None):
                 print(json.dumps(report, ensure_ascii=False, indent=2))
                 return 0
             with locked(args.state):
-                url = install(Client(os.getenv('NOTION_TOKEN')), c, args.parent, args.state)
+                client = Client(os.getenv('NOTION_TOKEN'))
+                url = install(client, c, args.parent, args.state)
+                if reviewed:
+                    journal = Journal(args.state, client)
+                    journal.data['reviewed_layout'] = reviewed
+                    journal.save()
             print('데이터 구조 생성 완료: ' + url)
-            print('설치 마무리 필요: layout-plan에 따라 MCP/UI로 배치·전체 너비·접기를 적용하세요.')
+            print('설치 마무리 필요: ' + ('검토한 배치 파일' if reviewed else 'layout-plan') + '에 따라 MCP/UI로 배치·전체 너비·접기를 적용하세요.')
             print('python -m teacher_planner verify --state ' + args.state + ' --layout-snapshot .local/layout-snapshot.json 으로 기능과 화면을 함께 검증하세요.')
         elif args.command == 'import-timetable':
             c = config(args.config)
@@ -142,6 +148,8 @@ def main(argv=None):
             if matrix_count:
                 print('주간 수업 시간표도 갱신했습니다.')
         elif args.command == 'verify':
+            if args.reviewed_bundle and (args.core_only or not args.layout_snapshot):
+                raise ValueError('--reviewed-bundle 검증에는 --layout-snapshot이 필요합니다.')
             client = Client(os.getenv('NOTION_TOKEN'))
             j = Journal(args.state, client)
             j.ready()
@@ -163,7 +171,8 @@ def main(argv=None):
                                   'pending': '실제 화면을 확인한 --layout-snapshot이 필요합니다.'}, ensure_ascii=False, indent=2))
                 return 1
             from .layout_cli import load_evidence
-            report = load_evidence(args.layout_snapshot, state=j.data, core_verified=True)
+            report = load_evidence(args.layout_snapshot, state=j.data, core_verified=True,
+                                   reviewed_bundle=args.reviewed_bundle)
             report['installation_complete'] = report['complete']
             print(json.dumps(report, ensure_ascii=False, indent=2))
             return 0 if report['installation_complete'] else 1

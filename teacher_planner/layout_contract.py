@@ -11,6 +11,8 @@ from collections.abc import Mapping, Sequence
 from html.parser import HTMLParser
 import json
 from pathlib import Path
+import re
+from copy import deepcopy
 
 
 class LayoutContractError(ValueError):
@@ -73,6 +75,51 @@ def resolve_page_layout(page_key, active_sections=None):
     page['rows'] = rows
     page['sections'] = {key: value for key, value in page['sections'].items() if key in active}
     return page
+
+
+def validate_layout_rows(page, rows):
+    """Validate an explicitly reviewed arrangement without changing its content.
+
+    Sections stay on their original page. Navigation and profile anchors remain
+    first; internal card grids retain their native full-width parent row. Only
+    ordinary sections can be stacked or placed in a two-column row.
+    """
+    if not isinstance(rows, list) or not rows or len(rows) > len(page['sections']):
+        raise LayoutContractError('배치 행은 비어 있지 않은 구역 수 이내의 목록이어야 합니다.')
+    ids, found = set(), []
+    allowed_pairs = {(50, 50), (40, 60), (60, 40), (55, 45), (45, 55)}
+    for row in rows:
+        if not isinstance(row, dict) or set(row) != {'id', 'columns'}:
+            raise LayoutContractError('배치 행에는 id와 columns만 필요합니다.')
+        identity = row['id']
+        if (not isinstance(identity, str) or not re.fullmatch(r'[A-Za-z][A-Za-z0-9_-]{0,63}', identity)
+                or identity in ids):
+            raise LayoutContractError('행 ID는 중복 없는 영문자로 시작하는 64자 이내의 이름이어야 합니다.')
+        ids.add(identity)
+        columns = row['columns']
+        if not isinstance(columns, list) or not 1 <= len(columns) <= 2:
+            raise LayoutContractError('배치 행은 한 열 또는 두 열이어야 합니다.')
+        for column in columns:
+            if not isinstance(column, dict) or set(column) != {'ratio', 'sections'}:
+                raise LayoutContractError('배치 열에는 ratio와 sections만 필요합니다.')
+            if type(column['ratio']) not in (int, float):
+                raise LayoutContractError('열 폭은 지원하는 숫자 비율이어야 합니다.')
+            keys = column['sections']
+            if not isinstance(keys, list) or not keys or any(
+                    not isinstance(key, str) or key not in page['sections'] for key in keys):
+                raise LayoutContractError('각 열에는 이 페이지에서 선택한 구역이 필요합니다.')
+            if any('cards' in page['sections'][key] for key in keys) and (
+                    len(columns) != 1 or len(keys) != 1):
+                raise LayoutContractError('카드 모음은 단독 전체 너비 행을 유지해야 합니다.')
+            found.extend(keys)
+        ratios = tuple(column['ratio'] for column in columns)
+        if (len(columns) == 1 and ratios != (100,)) or (len(columns) == 2 and ratios not in allowed_pairs):
+            raise LayoutContractError('지원하는 열 폭은 100 또는 50/50, 40/60, 60/40, 55/45, 45/55입니다.')
+    if len(found) != len(set(found)) or set(found) != set(page['sections']):
+        raise LayoutContractError('선택한 모든 구역은 해당 페이지에 정확히 한 번 있어야 합니다.')
+    if rows[:2] != page['rows'][:2]:
+        raise LayoutContractError('이동 메뉴와 소개는 맨 위 두 개의 전체 너비 행을 유지해야 합니다.')
+    return deepcopy(rows)
 
 
 def active_sections_for_config(config, page_key):
@@ -198,7 +245,7 @@ def _section(spec, value):
     return text
 
 
-def render_page(page_key, sections):
+def render_page(page_key, sections, *, reviewed_rows=None):
     """Render one page from exact supplied native section fragments.
 
     Strings include their own headings. Card lists get a contract heading and
@@ -226,6 +273,8 @@ def render_page(page_key, sections):
         else:
             raise LayoutContractError('section_content: ' + key)
     page = resolve_page_layout(page_key, active)
+    if reviewed_rows is not None:
+        page['rows'] = validate_layout_rows(page, reviewed_rows)
     rows = []
     for row in page['rows']:
         contents = ['\n'.join(_section(page['sections'][key], active[key])

@@ -7,7 +7,7 @@ Python 경로는 `python -m teacher_planner verify --state .local/state.json --c
 | 판정 | 완료 근거 | 미확인 시 보고 |
 | --- | --- | --- |
 | 기능 설치 | 실제 원본 DB·관계·페이지·뷰·필터·공유 격자 재조회 | 기능 설치 확인 대기와 실패 항목 |
-| 배치 재현 | `teacher-desk-layout-v1`과 선택 설정에 맞는 실제 블록 구조 + 전체 너비·열 폭·접기 UI 증거 | 배치 확인 대기와 페이지·행별 차이 |
+| 배치 재현 | `teacher-desk-layout-v1` 또는 검증한 사용자 지정 배치에 맞는 실제 블록 구조 + 전체 너비·열 폭·접기 UI 증거 | 배치 확인 대기와 페이지·행별 차이 |
 | 선택 연동 | 요청한 급식·학사일정·컴시간의 실제 연결·반영 결과 | 준비 / 승인 대기 / 미연결 / 최초 반영 미확인 |
 
 **기능 설치와 배치 재현이 모두 통과해야 기본 템플릿 설치 완료다.** 연동 미완료는 별도 표시한다. DB 수·설치 명령 성공·계약 계획만으로 배치 통과를 대신하지 않는다. 브라우저 접근이 없어 실제 화면을 확인하지 못한 경우에도 배치 완료라고 단정하지 않는다. 수정해야 할 항목을 보존하고 남은 검증을 인계한다.
@@ -19,13 +19,15 @@ Python 경로는 `python -m teacher_planner verify --state .local/state.json --c
 - [ ] `verify-preview --bundle .local/reviewed-layout.json`으로 현재 저장소의 원본 설계·버전·선택·네 페이지 배치·보기·체크섬이 일치하는지 검사했다. 차이를 무시하거나 다른 설계로 바꿔 적용하지 않았다.
 - [ ] 생성 전에 기존 설치 답과 설계의 추가 기능·양식·담임 여부·학교 바로가기 유무·교시 수를 대조했다. Python 새 설치는 `plan`·`install`에 같은 `--reviewed-bundle`을 전달했다. 학교·반·생성 위치는 원래 답변을 재사용했으며 설계 파일에 있다고 추정하지 않았다.
 - [ ] 실제 섹션 조각과 원본·연결 DB·동기화 참조를 조회해 `compile-preview`로 같은 설계의 반영안을 만들었다. 기존 수첩에는 전체 덮어쓰기 대신 필요한 구역만 적용했고, 미선택 항목을 기존 기능·기록 삭제 요청으로 해석하지 않았다.
+- [ ] 버전 `2` 파일의 `layout_overrides`가 있으면 그 행·열·폭을 최종 기준으로 사용했다. 기본 배치로 되돌리지 않았고, 구역 누락·중복·다른 페이지 구역·고정 카드 분할이 없으며 이동 링크·안내가 맨 위에 있다.
+- [ ] 배치 검사 명령에도 같은 `--reviewed-bundle .local/reviewed-layout.json`을 전달했다. 사용자 지정 배치를 기본 계약만으로 검사하거나, 다른 배치의 증거를 재사용하지 않았다.
 - [ ] 적용 후 실제 네 페이지의 블록·보기·필터·원본 연결을 다시 조회하고 아래 전체 너비·열·닫힌 접기 화면 검사를 완료했다. HTML·설계 JSON·컴파일 결과·확인 체크박스를 실제 Notion 증거로 제출하지 않았다.
 
 설계 파일 검증의 `bundle_valid`나 계획의 `reviewed_bundle_digest`는 선택한 설계의 일관성 확인이다. 기능 설치·배치 재현·선택 연동의 실제 완료 판정을 대신하지 않는다.
 
 ## 공통 배치 재현 필수 검사
 
-기준: [`layout_contract.json`](../teacher_planner/layout_contract.json)의 **`teacher-desk-layout-v1` / 버전 1**. 행·열의 설명은 [기본 템플릿](DEFAULT_TEMPLATE.md#필수-공통-배치-계약)에 있다. 먼저 `layout-plan`으로 교사의 선택 설정을 해석한다.
+기본 기준: [`layout_contract.json`](../teacher_planner/layout_contract.json)의 **`teacher-desk-layout-v1` / 버전 1**. 행·열의 설명은 [기본 템플릿](DEFAULT_TEMPLATE.md#필수-공통-배치-계약)에 있다. 먼저 `layout-plan`으로 교사의 선택 설정을 해석한다. **사용자 지정 파일이 있으면 아래 페이지별 기본 순서·전폭·비율 항목을 검증한 파일의 행·열·폭으로 대체해 검사한다.** 전체 너비·작은 텍스트·카드 내부 구성·닫힌 접기·실제 연결 DB와 원본·기록 보존·화면 증거 요구사항은 그대로 유지한다. 교사가 선택한 전폭 배치는 임의의 세로 나열로 취급하지 않는다.
 
 - [ ] 네 핵심 페이지 각각 **전체 너비 켜기 / 작은 텍스트 끄기**를 적용했다. 실제 `•••` 메뉴의 현재 상태를 확인했다. 지원되지 않는 요청 필드를 보냈거나 제목에 ‘전체 너비’를 붙인 것을 근거로 삼지 않았다.
 - [ ] 홈 빠른 실행은 실제 대상 링크를 가진 아이콘 카드 4개를 25/25/25/25로 배치했다. 선택 모듈이 없어도 항상 설치되는 학생·상담·업무·수업 자료 등 실제 대상으로 4개를 구성했다. 링크 한 줄로 대체하지 않았다.
@@ -59,15 +61,25 @@ python -m teacher_planner verify-layout --snapshot .local/layout-snapshot.json -
 python -m teacher_planner verify --state .local/state.json --layout-snapshot .local/layout-snapshot.json
 ```
 
+미리보기 파일을 받은 경우에는 같은 파일을 배치 검사에도 전달한다.
+
+```bash
+python -m teacher_planner verify-layout --snapshot .local/layout-snapshot.json \
+  --reviewed-bundle .local/reviewed-layout.json --report .local/layout-report.json
+python -m teacher_planner verify --state .local/state.json \
+  --layout-snapshot .local/layout-snapshot.json --reviewed-bundle .local/reviewed-layout.json
+```
+
 [스냅샷 형식 예시](../examples/layout-evidence.example.json)를 비공개 폴더로 복사하고 **실제 조회·관찰 결과로** 채운다. 예시의 `example=true`와 가짜 식별값은 의도적으로 통과하지 않는다. 값을 지우는 것만으로 실증거가 되지는 않는다.
 
-- 최상위에는 `schema_version`, `contract_version`, `expected_page_ids`, `active_sections`, `pages`를 둔다. `active_sections`는 `layout-plan`에서 실제 선택된 섹션 목록이다.
+- 최상위에는 `schema_version`, `contract_version`, `expected_page_ids`, `active_sections`, `pages`를 둔다. `active_sections`는 `layout-plan` 또는 검증한 설계 파일에서 실제 선택된 섹션 목록이다.
+- 설계 파일을 기준으로 검사할 때는 최상위 `reviewed_bundle_digest`에 그 파일의 `bundle_digest`를 기록한다. 같은 파일과 연결되었다는 표식이며 실제 조회·화면 관찰을 대신하지 않는다. 다른 파일의 체크섬이거나 파일 없이 이 값만 넘기면 통과하지 않는다.
 - 페이지별로 실제 `page_id`, 시간대가 포함된 `fetched_at`, 재조회한 `markdown`, 실제 `properties.full_width=true`, `properties.small_text=false`, `source_bindings`, `screenshots`를 기록한다. 원본·연결 DB ID를 실제 재조회와 대조하며 필터·보기 탭은 기능 검사에서 별도 확인한다.
 - 캡처마다 실제 파일 `path`, `page_id`, `captured_at`, `viewport.width/height`, `coverage`, `observations`를 기록한다. 경로는 스냅샷 파일 기준이다. 데스크톱 1280×720 이상에서 확인하며 `coverage`는 `full_page` 또는 `top`·`middle`·`bottom`을 모두 갖춘다.
 - 관찰 항목은 `full_width`, `small_text`, `columns`, `section_order`, `no_horizontal_overflow`, 각 접기의 `toggle:<section>:closed`다. 실제로 확인한 항목에만 `result: pass|fail`과 무엇을 확인했는지 `note`를 적는다. 확인 불가 항목을 통과로 채우지 않는다.
 - 재조회·캡처와 기능 검증 시각은 최종 판정 시점의 24시간 이내여야 한다. 설치가 오래 걸렸다면 현재 화면을 다시 확인한다. 기능 확인의 `core_verification`도 같은 페이지 ID와 실제 확인 시각으로 별도 기록한다.
 
-`verify-layout`은 수집된 스냅샷을 계약에 대조하는 **읽기 전용 검사**다. 명령이 Notion을 열거나 화면을 직접 수집했다고 보고하지 않는다. 스냅샷의 필수 필드·증거 형식은 검사기가 안내하는 규격을 따른다. 증거 누락·계약 불일치·도구 미지원은 배치 확인 대기로 남긴다. 사람이 실제 확인하지 않은 화면을 자동 합격시키지 않는다. 설명용 HTML/PNG 미리보기·합성 스크린샷·오프라인 테스트를 실제 Notion 캡처로 대신하지 않는다.
+`verify-layout`은 수집된 스냅샷을 공통 계약 또는 전달한 사용자 지정 설계에 대조하는 **읽기 전용 검사**다. 명령이 Notion을 열거나 화면을 직접 수집했다고 보고하지 않는다. 스냅샷의 필수 필드·증거 형식은 검사기가 안내하는 규격을 따른다. 증거 누락·목표 배치 불일치·도구 미지원은 배치 확인 대기로 남긴다. 사람이 실제 확인하지 않은 화면을 자동 합격시키지 않는다. 설명용 HTML/PNG 미리보기·합성 스크린샷·오프라인 테스트를 실제 Notion 캡처로 대신하지 않는다.
 
 기본 템플릿 설치 보고에는 계약 ID·버전, 기능 설치 결과, 배치 결과와 증거 위치, 연동 결과, 페이지·행별 남은 작업을 기록한다. 기존 수첩을 수정했다면 변경 전후 페이지·DB·data source·연결 뷰·동기화 원본 ID와 기록 보존 여부도 확인한다.
 

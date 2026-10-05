@@ -1,5 +1,5 @@
 import {MODULES, FORMS} from './setup-model.mjs';
-import {createSelection, selectionFromSetupAnswers, resolvePreview, buildReviewedBundle, verifyReviewedBundle, buildPreviewPrompt} from './preview-model.mjs';
+import {createSelection, selectionFromSetupAnswers, resolvePreview, buildReviewedBundle, verifyReviewedBundle, buildPreviewPrompt, movePreviewSection, setPreviewRowRatio, reconcilePreviewOverrides} from './preview-model.mjs';
 
 const $ = id => document.getElementById(id);
 const PAGE_NAMES = {home:'홈',classroom:'학급 · 상담',teaching:'수업 · 시간표',planning:'캘린더 · PARA'};
@@ -7,6 +7,8 @@ const PAGE_ICONS = {home:'📒',classroom:'👥',teaching:'📚',planning:'🗂�
 const STORAGE_KEY = 'teacher-planner-preview-v1';
 let catalog, selection = createSelection(), plan, reviewedBundle, activePage = 'home', revision = 0;
 let visited = new Set(), htmlStyles = '', viewChoices = {};
+let layoutOverrides = {}, undoHistory = [], editMode = true, picked = null, dragState = null, dragTarget = null, ignoreClickUntil = 0;
+const copy = value => JSON.parse(JSON.stringify(value));
 const node = (tag, text, className) => {
   const el = document.createElement(tag);
   if (text !== undefined) el.textContent = text;
@@ -17,7 +19,7 @@ const node = (tag, text, className) => {
 function message(text) { $('options-status').textContent = text; }
 function issue(text) { $('preview-error').textContent = text; $('preview-error').hidden = false; }
 function save() {
-  try { sessionStorage.setItem(STORAGE_KEY, JSON.stringify({version:1,selection})); }
+  try { sessionStorage.setItem(STORAGE_KEY, JSON.stringify({version:2,selection,layout_overrides:layoutOverrides})); }
   catch { message('이 브라우저에서는 임시 저장이 되지 않습니다. 배치 파일로 보관해 주세요.'); }
 }
 
@@ -47,6 +49,8 @@ function controls() {
 function rowClass(ratios) {
   const result = ['preview-row','columns-' + ratios.length];
   if (ratios.join(',') === '40,60') result.push('row-ratio-40-60');
+  else if (ratios.join(',') === '60,40') result.push('row-ratio-60-40');
+  else if (ratios.join(',') === '45,55') result.push('row-ratio-45-55');
   else if (ratios.join(',') === '55,45') result.push('row-ratio-55-45');
   else if (ratios.some(ratio => Math.abs(ratio - 100 / ratios.length) > .00001)) throw new Error('이 배치의 열 비율을 표시하는 코드가 필요합니다.');
   return result.join(' ');
@@ -146,7 +150,7 @@ function cards(spec, sectionKey) {
   return group;
 }
 
-function section(pageKey,key,spec) {
+function section(pageKey,key,spec,editable) {
   const section = node('section',undefined,'notion-section'); section.dataset.section = key;
   if (key === 'nav') {
     const nav = node('div',undefined,'notion-nav');
@@ -154,6 +158,7 @@ function section(pageKey,key,spec) {
     section.append(nav); return section;
   }
   if (key === 'intro') {section.append(node('p','[학년도]학년도 · [선생님] · [담당 교과와 학급]','notion-intro'));return section;}
+  if (editable) addSectionHandle(section,pageKey,key,spec);
   if (!spec.toggle) section.append(node('h3',spec.title));
   let content;
   if (spec.view_keys) content = databaseSection(pageKey,key,spec);
@@ -174,19 +179,24 @@ function section(pageKey,key,spec) {
   return section;
 }
 
-function renderPage(pageKey) {
+function renderPage(pageKey,editable = editMode) {
   const definition = plan.pages[pageKey], page = node('article',undefined,'notebook-page');
   page.id='notebook-'+pageKey;page.setAttribute('role','tabpanel');page.setAttribute('aria-labelledby','page-tab-'+pageKey);
   page.append(node('div',PAGE_ICONS[pageKey],'page-icon'),node('h2',definition.title,'notion-title'));
   for (const row of definition.rows) {
+    const firstKey=row.columns[0].sections[0];
+    if(editable && !['nav','intro'].includes(firstKey))page.append(rowDrop(pageKey,firstKey,'row-before'));
     const group=node('div',undefined,rowClass(row.columns.map(col=>col.ratio)));group.dataset.row=row.id;
-    for (const col of row.columns) {const column=node('div',undefined,'preview-column');column.dataset.ratio=String(col.ratio);for(const key of col.sections)column.append(section(pageKey,key,definition.sections[key]));group.append(column);}
+    if(editable && row.columns.length===2)group.append(ratioControl(pageKey,row));
+    for (const col of row.columns) {const column=node('div',undefined,'preview-column');column.dataset.ratio=String(col.ratio);for(const key of col.sections)column.append(section(pageKey,key,definition.sections[key],editable));group.append(column);}
     page.append(group);
   }
+  if(editable){const last=definition.rows.at(-1).columns.at(-1).sections.at(-1);page.append(rowDrop(pageKey,last,'row-after'));}
   return page;
 }
 
 function showPage(key,scroll=true) {
+  if(activePage!==key){picked=null;clearDrag();}
   activePage=key;visited.add(key);
   for(const page of Object.keys(PAGE_NAMES)) {
     $('notebook-'+page).hidden=page!==key;
@@ -194,7 +204,7 @@ function showPage(key,scroll=true) {
     button.querySelector('.visited-mark').textContent=visited.has(page)?'✓':'';
   }
   if(scroll)$('preview-frame').scrollTo({top:0,left:0});
-  updateReview();
+  updateEditor();updateReview();
 }
 
 function updateReview() {
@@ -212,13 +222,13 @@ async function refresh() {
   const current=++revision;reviewedBundle=null;visited=new Set();viewChoices={};
   $('review-confirm').checked=false;$('preview-error').hidden=true;$('handoff-status').textContent='';$('preview-prompt-output').value='';
   try {
-    plan=resolvePreview(catalog,selection);
-    controls();$('notebook-pages').replaceChildren(...Object.keys(PAGE_NAMES).map(renderPage));
+    plan=resolvePreview(catalog,selection,layoutOverrides);
+    controls();$('notebook-pages').replaceChildren(...Object.keys(PAGE_NAMES).map(key=>renderPage(key)));
     showPage(activePage,false);
-    const bundle=await buildReviewedBundle(catalog,selection);
+    const bundle=await buildReviewedBundle(catalog,selection,layoutOverrides);
     if(current!==revision)return;
     reviewedBundle=bundle;updateReview();
-    $('bundle-summary').textContent=`공통 배치 ${catalog.contract.version} · 네 화면 · 설계 ${bundle.bundle_digest.slice(0,12)}`;
+    $('bundle-summary').textContent=`공통 배치 ${catalog.contract.version}${Object.keys(layoutOverrides).length?" · 직접 조정함":""} · 네 화면 · 설계 ${bundle.bundle_digest.slice(0,12)}`;
   }catch(error){issue(error.message || '미리보기를 준비하지 못했습니다.');$('notebook-pages').replaceChildren();updateReview();}
 }
 
@@ -227,6 +237,7 @@ function changed() {
   const removed=selection.forms.filter(key=>!allowed.has(key));selection.forms=selection.forms.filter(key=>allowed.has(key));
   if(removed.length)message('사용할 수 없는 양식을 제외했습니다. 필요한 기능이나 담임 설정을 먼저 선택해 주세요.');
   else message('구성을 바꾸면 네 화면의 확인 상태가 초기화됩니다.');
+  layoutOverrides=reconcilePreviewOverrides(catalog,selection,layoutOverrides);
   save();void refresh();
 }
 
@@ -239,6 +250,146 @@ function readyPrompt() {
   const prompt=buildPreviewPrompt(reviewedBundle);$('preview-prompt-output').value=prompt;return prompt;
 }
 
+function checkpoint() {
+  undoHistory.push({selection:copy(selection),overrides:copy(layoutOverrides)});
+  if(undoHistory.length>30)undoHistory.shift();
+}
+
+function editorMessage(text) { $('layout-status').textContent=text; }
+
+function commitLayout(next,announcement,focusKey) {
+  if(JSON.stringify(next)===JSON.stringify(layoutOverrides))return;
+  checkpoint();layoutOverrides=next;clearDrag();save();editorMessage(announcement);
+  void refresh().then(()=>{if(focusKey)document.getElementById('move-handle-'+activePage+'-'+focusKey)?.focus({preventScroll:true});});
+}
+
+function moveSection(operation) {
+  try {
+    const next=movePreviewSection(catalog,selection,layoutOverrides,operation);
+    commitLayout(next,'구역을 옮겼습니다. 바뀐 배치는 저장 파일에도 반영됩니다.',operation.section);
+  }catch(error){editorMessage(error.message);clearDrag();}
+}
+
+function clearDrag() {
+  dragState=null;dragTarget=null;
+  $('preview-frame').classList.remove('is-dragging');
+  for(const item of document.querySelectorAll('[data-drop]'))delete item.dataset.drop;
+}
+
+function addSectionHandle(element,page,key,spec) {
+  element.classList.add('editable-section');
+  const handle=node('button','⠿','section-handle');handle.type='button';handle.draggable=true;
+  handle.id='move-handle-'+page+'-'+key;handle.setAttribute('aria-label',spec.title+' 위치 이동');
+  handle.title='드래그로 이동 · 클릭해 위치 선택 · ↑↓ 순서 이동';
+  handle.addEventListener('click',()=>{if(Date.now()<ignoreClickUntil)return;picked={page,section:key};updateEditor();$('move-target').focus({preventScroll:true});});
+  handle.addEventListener('dragstart',event=>{
+    if(!editMode)return event.preventDefault();
+    dragState={page,section:key};picked=dragState;
+    event.dataTransfer.effectAllowed='move';event.dataTransfer.setData('text/plain','teacher-planner-section:'+page+':'+key);
+    // Keep target geometry stable while the pointer is held down.
+    $('preview-frame').classList.add('is-dragging');
+    editorMessage(spec.title+' 이동 중 · 구역 위아래 또는 새 줄 표시 위에 놓으세요.');
+  });
+  handle.addEventListener('dragend',()=>{ignoreClickUntil=Date.now()+250;clearDrag();});
+  handle.addEventListener('keydown',event=>{
+    if(event.key==='Escape'){picked=null;clearDrag();updateEditor();return;}
+    if(!['ArrowUp','ArrowDown'].includes(event.key))return;
+    event.preventDefault();
+    const pageDef=plan.pages[page],keys=pageDef.rows.flatMap(row=>row.columns.flatMap(col=>col.sections)).filter(id=>!['nav','intro'].includes(id));
+    const target=keys[keys.indexOf(key)+(event.key==='ArrowUp'?-1:1)];if(!target)return;
+    const row=!!spec.cards||!!pageDef.sections[target].cards;
+    moveSection({page,section:key,target,position:(row?'row-':'')+(event.key==='ArrowUp'?'before':'after')});
+  });
+  element.prepend(handle);
+}
+
+function rowDrop(page,target,position) {
+  const drop=node('div','여기에 새 줄로 놓기','row-drop');
+  drop.dataset.page=page;drop.dataset.target=target;drop.dataset.position=position;
+  drop.setAttribute('aria-hidden','true');return drop;
+}
+
+function ratioControl(page,row) {
+  const label=node('label',undefined,'ratio-control'),select=node('select');
+  select.setAttribute('aria-label',plan.pages[page].sections[row.columns[0].sections[0]].title+' 행 열 너비');
+  for(const left of [40,45,50,55,60]){const option=node('option',left+' : '+(100-left));option.value=String(left);select.append(option);}
+  select.value=String(row.columns[0].ratio);
+  select.addEventListener('change',()=>{try{const left=Number(select.value);commitLayout(setPreviewRowRatio(catalog,selection,layoutOverrides,page,row.id,[left,100-left]),'열 너비를 변경했습니다.');}catch(error){editorMessage(error.message);select.value=String(row.columns[0].ratio);}});
+  label.append(node('span','열 너비'),select);return label;
+}
+
+function updateEditor() {
+  $('undo-layout').disabled=!undoHistory.length;
+  $('reset-layout').disabled=!Object.hasOwn(layoutOverrides,activePage);
+  $('preview-frame').classList.toggle('layout-editing',editMode);
+  if(picked && (picked.page!==activePage || !plan?.pages[activePage].sections[picked.section]))picked=null;
+  for(const section of document.querySelectorAll('.editable-section'))section.classList.toggle('section-picked',!!picked && section.dataset.section===picked.section && section.closest('article').id==='notebook-'+picked.page);
+  $('move-panel').hidden=!picked || !editMode;
+  if(!picked || !editMode)return;
+  $('picked-section').textContent=plan.pages[picked.page].sections[picked.section].title;
+  const target=$('move-target'),old=target.value;target.replaceChildren();
+  for(const row of plan.pages[picked.page].rows)for(const col of row.columns)for(const key of col.sections){
+    if(['nav','intro',picked.section].includes(key))continue;
+    const option=node('option',plan.pages[picked.page].sections[key].title);option.value=key;target.append(option);
+  }
+  if([...target.options].some(option=>option.value===old))target.value=old;
+  updateMovePositions();
+}
+
+function updateMovePositions() {
+  if(!picked)return;
+  const select=$('move-position');
+  for(const option of select.options){
+    try{movePreviewSection(catalog,selection,layoutOverrides,{...picked,target:$('move-target').value,position:option.value});option.disabled=false;}
+    catch{option.disabled=true;}
+  }
+  if(select.selectedOptions[0]?.disabled)select.value=[...select.options].find(option=>!option.disabled)?.value||'';
+  $('apply-move').disabled=!select.value;
+}
+
+function dragOperation(event) {
+  if(!dragState || dragState.page!==activePage)return null;
+  const row=event.target.closest('.row-drop');
+  if(row)return {...dragState,target:row.dataset.target,position:row.dataset.position,element:row};
+  const area=event.target.closest('.editable-section');if(!area)return null;
+  const target=area.dataset.section;if(target===dragState.section)return null;
+  const rect=area.getBoundingClientRect(),spec=plan.pages[activePage].sections[target];
+  let position=event.clientY<rect.top+rect.height/2?'before':'after';
+  const sourceCard=plan.pages[activePage].sections[dragState.section].cards;
+  if(sourceCard || spec.cards)position='row-'+position;
+  else if(event.clientX<rect.left+rect.width*.16)position='left';
+  else if(event.clientX>rect.right-rect.width*.16)position='right';
+  return {...dragState,target,position,element:area};
+}
+
+function initEditor() {
+  $('edit-layout').addEventListener('change',()=>{
+    editMode=$('edit-layout').checked;picked=null;clearDrag();
+    $('notebook-pages').replaceChildren(...Object.keys(PAGE_NAMES).map(key=>renderPage(key)));showPage(activePage,false);
+  });
+  $('undo-layout').addEventListener('click',()=>{
+    const previous=undoHistory.pop();if(!previous)return;
+    selection=previous.selection;layoutOverrides=previous.overrides;picked=null;clearDrag();save();editorMessage('이전 구성으로 되돌렸습니다.');void refresh();
+  });
+  $('reset-layout').addEventListener('click',()=>{const next=copy(layoutOverrides);delete next[activePage];commitLayout(next,'이 페이지를 기본 배치로 돌렸습니다. 되돌리기로 취소할 수 있습니다.');});
+  $('cancel-move').addEventListener('click',()=>{picked=null;clearDrag();updateEditor();});
+  $('move-target').addEventListener('change',updateMovePositions);
+  $('apply-move').addEventListener('click',()=>{if(picked)moveSection({...picked,target:$('move-target').value,position:$('move-position').value});});
+  const frame=$('preview-frame');
+  frame.addEventListener('dragover',event=>{
+    if(!dragState)return;
+    for(const item of frame.querySelectorAll('[data-drop]'))delete item.dataset.drop;
+    dragTarget=null;const candidate=dragOperation(event);
+    if(candidate){try{const {element,...operation}=candidate;movePreviewSection(catalog,selection,layoutOverrides,operation);dragTarget=operation;element.dataset.drop=operation.position;event.preventDefault();event.dataTransfer.dropEffect='move';}catch{event.dataTransfer.dropEffect='none';}}
+    const bounds=frame.getBoundingClientRect();
+    if(event.clientY<bounds.top+55)frame.scrollTop-=22;
+    else if(event.clientY>bounds.bottom-55)frame.scrollTop+=22;
+  });
+  frame.addEventListener('drop',event=>{if(!dragState)return;event.preventDefault();const candidate=dragOperation(event);const operation=candidate?(({element,...op})=>op)(candidate):dragTarget;clearDrag();ignoreClickUntil=Date.now()+250;if(operation)moveSection(operation);});
+  frame.addEventListener('dragleave',event=>{if(event.relatedTarget && !frame.contains(event.relatedTarget)){dragTarget=null;for(const item of frame.querySelectorAll('[data-drop]'))delete item.dataset.drop;}});
+  document.addEventListener('keydown',event=>{if(event.key==='Escape'){picked=null;clearDrag();updateEditor();}});
+}
+
 async function init() {
   const response=await fetch('/preview-catalog.json');if(!response.ok)throw new Error('공통 배치 파일을 불러오지 못했습니다. 새로고침해 주세요.');
   catalog=await response.json();
@@ -246,13 +397,13 @@ async function init() {
     const fromSetup=new URLSearchParams(location.search).get('from')==='setup' ? setupSelection() : null;
     const stored=sessionStorage.getItem(STORAGE_KEY);
     if(fromSetup){selection=fromSetup;save();$('selection-origin').textContent='방금 작성한 설치 설정으로 미리 봅니다.';}
-    else if(stored && stored.length<12000){const saved=JSON.parse(stored);if(saved.version===1){selection=createSelection(saved.selection);resolvePreview(catalog,selection);$('selection-origin').textContent='이 탭에서 살펴보던 구성입니다.';}}
+    else if(stored && stored.length<200000){const saved=JSON.parse(stored);if([1,2].includes(saved.version)){selection=createSelection(saved.selection);layoutOverrides=saved.version===2?(saved.layout_overrides||{}):{};resolvePreview(catalog,selection,layoutOverrides);$('selection-origin').textContent='이 탭에서 살펴보던 구성입니다.';}}
     else {const loaded=setupSelection();if(loaded){selection=loaded;$('selection-origin').textContent='같은 탭에서 작성한 설치 설정을 사용합니다.';}}
-  }catch{selection=createSelection();message('저장된 설정을 읽지 못해 기본 구성으로 시작합니다.');}
-  for(const item of MODULES){const label=node('label',undefined,'preview-check'),input=node('input');input.type='checkbox';input.id='preview-module-'+item.key;label.append(input,node('span',item.label));input.addEventListener('change',()=>{selection.modules=input.checked?[...selection.modules,item.key].sort():selection.modules.filter(key=>key!==item.key);changed();});$('module-options').append(label);}
-  for(const form of FORMS){const label=node('label',undefined,'preview-check'),input=node('input');input.type='checkbox';input.id='preview-form-'+form.key;label.append(input,node('span',form.label));input.addEventListener('change',()=>{selection.forms=input.checked?[...selection.forms,form.key].sort():selection.forms.filter(key=>key!==form.key);changed();});$('form-options').append(label);}
-  for(const [id,key] of [['preview-homeroom','homeroom'],['preview-school-links','school_links']])$(id).addEventListener('change',()=>{selection[key]=$(id).checked;changed();});
-  $('preview-periods').addEventListener('change',()=>{const value=Number($('preview-periods').value);if(!Number.isInteger(value)||value<1||value>20){$('preview-periods').value=selection.periods;message('교시 수는 1~20 사이 정수로 입력해 주세요.');return;}selection.periods=value;changed();});
+  }catch{selection=createSelection();layoutOverrides={};message('저장된 설정을 읽지 못해 기본 구성으로 시작합니다.');}
+  for(const item of MODULES){const label=node('label',undefined,'preview-check'),input=node('input');input.type='checkbox';input.id='preview-module-'+item.key;label.append(input,node('span',item.label));input.addEventListener('change',()=>{checkpoint();selection.modules=input.checked?[...selection.modules,item.key].sort():selection.modules.filter(key=>key!==item.key);changed();});$('module-options').append(label);}
+  for(const form of FORMS){const label=node('label',undefined,'preview-check'),input=node('input');input.type='checkbox';input.id='preview-form-'+form.key;label.append(input,node('span',form.label));input.addEventListener('change',()=>{checkpoint();selection.forms=input.checked?[...selection.forms,form.key].sort():selection.forms.filter(key=>key!==form.key);changed();});$('form-options').append(label);}
+  for(const [id,key] of [['preview-homeroom','homeroom'],['preview-school-links','school_links']])$(id).addEventListener('change',()=>{checkpoint();selection[key]=$(id).checked;changed();});
+  $('preview-periods').addEventListener('change',()=>{const value=Number($('preview-periods').value);if(!Number.isInteger(value)||value<1||value>20){$('preview-periods').value=selection.periods;message('교시 수는 1~20 사이 정수로 입력해 주세요.');return;}checkpoint();selection.periods=value;changed();});
   const pageKeys=Object.keys(PAGE_NAMES);
   for(const [key,name] of Object.entries(PAGE_NAMES)){
     const button=node('button',name);button.type='button';button.id='page-tab-'+key;button.setAttribute('role','tab');button.setAttribute('aria-controls','notebook-'+key);button.append(node('span','','visited-mark'));
@@ -260,10 +411,10 @@ async function init() {
     button.addEventListener('keydown',event=>{if(!['ArrowLeft','ArrowRight','Home','End'].includes(event.key))return;event.preventDefault();const index=pageKeys.indexOf(key),next=event.key==='Home'?0:event.key==='End'?3:(index+(event.key==='ArrowRight'?1:-1)+4)%4;showPage(pageKeys[next]);$('page-tab-'+pageKeys[next]).focus();});$('preview-tabs').append(button);
   }
   $('review-confirm').addEventListener('change',updateReview);
-  $('load-setup').addEventListener('click',()=>{try{const loaded=setupSelection();if(!loaded){message('이 탭에 설치 답변이 없어요. 상단의 설치 정보 입력에서 먼저 작성할 수 있습니다.');return;}selection=loaded;message('기능·양식·교시 설정만 불러왔습니다. 학교·개인 정보는 이 미리보기에 가져오지 않습니다.');save();void refresh();}catch{message('설치 답변을 읽지 못했습니다. 설정을 확인해 주세요.');}});
+  $('load-setup').addEventListener('click',()=>{try{const loaded=setupSelection();if(!loaded){message('이 탭에 설치 답변이 없어요. 상단의 설치 정보 입력에서 먼저 작성할 수 있습니다.');return;}checkpoint();selection=loaded;layoutOverrides={};message('기능·양식·교시 설정만 불러왔습니다. 학교·개인 정보는 이 미리보기에 가져오지 않습니다.');save();void refresh();}catch{message('설치 답변을 읽지 못했습니다. 설정을 확인해 주세요.');}});
   $('load-bundle').addEventListener('change',async()=>{
     const file=$('load-bundle').files[0];if(!file)return;
-    try{if(file.size>2*1024*1024)throw new Error('2MB 이하의 배치 JSON 파일을 선택해 주세요.');const bundle=JSON.parse(await file.text()),report=await verifyReviewedBundle(catalog,bundle);if(!report.valid)throw new Error('현재 공통 배치와 맞지 않거나 변경된 파일입니다. 새로 미리 보고 저장해 주세요.');selection=createSelection(bundle.selection);message('저장한 배치를 불러왔습니다. 적용 요청 전에 네 화면을 다시 확인해 주세요.');save();await refresh();}catch(error){message(error.message || '배치 파일을 읽지 못했습니다.');}finally{$('load-bundle').value='';}
+    try{if(file.size>2*1024*1024)throw new Error('2MB 이하의 배치 JSON 파일을 선택해 주세요.');const bundle=JSON.parse(await file.text()),report=await verifyReviewedBundle(catalog,bundle);if(!report.valid)throw new Error('현재 공통 배치와 맞지 않거나 변경된 파일입니다. 새로 미리 보고 저장해 주세요.');checkpoint();selection=createSelection(bundle.selection);layoutOverrides=copy(bundle.layout_overrides||{});message('저장한 배치를 불러왔습니다. 적용 요청 전에 네 화면을 다시 확인해 주세요.');save();await refresh();}catch(error){message(error.message || '배치 파일을 읽지 못했습니다.');}finally{$('load-bundle').value='';}
   });
   $('download-bundle').addEventListener('click',()=>{if(!readyPrompt())return;download(JSON.stringify(reviewedBundle,null,2)+'\n','application/json;charset=utf-8','reviewed-layout.json');$('handoff-status').textContent='배치 파일 저장을 요청했습니다. 이어서 요청문을 복사하고, AI에게 파일도 함께 첨부해 주세요.';});
   $('copy-preview-prompt').addEventListener('click',async()=>{const prompt=readyPrompt();if(!prompt)return;try{await navigator.clipboard.writeText(prompt);if(prompt!==buildPreviewPrompt(reviewedBundle))return;$('handoff-status').textContent='요청문을 복사했습니다. reviewed-layout.json 파일을 함께 첨부해 AI에게 전달하세요.';}catch{if(!reviewedBundle)return;$('preview-prompt-details').open=true;$('preview-prompt-output').focus();$('preview-prompt-output').select();$('handoff-status').textContent='자동 복사가 되지 않아 요청문을 선택했습니다. Ctrl+C 또는 ⌘C로 복사해 주세요.';}});
@@ -272,15 +423,16 @@ async function init() {
     const container=node('div');
     // Exports always use the reviewed defaults, not transient tab/toggle exploration.
     const oldChoices=viewChoices;viewChoices={};
-    for(const key of pageKeys){const page=renderPage(key);page.removeAttribute('role');page.removeAttribute('aria-labelledby');container.append(page);}
+    for(const key of pageKeys){const page=renderPage(key,false);page.removeAttribute('role');page.removeAttribute('aria-labelledby');container.append(page);}
     viewChoices=oldChoices;
     for(const button of container.querySelectorAll('button'))button.replaceWith(node('span',button.textContent));
     const json=node('pre',JSON.stringify(reviewedBundle,null,2),'bundle-code');
     const heading=node('header',undefined,'export-heading');heading.append(node('h1','교무수첩 · 검토용 배치'),node('p','이 HTML은 배치 미리보기입니다. 실제 기록·개인 설정은 포함하지 않습니다. Notion에는 같은 reviewed-layout.json과 적용 요청문을 사용하세요.'),node('p','설계 '+reviewedBundle.bundle_digest));
     const details=node('details');details.append(node('summary','동일한 배치 JSON 확인'),json);
     const html='<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>교무수첩 배치 미리보기</title><style>'+htmlStyles+'</style></head><body class="export-preview">'+heading.outerHTML+container.outerHTML+details.outerHTML+'<footer>made by 여광재(온양고) · made with <a href="https://dorms.school">DoRms</a></footer></body></html>';
-    download(html,'text/html;charset=utf-8','teacher-planner-preview.html');$('handoff-status').textContent='네 화면의 기본 배치를 HTML로 저장했습니다. 이 파일은 보관·열람용입니다.';
+    download(html,'text/html;charset=utf-8','teacher-planner-preview.html');$('handoff-status').textContent='네 화면의 현재 배치를 HTML로 저장했습니다. 이 파일은 보관·열람용입니다.';
   });
+  initEditor();
   await refresh();$('preview-loading').hidden=true;$('preview-shell').hidden=false;
   try{const css=await Promise.all(['/setup.css','/preview.css'].map(async path=>{const r=await fetch(path);if(!r.ok)throw new Error('style');return r.text();}));htmlStyles=css.join('\n');updateReview();}catch{message('HTML 저장용 스타일을 불러오지 못했습니다. 배치 파일과 요청문은 사용할 수 있습니다.');}
 }

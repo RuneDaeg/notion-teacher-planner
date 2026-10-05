@@ -211,7 +211,7 @@ def _image_size(path):
             stream.seek(length - 2, 1)
 
 
-def verify_layout_snapshot(snapshot, base_dir=None, now=None):
+def verify_layout_snapshot(snapshot, base_dir=None, now=None, *, reviewed_bundle=None):
     """Check JSON evidence against the common contract; never contact Notion.
 
     ``base_dir`` resolves screenshot paths (normally the evidence file's parent).
@@ -223,6 +223,10 @@ def verify_layout_snapshot(snapshot, base_dir=None, now=None):
     from .layout_contract import load_contract, resolve_page_layout
 
     contract = load_contract()
+    reviewed = None
+    if reviewed_bundle is not None:
+        from .preview_bundle import validate_bundle
+        reviewed = validate_bundle(reviewed_bundle)
     ratio_tolerance = contract.get("rules", {}).get("column_ratio_tolerance_percentage_points", 0.5)
     now = now or datetime.now(timezone.utc)
     if now.tzinfo is None:
@@ -249,6 +253,13 @@ def verify_layout_snapshot(snapshot, base_dir=None, now=None):
         "현재 공통 배치 명세 버전과 일치")
     add("snapshot.actual", "structure", "fail" if snapshot.get("example") is True else "pass",
         "공개 예시 파일은 실제 설치 완료 증거가 아님")
+    if reviewed is not None:
+        add("snapshot.reviewed_bundle", "structure",
+            "pass" if snapshot.get("reviewed_bundle_digest") == reviewed["bundle_digest"] else "fail",
+            "실제 화면 증거가 검토한 배치 파일의 지문과 연결됨")
+    elif snapshot.get("reviewed_bundle_digest") is not None:
+        add("snapshot.reviewed_bundle", "structure", "fail",
+            "검토한 배치 증거를 검사하려면 같은 --reviewed-bundle 파일이 필요함")
     expected_ids = snapshot.get("expected_page_ids", {})
     pages = snapshot.get("pages", {})
     active = snapshot.get("active_sections", {})
@@ -274,7 +285,14 @@ def verify_layout_snapshot(snapshot, base_dir=None, now=None):
             "설치 기록의 대상 페이지와 읽어 온 페이지 ID 일치")
         freshness(prefix + "fetch_date", page.get("fetched_at"), "structure")
         try:
-            page_layout = resolve_page_layout(page_key, active.get(page_key))
+            if reviewed is None:
+                page_layout = resolve_page_layout(page_key, active.get(page_key))
+            else:
+                page_layout = reviewed['pages'][page_key]
+                selected = active.get(page_key)
+                if (not isinstance(selected, list) or any(not isinstance(key, str) for key in selected)
+                        or len(selected) != len(set(selected)) or set(selected) != set(page_layout['sections'])):
+                    raise ValueError('검토한 구역과 실제 구역 목록이 다릅니다.')
         except (KeyError, TypeError, ValueError):
             add(prefix + "selection", "structure", "fail", "선택한 섹션 목록이 공통 명세와 일치하지 않음")
             continue
@@ -308,6 +326,20 @@ def verify_layout_snapshot(snapshot, base_dir=None, now=None):
             spans = {}
             for index, (key, node) in enumerate(ordered):
                 end = ordered[index + 1][1].order if index + 1 < len(ordered) else len(tree.nodes) + 1
+                if index + 1 < len(ordered):
+                    # A new row's <columns> opens before its first heading.
+                    # Do not attribute that next row to the preceding card
+                    # section after an otherwise valid drag arrangement.
+                    shared = set()
+                    ancestor = node
+                    while ancestor is not None:
+                        shared.add(id(ancestor))
+                        ancestor = ancestor.parent
+                    ancestor = ordered[index + 1][1].parent
+                    while ancestor is not None:
+                        if id(ancestor) not in shared:
+                            end = min(end, ancestor.order)
+                        ancestor = ancestor.parent
                 spans[key] = [candidate for candidate in tree.nodes if node.order <= candidate.order < end]
             expected_order = [key for row in page_layout["rows"] for column in row["columns"] for key in column["sections"]]
             add(prefix + "section_order", "structure", "pass" if [key for key, _ in ordered] == expected_order else "fail",
