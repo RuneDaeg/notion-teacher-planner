@@ -188,6 +188,12 @@ def render_document(document, css: str, *, portable: bool, version: str) -> str:
         </div>
       </div>
       <p class="format-note">브라우저 인쇄(Ctrl/Cmd+P)로 인쇄할 수도 있습니다. 본문의 쪽수는 PDF 기준입니다.</p>
+      <aside class="request-example" aria-label="최신 기능 안내">
+        <p><strong>새 기능 안내 · 2026.10.13</strong></p>
+        <p>기본·추천·커스텀 설정의 설명과 가상 예시가 추가되었습니다. 학생별 기록부터 제출물·평가·교직원 연결까지 필요한 기능을 골라 보세요. 선택한 내용은 AI 설치·수정 요청문에 담깁니다.</p>
+        <p><a href="{base}/features">기능 설명과 예시 보기 →</a> · <a href="{REPOSITORY}/blob/main/docs/WORKFLOWS.md">최신 기능 사용법</a></p>
+        <p>아래 본문과 PDF는 사용 안내서 {escape(version)}판입니다. 새 기능 선택은 위 안내를 함께 확인하세요. 가상 예시를 누르거나 기능을 선택하는 것만으로 실제 Notion이 바뀌지는 않습니다.</p>
+      </aside>
       <article class="guide-document" aria-labelledby="guide-title">
 {body}
       </article>

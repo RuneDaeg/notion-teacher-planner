@@ -1,9 +1,12 @@
+import {applyWorkflowsToSetupAnswers, requiredWorkflowModules, validateWorkflowSelection, workflowSummary} from './workflow-model.mjs';
+import {loadWorkflowCatalog, readWorkflowDraft, saveWorkflowDraft, mountWorkflowPicker} from './workflow-picker.mjs';
 import {QUESTIONNAIRE_VERSION, QUESTIONS, MODULES, FORMS, createAnswers, eligibleForms, validateStep, buildPrompt} from './setup-model.mjs';
 
 const $ = id => document.getElementById(id);
 const STORAGE_KEY = 'teacher-planner-setup-v1';
 const STEPS = ['학교와 학년도', '수업과 설치 위치', '기능과 양식', '시간표와 학교 소식', '마무리 설정'];
 const SHORT_STEPS = ['학교 · 학년도', '수업 · 위치', '기능 · 양식', '학교 연동', '마무리'];
+let workflowCatalog;
 let answers = createAnswers(), step = 0, highestStep = 0, errors = [];
 
 function el(tag, text, className) {
@@ -19,10 +22,11 @@ function restore() {
     if (!raw || raw.length > 40000) return;
     const saved = JSON.parse(raw);
     // Keep v1 drafts in the same tab; the allowlist below drops the old semester answer.
-    if (![1, QUESTIONNAIRE_VERSION].includes(saved.version) || !saved.answers || typeof saved.answers !== 'object') return;
+    if (![1, 2, QUESTIONNAIRE_VERSION].includes(saved.version) || !saved.answers || typeof saved.answers !== 'object') return;
     const defaults = createAnswers();
     for (const key of Object.keys(defaults)) {
       const value = saved.answers[key];
+      if (key === 'workflows') { if (value && !validateWorkflowSelection(workflowCatalog, value).length) answers.workflows = value; continue; }
       if (Array.isArray(defaults[key]) && Array.isArray(value)) answers[key] = value.filter(v => typeof v === 'string').slice(0, 6);
       else if (typeof value === typeof defaults[key]) answers[key] = typeof value === 'string' ? value.slice(0, 6000) : value;
     }
@@ -153,6 +157,7 @@ function choices(type) {
   for (const action of actions) {
     const button = el('button', action.label); button.type = 'button';
     button.id = `${type}-${action.value}`;
+    if (!isForms && answers.workflows && requiredWorkflowModules(workflowCatalog, answers.workflows).length && action.value !== 'select') button.disabled = true;
     const allSelected = allowed.size > 0 && answers[type].length === allowed.size;
     const active = answers[choiceField] === action.value && (action.value !== 'select' || allSelected);
     button.classList.toggle('active', active); button.setAttribute('aria-pressed', String(active));
@@ -167,7 +172,7 @@ function choices(type) {
   for (const item of catalog) {
     const option = el('label', undefined, 'option');
     const input = el('input'); input.type = 'checkbox'; input.id = `${type}-${item.key}`;
-    input.checked = answers[type].includes(item.key); input.disabled = !allowed.has(item.key);
+    input.checked = answers[type].includes(item.key); input.disabled = !allowed.has(item.key) || (!isForms && answers.workflows && requiredWorkflowModules(workflowCatalog, answers.workflows).includes(item.key));
     input.addEventListener('change', () => {
       answers[choiceField] = 'select';
       setAnswer(type, input.checked ? [...answers[type], item.key] : answers[type].filter(key => key !== item.key), true);
@@ -208,7 +213,19 @@ function renderQuestions() {
       mode.body.append(radios('formMode', QUESTIONS.Q06N.options, {label: '양식 사용 방식'}));
       forms.body.append(mode.container);
     }
-    host.append(modules.container, forms.container);
+    const workflows = question('Q05W', '기록을 어떻게 연결할까요?');
+    const picker = el('div'); picker.id = 'workflows';
+    if (workflowCatalog) mountWorkflowPicker(picker, workflowCatalog, answers.workflows, value => {
+      answers = applyWorkflowsToSetupAnswers(workflowCatalog, answers, value);
+      saveWorkflowDraft(value); setAnswer('workflows', value, true);
+    }, {compact:true, examples:true});
+    else picker.append(el('p', '연결 기능 목록을 불러오지 못했습니다. 새로고침하거나 기능·예시 페이지에서 다시 선택해 주세요.', 'hint'));
+    const defer = el('button', '연결 구성은 나중에', 'button text-button'); defer.type = 'button';
+    defer.setAttribute('aria-pressed', String(!answers.workflows));
+    defer.addEventListener('click', () => {saveWorkflowDraft(null); setAnswer('workflows', null, true);});
+    picker.append(defer);
+    workflows.body.append(picker);
+    host.append(workflows.container, modules.container, forms.container);
   } else if (step === 3) {
     const timetable = question('Q07', '시간표를 준비하는 방법');
     timetable.body.append(radios('timetable', QUESTIONS.Q07.options, {redraw: true, label: '시간표 준비 방식'}));
@@ -274,6 +291,7 @@ function renderSummary() {
   for (const line of ['학생 명단 · 상담 기록', '할 일 · 주간/월간 캘린더', '시간표 · 수업 진도 · PARA']) summary.append(el('div', line, 'selection-item'));
   const selected = answers.moduleChoice === 'select' ? answers.modules.length : 0;
   const selectedForms = answers.formChoice === 'select' ? answers.forms.length : 0;
+  if (answers.workflows && workflowCatalog) summary.append(el('div', `${workflowSummary(workflowCatalog, answers.workflows).title} · 연결 ${answers.workflows.features.length}개`, 'selection-item'));
   summary.append(el('div', `추가 기능 ${selected}개 · 기록 양식 ${selectedForms}개`, 'selection-count'));
 }
 
@@ -305,19 +323,20 @@ function showResult(prompt) {
   $('wizard').hidden = true; $('result').hidden = false;
   const summary = $('result-summary'); summary.replaceChildren();
   summary.append(summaryRow('학교 · 학년도', `${answers.schoolDeferred ? '학교는 나중에 확인' : answers.schoolName} · ${answers.academicYear}학년도`), summaryRow('담당 수업', `${answers.subjects} / ${answers.classes}`), summaryRow('추가 기능', answers.modules.length ? MODULES.filter(m => answers.modules.includes(m.key)).map(m => m.label.replace(/^[①-⑥]\s*/, '')).join(', ') : '없음'), summaryRow('기록 양식', answers.forms.length ? FORMS.filter(f => answers.forms.includes(f.key)).map(f => f.label.replace(/^[①-⑥]\s*/, '')).join(', ') : '없음'), summaryRow('학교 소식', {daily:'중식·학사일정 하루 한 번 갱신 요청',meal:'필요할 때 중식',calendar:'필요할 때 학사일정','manual-both':'필요할 때 중식·학사일정',later:'나중에 연결'}[answers.neis]), summaryRow('설치 위치', answers.notionLocation === 'help' ? 'AI와 위치 선택' : answers.notionUrl));
+  if (answers.workflows) summary.append(summaryRow('연결 구성', `${workflowSummary(workflowCatalog, answers.workflows).title} · ${answers.workflows.features.length}개`));
   $('prompt-output').value = prompt;
   $('result-title').focus();
 }
 
 $('setup-form').addEventListener('submit', event => {
-  event.preventDefault(); errors = validateStep(answers, step);
+  event.preventDefault(); errors = validateStep(answers, step, workflowCatalog);
   if (errors.length) { showErrors(); $('form-errors').setAttribute('tabindex', '-1'); $('form-errors').focus(); return; }
   if (step < 4) { highestStep = Math.max(highestStep, step + 1); go(step + 1); return; }
   for (let index = 0; index < 5; index++) {
-    const remaining = validateStep(answers, index);
+    const remaining = validateStep(answers, index, workflowCatalog);
     if (remaining.length) { step = index; errors = remaining; render(); $('step-title').focus(); return; }
   }
-  try { showResult(buildPrompt(answers)); }
+  try { showResult(buildPrompt(answers, workflowCatalog)); }
   catch (error) { errors = error.errors || [{field: 'title', message: '입력 내용을 다시 확인해 주세요.'}]; showErrors(); }
 });
 $('previous').addEventListener('click', () => { if (step > 0) go(step - 1); });
@@ -338,9 +357,16 @@ $('reset').addEventListener('click', () => { $('reset-confirm').hidden = false; 
 $('reset-no').addEventListener('click', () => { $('reset-confirm').hidden = true; $('reset').focus(); });
 $('reset-yes').addEventListener('click', () => {
   answers = createAnswers(); step = 0; highestStep = 0; errors = [];
+  saveWorkflowDraft(null);
   try { sessionStorage.removeItem(STORAGE_KEY); } catch { /* Clearing the current form remains available. */ }
   $('reset-confirm').hidden = true; $('prompt-output').value = ''; $('copy-status').textContent = ''; $('change-notice').textContent = '';
   $('draft-status').textContent = '입력 내용과 임시 저장을 지웠습니다.';
   render(); $('step-title').focus();
 });
-restore(); render();
+try { workflowCatalog = await loadWorkflowCatalog(); } catch { /* Base questionnaire remains usable without optional connections. */ }
+restore();
+if (workflowCatalog && new URLSearchParams(location.search).get('from') === 'features') {
+  const chosen = readWorkflowDraft(workflowCatalog);
+  if (chosen) { answers = applyWorkflowsToSetupAnswers(workflowCatalog, answers, chosen); save(); }
+}
+render();

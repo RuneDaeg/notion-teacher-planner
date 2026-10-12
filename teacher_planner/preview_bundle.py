@@ -12,6 +12,7 @@ from .forms import selected_forms
 from .layout_contract import (active_sections_for_config, load_contract, render_page,
                               resolve_page_layout, validate_layout_rows)
 from .model import blueprint
+from .workflows import workflow_catalog, validate_workflow_selection, workflow_summary, workflow_plan
 
 
 MODULES = ('accounts', 'assessment', 'attendance', 'contact', 'meeting', 'staff')
@@ -45,9 +46,10 @@ def default_selection():
     return {'modules': [], 'forms': [], 'homeroom': False, 'school_links': False, 'periods': 7}
 
 
-def validate_selection(selection):
-    if not isinstance(selection, dict) or set(selection) != SELECTION_KEYS:
-        raise ValueError('미리보기 선택에는 modules, forms, homeroom, school_links, periods만 필요합니다.')
+def validate_selection(selection, *, bundle_version=4):
+    if (not isinstance(selection, dict) or
+            set(selection) != SELECTION_KEYS | ({'workflows'} if 'workflows' in selection and bundle_version >= 4 else set())):
+        raise ValueError('미리보기 선택에는 modules, forms, homeroom, school_links, periods와 버전 4의 선택형 workflows만 필요합니다.')
     result = dict(selection)
     for key, allowed in (('modules', MODULES), ('forms', FORMS)):
         values = selection[key]
@@ -64,12 +66,15 @@ def validate_selection(selection):
             raise ValueError(f'{form} 양식에 필요한 {module} 기능을 먼저 선택하세요.')
     if 'homeroom' in result['forms'] and not result['homeroom']:
         raise ValueError('조회·종례 양식에는 담임 선택이 필요합니다.')
+    if 'workflows' in selection:
+        result['workflows'] = validate_workflow_selection(selection['workflows'], result['modules'])
     return result
 
 
 def _config(selection):
     """Only the minimum nonpersonal selectors used by the existing resolver."""
     return {
+        **({'workflows': selection['workflows']} if 'workflows' in selection else {}),
         'modules': {key: key in selection['modules'] for key in MODULES},
         'forms': selection['forms'], 'classes': [{'homeroom': selection['homeroom']}],
         'dashboard': {'periods': selection['periods'], 'links': {
@@ -80,6 +85,7 @@ def _config(selection):
 def selection_from_config(config):
     settings = dashboard_config(config)
     return validate_selection({
+        **({'workflows': config['workflows']} if 'workflows' in config else {}),
         'modules': sorted(key for key in MODULES if config.get('modules', {}).get(key) is True),
         'forms': sorted(item['key'] for item in selected_forms(config)),
         'homeroom': any(item.get('homeroom') is True for item in config.get('classes', [])),
@@ -89,27 +95,37 @@ def selection_from_config(config):
 
 def build_catalog():
     contract, data, dashboard = load_contract(), blueprint(), layout_spec()
+    workflows = workflow_catalog()
+    reference = workflow_plan({'modules': {key: True for key in MODULES},
+                               'workflows': {'preset': 'custom', 'features': [item['key'] for item in workflows['features']]}})
+    workflow_schema_digest = digest(reference)
+    new_sources = {'submission_items': 'submissions', 'assessment_results': 'assessment_results'}
+    workflow_databases = [{**item, 'workflow': new_sources[item['key']]}
+                          for item in reference['schema']['databases'] if item['key'] in new_sources]
     return _json_values({
         'format': 'teacher-planner-preview-catalog', 'version': 1,
-        'source_digest': digest({'contract': contract, 'blueprint': data, 'dashboard': dashboard}),
+        'source_digest': digest({'contract': contract, 'blueprint': data, 'dashboard': dashboard, 'workflows': workflows, 'workflow_schema_digest': workflow_schema_digest, 'workflow_databases': workflow_databases}),
+        'legacy_source_digest': digest({'contract': contract, 'blueprint': data, 'dashboard': dashboard}),
+        'workflows': workflows, 'workflow_schema_digest': workflow_schema_digest,
+        'workflow_databases': workflow_databases,
         'contract': contract, 'databases': data['databases'], 'views': data['views'],
         'workspace': dashboard['workspace'],
     })
 
 
-def create_bundle(selection=None, layout_overrides=None, *, bundle_version=3):
-    if type(bundle_version) is not int or bundle_version not in (1, 2, 3):
-        raise ValueError('지원하는 미리보기 설계 버전은 1, 2 또는 3입니다.')
+def create_bundle(selection=None, layout_overrides=None, *, bundle_version=4):
+    if type(bundle_version) is not int or bundle_version not in (1, 2, 3, 4):
+        raise ValueError('지원하는 미리보기 설계 버전은 1, 2, 3 또는 4입니다.')
     if bundle_version == 1 and layout_overrides is not None:
         raise ValueError('버전 1은 기본 배치만 지원합니다.')
-    selection = validate_selection(default_selection() if selection is None else selection)
+    selection = validate_selection(default_selection() if selection is None else selection, bundle_version=bundle_version)
     catalog = build_catalog()
     config = _config(selection)
     pages = {key: resolve_page_layout(key, active_sections_for_config(config, key)) for key in PAGE_KEYS}
     overrides = {} if layout_overrides is None else layout_overrides
     if not isinstance(overrides, dict) or set(overrides) - set(PAGE_KEYS):
         raise ValueError('배치 변경에는 네 페이지의 키만 사용할 수 있습니다.')
-    overrides = {key: validate_layout_rows(pages[key], rows, layout_version=bundle_version)
+    overrides = {key: validate_layout_rows(pages[key], rows, layout_version=min(bundle_version, 3))
                  for key, rows in overrides.items()}
     for key, rows in overrides.items():
         pages[key]['rows'] = rows
@@ -120,7 +136,11 @@ def create_bundle(selection=None, layout_overrides=None, *, bundle_version=3):
         raise ValueError('배치 계약의 보기와 원본 명세가 일치하지 않습니다.')
     bundle = _json_values({
         'format': 'teacher-planner-reviewed-layout', 'version': bundle_version,
-        'source_digest': catalog['source_digest'], 'selection': selection,
+        'source_digest': catalog['source_digest' if bundle_version >= 4 else 'legacy_source_digest'], 'selection': selection,
+        **({'workflow_summary': workflow_summary(selection['workflows']),
+            'workflow_databases': [item for item in catalog['workflow_databases']
+                                   if item['workflow'] in selection['workflows']['features']]}
+           if 'workflows' in selection else {}),
         'page_settings': catalog['contract']['page_settings'], 'pages': pages,
         'views': views, 'applied': False, 'layout_overrides': overrides,
     })
@@ -136,8 +156,8 @@ make_bundle = create_bundle
 def validate_bundle(bundle):
     if not isinstance(bundle, dict):
         raise ValueError('미리보기 설계는 JSON 객체여야 합니다.')
-    if type(bundle.get('version')) is not int or bundle['version'] not in (1, 2, 3):
-        raise ValueError('지원하는 미리보기 설계 버전은 1, 2 또는 3입니다.')
+    if type(bundle.get('version')) is not int or bundle['version'] not in (1, 2, 3, 4):
+        raise ValueError('지원하는 미리보기 설계 버전은 1, 2, 3 또는 4입니다.')
     expected = create_bundle(bundle.get('selection'),
                              bundle.get('layout_overrides') if bundle['version'] >= 2 else None,
                              bundle_version=bundle['version'])

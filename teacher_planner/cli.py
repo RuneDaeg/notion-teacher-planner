@@ -56,17 +56,31 @@ def main(argv=None):
     add_layout(commands)
     from .preview_cli import add_commands as add_preview
     add_preview(commands)
+    workflow_plan_parser = commands.add_parser('workflow-plan', help='선택한 연결 기능·상세보기 계획 (오프라인)')
+    workflow_plan_parser.add_argument('--config', default='config.example.json')
+    workflow_verify_parser = commands.add_parser('verify-workflows', help='실제 상세보기 조회·화면 증거 검사 (Notion 변경 없음)')
+    workflow_verify_parser.add_argument('--config', default='config.example.json')
+    workflow_verify_parser.add_argument('--snapshot', required=True)
     verify = commands.add_parser('verify', help='설치된 원격 속성·관계·캘린더·홈 배치 확인')
     verify.add_argument('--state', default='.local/state.json')
     verify.add_argument('--layout-snapshot', help='이 수첩의 실제 Markdown·UI 증거 JSON')
     verify.add_argument('--reviewed-bundle', help='검토한 배치 JSON; 실제 화면 증거를 이 배치와 대조')
     verify.add_argument('--core-only', action='store_true', help='기능 구조만 검사; 설치 완료를 뜻하지 않음')
+    verify.add_argument('--workflow-snapshot', help='선택한 학생·학급 등 상세보기의 실제 조회·UI 증거 JSON')
     rec = commands.add_parser('recover', help='불확실한 생성 요청의 기존 Notion 객체 연결')
     rec.add_argument('--state', default='.local/state.json')
     rec.add_argument('--id', required=True, help='Notion에서 확인한 생성 객체 ID')
     args = p.parse_args(argv)
     try:
-        if args.command in ('verify-preview', 'compile-preview'):
+        if args.command in ('workflow-plan', 'verify-workflows'):
+            from .workflows import workflow_plan, verify_workflow_evidence
+            from .preview_bundle import read_json
+            c = config(args.config)
+            result = (workflow_plan(c) if args.command == 'workflow-plan'
+                      else verify_workflow_evidence(c, read_json(args.snapshot)))
+            print(json.dumps(result, ensure_ascii=False, indent=2))
+            return 0 if args.command == 'workflow-plan' or result['evidence_valid'] else 1
+        elif args.command in ('verify-preview', 'compile-preview'):
             from .preview_cli import run
             return run(args)
         elif args.command in ('layout-plan', 'render-layout', 'verify-layout'):
@@ -107,6 +121,15 @@ def main(argv=None):
                 report['layout_contract'] = load_contract()['id']
                 report['page_settings'] = {'full_width': True, 'small_text': False}
                 report['layout_verification_required'] = True
+                if 'workflows' in c:
+                    from .workflows import workflow_plan, workflow_selection
+                    workflow = workflow_plan(c)
+                    report['workflows'] = workflow_selection(c)
+                    report['workflow_record_view_count'] = len(workflow['record_views'])
+                    report['workflow_record_views_installed'] = False
+                    report['workflow_plan_digest'] = workflow['plan_digest']
+                    if getattr(args, 'full', False):
+                        report['workflow_plan'] = workflow
                 if reviewed:
                     report['reviewed_bundle_digest'] = reviewed['bundle_digest']
                 if getattr(args, 'full', False):
@@ -125,6 +148,8 @@ def main(argv=None):
                     journal.save()
             print('데이터 구조 생성 완료: ' + url)
             print('설치 마무리 필요: ' + ('검토한 배치 파일' if reviewed else 'layout-plan') + '에 따라 MCP/UI로 배치·전체 너비·접기를 적용하세요.')
+            if 'workflows' in c:
+                print('연결 기능의 상세보기는 workflow-plan을 따라 MCP/UI로 구성하고 verify-workflows로 실제 증거를 검사하세요.')
             print('python -m teacher_planner verify --state ' + args.state + ' --layout-snapshot .local/layout-snapshot.json 으로 기능과 화면을 함께 검증하세요.')
         elif args.command == 'import-timetable':
             c = config(args.config)
@@ -159,6 +184,8 @@ def main(argv=None):
                 raise ValueError('설치 당시의 연결이 아닙니다.')
             if args.core_only and args.layout_snapshot:
                 raise ValueError('--core-only와 --layout-snapshot은 함께 사용할 수 없습니다.')
+            if args.core_only and args.workflow_snapshot:
+                raise ValueError('--core-only와 --workflow-snapshot은 함께 사용할 수 없습니다.')
             issues = verify_remote(client, j.data, check_placement=not bool(args.layout_snapshot))
             if issues:
                 print('\n'.join(issues), file=sys.stderr)
@@ -174,6 +201,24 @@ def main(argv=None):
             report = load_evidence(args.layout_snapshot, state=j.data, core_verified=True,
                                    reviewed_bundle=args.reviewed_bundle)
             report['installation_complete'] = report['complete']
+            if 'workflows' in j.data['config']:
+                from .workflows import workflow_plan, verify_workflow_evidence
+                from .preview_bundle import read_json
+                workflow = workflow_plan(j.data['config'])
+                if workflow['record_views']:
+                    if args.workflow_snapshot:
+                        evidence = read_json(args.workflow_snapshot)
+                        expected_sources = {key: value['data_source_id'] for key, value in j.data['databases'].items()}
+                        if evidence.get('data_sources') != expected_sources:
+                            raise ValueError('상세보기 증거의 원본 ID가 기존 설치 기록과 다릅니다.')
+                        report['workflow_verification'] = verify_workflow_evidence(j.data['config'], evidence)
+                        report['workflow_complete'] = report['workflow_verification']['evidence_valid']
+                    else:
+                        report['workflow_complete'] = False
+                        report['workflow_pending'] = '상세보기·기록 규칙·집계의 실제 조회·UI 증거 --workflow-snapshot이 필요합니다.'
+                    report['installation_complete'] = report['complete'] and report['workflow_complete']
+                    report['layout_core_complete'] = report['complete']
+                    report['complete'] = report['installation_complete']
             print(json.dumps(report, ensure_ascii=False, indent=2))
             return 0 if report['installation_complete'] else 1
         elif args.command == 'recover':

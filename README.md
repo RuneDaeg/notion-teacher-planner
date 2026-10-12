@@ -6,7 +6,7 @@ made by 여광재(온양고) · made with [DoRms](https://dorms.school)
 
 기본 템플릿은 **대시보드·학급 경영·교과 진도·학사 일정**의 네 Notion 페이지로 구성됩니다. 오늘 필요한 기록을 대시보드에서 확인하고 각 업무 페이지로 이동합니다. **수첩은 학년도마다 한 권**을 사용합니다. 해당 연도 3월부터 다음 해 2월까지의 기록을 담고, 2학기에도 같은 수첩을 이어 씁니다. 수업 진도의 학기는 필요한 기록에서 선택해 구분합니다.
 
-교사용 사용 안내서: [웹에서 읽기](https://notion-teacher-planner.notion-teacher-planner-cloudflare.workers.dev/guide) · [PDF 바로 보기](https://notion-teacher-planner.notion-teacher-planner-cloudflare.workers.dev/teacher-planner-guide.pdf) · [첨부용 HTML](output/html/교무수첩_사용안내서.html) · [수정용 Word](output/docx/교무수첩_사용안내서.docx). 웹 질문지로 시작하는 방법, 학년도 한 권 운영, 학생별 상담 이력, 여섯 가지 기록 양식, 시간표·진도, 캘린더·PARA, 급식·학사일정 갱신, 문제 해결과 기존 수첩의 선택 업데이트를 설명합니다. 전체 배치 미리보기·드래그·1~4열 편집과 기존 수첩 수정 요청문 사용법도 포함합니다. 문서 버전은 1.4, 기준일은 2026년 10월 6일입니다.
+교사용 사용 안내서: [웹에서 읽기](https://notion-teacher-planner.notion-teacher-planner-cloudflare.workers.dev/guide) · [PDF 바로 보기](https://notion-teacher-planner.notion-teacher-planner-cloudflare.workers.dev/teacher-planner-guide.pdf) · [첨부용 HTML](output/html/교무수첩_사용안내서.html) · [수정용 Word](output/docx/교무수첩_사용안내서.docx). 웹 질문지로 시작하는 방법, 학년도 한 권 운영, 학생별 상담 이력, 여섯 가지 기록 양식, 시간표·진도, 캘린더·PARA, 급식·학사일정 갱신, 문제 해결과 기존 수첩의 선택 업데이트를 설명합니다. 전체 배치 미리보기·드래그·1~4열 편집과 기존 수첩 수정 요청문 사용법도 포함합니다. 문서 버전은 1.4, 기준일은 2026년 10월 6일입니다. 이후 추가된 기능 선택·관계·상세 보기는 [최신 기능 안내](docs/WORKFLOWS.md)와 [기능별 예시 화면](https://notion-teacher-planner.notion-teacher-planner-cloudflare.workers.dev/features)을 함께 확인하세요.
 
 커뮤니티 공유용 [개조식 소개글](output/community/교무수첩_커뮤니티_소개글.txt)과 [첨부용 PDF](output/pdf/교무수첩_사용안내서.pdf)도 제공합니다. HTML 안내서는 별도 로그인 없이 읽을 수 있으며, 웹에서 PDF를 열거나 HTML·PDF 파일을 내려받을 수 있습니다.
 
@@ -16,11 +16,19 @@ made by 여광재(온양고) · made with [DoRms](https://dorms.school)
 
 ## 웹에서 설치 설정 준비하기
 
-[교무수첩 시작하기](https://notion-teacher-planner.notion-teacher-planner-cloudflare.workers.dev/setup)에서 공통 질문을 **5단계**로 답하고, 내 설정이 담긴 AI 설치 요청문을 복사할 수 있습니다. Q01·Q02 → Q03·Q04 → Q05·Q06 → Q07·Q08 → Q09·Q10 순서이며 필요한 추가 질문만 표시합니다.
+[교무수첩 시작하기](https://notion-teacher-planner.notion-teacher-planner-cloudflare.workers.dev/setup)에서 공통 질문을 **5단계**로 답하고, 내 설정이 담긴 AI 설치 요청문을 복사할 수 있습니다. Q01·Q02 → Q03·Q04 → Q05W·Q05·Q06 → Q07·Q08 → Q09·Q10 순서이며 필요한 추가 질문만 표시합니다.
 
 요청문은 브라우저 안에서 정해진 규칙으로 생성합니다. 답변을 서버에 제출하거나 LLM API를 호출하지 않아 **웹 설문 자체의 AI API 비용은 없습니다.** 입력 초안은 현재 탭의 `sessionStorage`에 임시 저장되며 화면에서 초기화할 수 있습니다. 토큰·비밀번호·학생 명단·상담 내용은 입력하지 마세요.
 
 마지막에 복사한 요청문을 **Notion 쓰기 도구가 연결된 AI**에 붙여 넣어 설치를 진행하세요. 웹 양식은 Notion 페이지를 생성하거나 연동을 활성화하지 않습니다. AI 서비스의 이용 조건과 비용은 해당 서비스에 따릅니다. 자세한 사용법은 [웹 시작 안내](docs/WEB_SETUP.md)에 있습니다.
+
+## 필요한 기능을 예시로 보고 고르기
+
+[기능 선택과 예시](https://notion-teacher-planner.notion-teacher-planner-cloudflare.workers.dev/features)에서 가상 학생·학급·업무의 연결 모습을 확인하고 **기본 설정·추천 설정·커스텀** 중 고르세요. 학생별 기록, 학급별 공간, 수업 준비 연결, 후속 업무, PARA, 제출물 수합, 평가 범위, 학생별 평가·피드백, 담당 교직원 연결까지 9개 기능을 제공합니다.
+
+기본 설정은 학생·학급·수업 연결 3개, 추천 설정은 앞의 7개와 필요한 모듈을 포함합니다. 학생별 평가·피드백과 교직원 연결은 커스텀에서 선택할 수 있습니다. 모두 선택할 수도 있지만 전체가 기본값은 아닙니다. 선택 내용은 설치·수정 요청문과 미리보기 설계 파일로 전달하며, **웹의 가상 예시는 실제 Notion 설치가 아닙니다.** AI가 원본 관계와 해당 학생·학급·프로젝트의 상세 보기를 구성한 뒤 확인합니다. [기능별 연결과 사용법](docs/WORKFLOWS.md)을 참고하세요.
+
+**2026.10.13 추가:** 기능별 가상 예시·프리셋 선택, Q05W 공통 질문, 선택한 관계·상세 보기 계획, 제출 항목·학생별 평가 결과의 선택형 원본을 추가했습니다. 기존 설정에 기능 선택이 없으면 기존 의미를 유지하며, 이미 사용하는 수첩은 요청한 부분만 보완합니다.
 
 ## 이미 만든 수첩을 쉽게 바꾸기
 
@@ -74,7 +82,7 @@ AI가 GitHub를 읽을 수 없다면 저장소를 ZIP으로 내려받아 첨부�
 | 선택: 교직원 연락망 | 부서·직책·교내 연락처·이메일·담당 업무 |
 | 선택: 학교 계정 관리 | 서비스 접속 주소·계정 ID·관리 담당·비밀번호 관리 도구 링크 |
 
-기본 9개, 선택 기능을 모두 켜면 **16개 원본 데이터베이스**를 사용합니다. 네 페이지는 같은 원본을 연결하며 학생·수업·일정을 중복 저장하지 않습니다. 전체 선택 시 24개 연결 DB 블록에 46개 연결 뷰를 탭으로 배치합니다. 원본 뷰를 포함한 정확한 구성은 `plan` 명령에서 확인할 수 있습니다. 이 저장소 제작 요청에서는 추가 기능을 모두 선택했지만, 재사용할 때는 각 교사에게 다시 묻습니다. 학교 계정에는 비밀번호·복구 코드·토큰 필드를 만들지 않습니다.
+기존 기본 구성은 9개, 여섯 추가 모듈을 모두 켜면 **16개 원본 데이터베이스**를 사용합니다. 기능 연결에서 제출물 수합을 선택하면 제출 항목 DB, 학생별 평가·피드백을 선택하면 학생별 평가 결과 DB가 각각 추가됩니다. 네 페이지는 같은 원본을 연결하며 학생·수업·일정을 중복 저장하지 않습니다. 기능 연결 확장 전 전체 모듈 구성은 24개 연결 DB 블록에 46개 연결 뷰를 탭으로 배치하며, 선택한 상세 관계 보기는 별도로 구성·확인합니다. 원본 뷰를 포함한 정확한 구성은 `plan` 명령에서 확인할 수 있습니다. 이 저장소 제작 요청에서는 추가 기능을 모두 선택했지만, 재사용할 때는 각 교사에게 다시 묻습니다. 학교 계정에는 비밀번호·복구 코드·토큰 필드를 만들지 않습니다.
 
 ```text
 📒 2026학년도 · 교무수첩 데스크 (대시보드)
@@ -227,6 +235,7 @@ Python 설치의 `양식 모음`은 상담·학부모 연락·회의록·수업�
 - [START_HERE.md](START_HERE.md): AI가 읽을 첫 문서
 - [ONBOARDING.md](docs/ONBOARDING.md): AI 공통 질문 원문·선택지·순서·조건과 설정 매핑
 - [WEB_SETUP.md](docs/WEB_SETUP.md): 5단계 웹 질문지·AI 요청문 복사·임시 초안 보관
+- [WORKFLOWS.md](docs/WORKFLOWS.md): 9개 기능·프리셋·관계와 상세 보기·기존 수첩 보완
 - [AGENTS.md](AGENTS.md): 실행 범위와 데이터 취급 원칙
 - [INSTALL_WITH_MCP.md](docs/INSTALL_WITH_MCP.md): Notion 커넥터로 설치
 - [DESIGN.md](DESIGN.md): 요청 디자인과 Notion 네이티브 표현 기준

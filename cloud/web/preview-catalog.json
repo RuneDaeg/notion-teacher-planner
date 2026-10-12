@@ -1,7 +1,241 @@
 {
   "format": "teacher-planner-preview-catalog",
   "version": 1,
-  "source_digest": "4a4392edd555b682a5832907bfebbc27255e47dd26a159a582ab4244be9133b3",
+  "source_digest": "42d7618f0f99e1c25fc0010ac90a3e3d7be9a06d60b97dcf18843804266f7319",
+  "legacy_source_digest": "4a4392edd555b682a5832907bfebbc27255e47dd26a159a582ab4244be9133b3",
+  "workflows": {
+    "version": 1,
+    "features": [
+      {
+        "key": "student_history",
+        "title": "학생별 기록 모아 보기",
+        "description": "학생 페이지에서 상담과 선택한 출결·제출·학부모 연락 기록을 함께 확인합니다.",
+        "example": "가상학생 A를 열면 그 학생의 상담과 미제출 기록을 확인합니다.",
+        "requires_modules": [],
+        "optional_modules": [
+          "attendance",
+          "contact"
+        ]
+      },
+      {
+        "key": "class_hub",
+        "title": "학급별 업무 모아 보기",
+        "description": "학급 페이지에서 학생·시간표·진도와 선택한 출결·평가를 연결합니다.",
+        "example": "가상 1학년 1반 페이지에서 명단과 반별 수업 진도를 확인합니다.",
+        "requires_modules": [],
+        "optional_modules": [
+          "attendance",
+          "assessment"
+        ]
+      },
+      {
+        "key": "lesson_links",
+        "title": "시간표·진도·자료 연결",
+        "description": "수업 진도와 날짜별 시간표, 수업 자료를 양쪽에서 찾아볼 수 있게 연결합니다.",
+        "example": "가상 탐구 단원에서 연결한 수업 날짜와 실험 자료를 엽니다.",
+        "requires_modules": [],
+        "optional_modules": []
+      },
+      {
+        "key": "followups",
+        "title": "상담·회의 후속 업무 연결",
+        "description": "상담과 선택한 연락·회의의 후속 업무를 연결하고 확인할 기록을 모읍니다.",
+        "example": "가상 상담의 후속 확인 업무에서 원래 상담으로 돌아갑니다.",
+        "requires_modules": [],
+        "optional_modules": [
+          "contact",
+          "meeting"
+        ]
+      },
+      {
+        "key": "para_hub",
+        "title": "PARA 관련 기록 모아 보기",
+        "description": "프로젝트와 담당 영역에서 관련 할 일·자료와 선택한 회의록을 확인합니다.",
+        "example": "가상 학급 행사 프로젝트에서 준비 업무와 회의 결정을 봅니다.",
+        "requires_modules": [],
+        "optional_modules": [
+          "meeting"
+        ]
+      },
+      {
+        "key": "submissions",
+        "title": "제출 항목별 현황 관리",
+        "description": "제출 항목과 학생별 제출 기록을 분리하고 대상 학생·미제출자를 확인합니다.",
+        "example": "가상 동의서 항목에서 대상 학생과 제출 여부를 비교합니다.",
+        "requires_modules": [
+          "attendance"
+        ],
+        "optional_modules": []
+      },
+      {
+        "key": "assessment_scope",
+        "title": "평가 범위·수업 진도 연결",
+        "description": "평가와 관련 수업 단원을 연결해 범위와 준비 자료를 확인합니다.",
+        "example": "가상 수행평가에서 평가 범위에 해당하는 수업 단원을 엽니다.",
+        "requires_modules": [
+          "assessment"
+        ],
+        "optional_modules": []
+      },
+      {
+        "key": "assessment_results",
+        "title": "학생별 평가 결과 기록",
+        "description": "평가별 학생 결과·채점 여부·점수·피드백을 별도 기록으로 관리합니다.",
+        "example": "가상학생 A의 수행평가 결과와 피드백을 연결해 확인합니다.",
+        "requires_modules": [
+          "assessment"
+        ],
+        "optional_modules": []
+      },
+      {
+        "key": "staff_links",
+        "title": "담당 교직원 연결",
+        "description": "업무와 선택한 회의·학교 계정의 담당자를 교직원 연락망과 연결합니다.",
+        "example": "가상 행사 업무에서 담당 교직원의 교내 연락처를 확인합니다.",
+        "requires_modules": [
+          "staff"
+        ],
+        "optional_modules": [
+          "meeting",
+          "accounts"
+        ]
+      }
+    ],
+    "presets": {
+      "basic": {
+        "title": "기본 설정",
+        "features": [
+          "student_history",
+          "class_hub",
+          "lesson_links"
+        ],
+        "modules": []
+      },
+      "recommended": {
+        "title": "추천 설정",
+        "features": [
+          "student_history",
+          "class_hub",
+          "lesson_links",
+          "followups",
+          "para_hub",
+          "submissions",
+          "assessment_scope"
+        ],
+        "modules": [
+          "attendance",
+          "assessment",
+          "contact",
+          "meeting"
+        ]
+      },
+      "custom": {
+        "title": "커스텀",
+        "features": [],
+        "modules": []
+      }
+    }
+  },
+  "workflow_schema_digest": "6abd28b4e477b328e70feadecaa64d6df8ca8a38e5b552353fa7427c791e868e",
+  "workflow_databases": [
+    {
+      "key": "submission_items",
+      "title": "제출 항목",
+      "module": "attendance",
+      "section": "학생 기록",
+      "properties": {
+        "이름": {
+          "type": "title"
+        },
+        "학년도": {
+          "type": "number"
+        },
+        "보관": {
+          "type": "checkbox"
+        },
+        "학급": {
+          "type": "relation",
+          "target": "classes",
+          "reciprocal": "제출 항목"
+        },
+        "대상 학생": {
+          "type": "relation",
+          "target": "students",
+          "reciprocal": "제출 대상 항목"
+        },
+        "대상 확정일": {
+          "type": "date"
+        },
+        "마감": {
+          "type": "date"
+        },
+        "상태": {
+          "type": "select",
+          "options": [
+            "준비",
+            "수집 중",
+            "마감",
+            "취소"
+          ]
+        },
+        "업무·일정": {
+          "type": "relation",
+          "target": "agenda",
+          "reciprocal": "제출 항목"
+        },
+        "안내": {
+          "type": "rich_text"
+        }
+      },
+      "workflow": "submissions"
+    },
+    {
+      "key": "assessment_results",
+      "title": "학생별 평가 결과",
+      "module": "assessment",
+      "section": "학생 기록",
+      "properties": {
+        "이름": {
+          "type": "title"
+        },
+        "학년도": {
+          "type": "number"
+        },
+        "보관": {
+          "type": "checkbox"
+        },
+        "평가": {
+          "type": "relation",
+          "target": "assessments",
+          "reciprocal": "학생별 결과"
+        },
+        "학생": {
+          "type": "relation",
+          "target": "students",
+          "reciprocal": "평가 결과"
+        },
+        "기록 키": {
+          "type": "rich_text"
+        },
+        "채점 완료": {
+          "type": "checkbox"
+        },
+        "결시": {
+          "type": "checkbox"
+        },
+        "점수": {
+          "type": "number"
+        },
+        "피드백": {
+          "type": "rich_text"
+        },
+        "확인일": {
+          "type": "date"
+        }
+      },
+      "workflow": "assessment_results"
+    }
+  ],
   "contract": {
     "id": "teacher-desk-layout-v1",
     "version": 1,

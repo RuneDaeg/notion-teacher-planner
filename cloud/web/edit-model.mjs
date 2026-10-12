@@ -1,5 +1,6 @@
+import {normalizeWorkflowSelection, validateWorkflowSelection, workflowPromptLines} from './workflow-model.mjs';
 // Existing-notebook requests are generated locally; this module has no side effects.
-export const EDIT_PROMPT_VERSION = 1;
+export const EDIT_PROMPT_VERSION = 2;
 const REPOSITORY = 'https://github.com/RuneDaeg/notion-teacher-planner';
 
 export const LOCATIONS = Object.freeze([
@@ -142,9 +143,9 @@ export const FEATURE_CATALOG = Object.freeze([
 ].map(item => Object.freeze({...item, summary: Object.freeze(item.summary), behavior: Object.freeze(item.behavior), checks: Object.freeze(item.checks)})));
 
 export function applyFeature(id) {
-  const feature = FEATURE_CATALOG.find(item => item.id === id);
+  const feature = id === 'workflows' ? {location: 'choose', view: 'recommended', fields: ''} : FEATURE_CATALOG.find(item => item.id === id);
   if (!feature) throw new RangeError('목록에 있는 기능을 선택해주세요.');
-  return {featureId: id, notebookUrl: '', location: feature.location, view: feature.view, goal: '', fields: feature.fields, details: ''};
+  return {featureId: id, notebookUrl: '', location: feature.location, view: feature.view, goal: '', fields: feature.fields, details: '', workflows: null};
 }
 
 export function createEditAnswers() {
@@ -173,11 +174,13 @@ function validNotionURL(value) {
   } catch { return false; }
 }
 
-export function validateEditAnswers(answers) {
+export function validateEditAnswers(answers, workflowCatalog) {
   if (!isRecord(answers)) return [{field: 'answers', message: '수정할 기능을 선택해주세요.'}];
   const a = normalize(answers), errors = [];
   const add = (field, message) => {if (!errors.some(error => error.field === field)) errors.push({field, message});};
-  if (!FEATURE_CATALOG.some(item => item.id === a.featureId)) add('featureId', '목록에 있는 기능을 선택해주세요.');
+  if (a.workflows !== null && a.workflows !== undefined) errors.push(...validateWorkflowSelection(workflowCatalog, a.workflows));
+  if (a.featureId === 'workflows' && (a.workflows === null || a.workflows === undefined)) add('workflows', '관계형·보기 기능을 먼저 선택해주세요.');
+  if (a.featureId !== 'workflows' && !FEATURE_CATALOG.some(item => item.id === a.featureId)) add('featureId', '목록에 있는 기능을 선택해주세요.');
   if (!LOCATIONS.some(item => item.id === a.location)) add('location', '기능을 사용할 화면을 선택해주세요.');
   if (!VIEWS.some(item => item.id === a.view)) add('view', '보고 싶은 형태를 선택해주세요.');
   for (const [field, max] of Object.entries(TEXT_LIMITS)) {
@@ -190,10 +193,10 @@ export function validateEditAnswers(answers) {
   return errors;
 }
 
-export function buildEditPrompt(answers) {
-  const errors = validateEditAnswers(answers);
+export function buildEditPrompt(answers, workflowCatalog) {
+  const errors = validateEditAnswers(answers, workflowCatalog);
   if (errors.length) throw Object.assign(new Error('입력한 내용을 확인해주세요.'), {errors});
-  const a = normalize(answers), feature = FEATURE_CATALOG.find(item => item.id === a.featureId);
+  const a = normalize(answers), feature = a.featureId === 'workflows' ? {title: '선택한 관계형·보기', behavior: ['선택한 workflows를 기존 수첩에 필요한 부분만 추가합니다.'], checks: ['선택한 관계와 기록별 보기 필터를 실제 Notion에서 검증합니다.']} : FEATURE_CATALOG.find(item => item.id === a.featureId);
   const selectedView = VIEWS.find(item => item.id === a.view).label;
   const selectedLocation = LOCATIONS.find(item => item.id === a.location).label;
   const paragraphs = [
@@ -214,7 +217,9 @@ export function buildEditPrompt(answers) {
     '일회성 수정과 자동화를 구분하세요. 이번 요청만으로 예약 실행·클라우드 등록·외부 전송·새 OAuth 권한을 활성화하지 마세요. 사용자가 추가 조건에서 자동화를 원하면 현재 Notion 기능·도구·기존 연동을 확인하고, 필요한 별도 설정과 실제 실행 조건을 먼저 설명하세요. 필터·정렬 변경을 푸시 알림·자동 메시지·NEIS 쓰기·실시간 양방향 동기화라고 안내하지 마세요.',
     `완료 확인의 기본 예시 (별도 변경 요청이 없을 때; 최종 확인 기준은 모든 사용자 선택에서 도출):\n${feature.checks.map(item => '- ' + item).join('\n')}\n- 변경 후 실제 Notion을 다시 읽고 연결 원본·속성·필터·정렬과 기존 ID 보존을 확인하세요. 선택한 사용자 정의 보기와 추가 조건도 확인 항목에 포함하세요. 사용자가 바꾼 표시 항목·기간·상태 조건과 충돌하는 기본 확인 항목은 새 요구에 맞게 대체하세요. 완료한 업무 포함을 요청했다면 완료 기록 포함 여부를, 상담을 오래된 순으로 요청했다면 상담일 오름차순을 확인하세요.\n- 배치를 바꿨다면 대상 화면의 실제 캡처와 블록 부모·순서·폭·접기 상태를 대조하세요. 증거와 개인 페이지 ID는 .local/ 또는 private/에만 저장하세요.\n- 검증을 위해 개인 기록을 임의로 만들거나 상태를 바꾸지 마세요. 기존 확인 가능한 기록과 설정을 읽어 검증하고, 새 입력이 필요한 시험은 요청 범위와 기존 허락 안에서만 진행하세요. 시험하지 못한 항목은 미확인으로 남기세요.\n- 바뀐 페이지 링크, 변경 내용, 실제 확인 결과, 남은 작업을 알려주세요. Notion 연결 도구가 없으면 준비된 변경안과 연결 방법까지만 제공하고 수정 완료로 보고하지 마세요.`,
   ];
+  if (a.workflows !== null && a.workflows !== undefined) paragraphs.push(...workflowPromptLines(workflowCatalog, a.workflows, {mode: 'edit'}));
   const data = {
+    ...(a.workflows !== null && a.workflows !== undefined ? {workflows: normalizeWorkflowSelection(workflowCatalog, a.workflows)} : {}),
     edit_prompt_version: EDIT_PROMPT_VERSION,
     request_kind: 'modify_existing_notebook',
     scope: 'selected_personal_notebook',

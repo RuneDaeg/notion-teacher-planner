@@ -54,6 +54,8 @@ def config(path):
     dashboard_config(c)
     from .forms import selected_forms
     selected_forms(c)
+    from .workflows import workflow_selection
+    workflow_selection(c)
     return c
 
 
@@ -65,7 +67,8 @@ def academic_label(c):
 
 
 def selected(c):
-    b = blueprint()
+    from .workflows import workflow_blueprint
+    b = workflow_blueprint(c, blueprint())
     dbs = [d for d in b['databases'] if d['module'] == 'core' or c['modules'].get(d['module'], False)]
     keys = {d['key'] for d in dbs}
     return dbs, [v for v in b['views'] if v['source'] in keys]

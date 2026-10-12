@@ -9,19 +9,33 @@
 3. 실제 도구의 enhanced Markdown·뷰 DSL·블록 명세를 읽는다. REST 요청 형식과 MCP DSL을 섞지 않는다.
 4. `DESIGN.md`, `docs/DEFAULT_TEMPLATE.md`, `teacher_planner/dashboard.json` 버전 5의 `workspace.pages`, `teacher_planner/blueprint.json`, `teacher_planner/layout_contract.json`의 `teacher-desk-layout-v1`을 읽는다. dashboard는 논리 섹션, layout_contract는 실제 행·열·폭·접기의 기본 기준이며 둘 다 따른다. 교사가 확인한 사용자 지정 배치 파일이 있다면 검증한 행·열·폭이 기본값보다 우선한다.
 
-로컬 실행이 가능하면 `python -m teacher_planner plan --config .local/config.json --full`과 `python -m teacher_planner layout-plan --config .local/config.json`으로 선택 모듈에 따른 기능·배치 명세를 확인한다. `database_id`, `data_source_id`, `page_id`, `view_id`와 화면·섹션별 연결 DB ID를 각각 저장한다. MCP 기록은 `.local/mcp-install.json` 등에 보관하고 Python 상태와 섞지 않는다.
+선택한 기능의 상세 계획은 아래 [관계와 상세 보기](#선택한-기능의-관계와-상세-보기)를 함께 따른다. 로컬 실행이 가능하면 `python -m teacher_planner plan --config .local/config.json --full`과 `python -m teacher_planner layout-plan --config .local/config.json`으로 선택 모듈에 따른 기능·배치 명세를 확인한다. `database_id`, `data_source_id`, `page_id`, `view_id`와 화면·섹션별 연결 DB ID를 각각 저장한다. MCP 기록은 `.local/mcp-install.json` 등에 보관하고 Python 상태와 섞지 않는다.
 
 [공통 렌더러 사용법](DEFAULT_TEMPLATE.md#같은-배치를-출력하는-렌더러)을 따라 실제 네이티브 섹션 조각을 `render-layout --page ... --sections ... --output ...`으로 조합할 수 있다. 원본·연결 DB·페이지·동기화 블록을 먼저 전부 목록화하고 실제 태그·URL을 유지한다. 생성 파일을 기존 페이지 전체에 맹목적으로 덮어쓰거나 누락된 자식 페이지를 삭제하도록 허용하지 않는다. 렌더링과 Notion 반영·실제 화면 확인은 별도 단계다.
 
 ### 미리보기의 설계 파일이 첨부된 경우
 
-교사가 `/preview`에서 확인한 `reviewed-layout.json`을 전달했을 때만 [미리보기 적용 절차](PREVIEW.md)를 추가한다. 파일이 없는 기존 MCP 설치는 위 준비와 아래 생성 순서를 그대로 사용한다. 버전 `3`의 `layout_overrides`는 교사가 드래그·이동 버튼·열 편집으로 고른 배치다. 일반 행은 실제 구역을 가진 최대 네 열이며 열마다 최소 10%, 합 100%의 상대 폭을 사용한다. 빈 열·안내용 드롭 영역·구역 복제본을 만들지 않는다. 검증한 변경은 아래 생성 순서의 기본 순서·비율보다 우선하며, 전체 너비·카드 내부 구성·닫힌 접기·원본 연결은 유지한다. 이전 버전 `1`·`2`의 파일은 해당 버전의 규칙으로 검증한다.
+교사가 `/preview`에서 확인한 `reviewed-layout.json`을 전달했을 때만 [미리보기 적용 절차](PREVIEW.md)를 추가한다. 파일이 없는 기존 MCP 설치는 위 준비와 아래 생성 순서를 그대로 사용한다. 버전 `3`·`4`의 `layout_overrides`는 교사가 드래그·이동 버튼·열 편집으로 고른 배치다. 일반 행은 실제 구역을 가진 최대 네 열이며 열마다 최소 10%, 합 100%의 상대 폭을 사용한다. 빈 열·안내용 드롭 영역·구역 복제본을 만들지 않는다. 검증한 변경은 아래 생성 순서의 기본 순서·비율보다 우선하며, 전체 너비·카드 내부 구성·닫힌 접기·원본 연결은 유지한다. 버전 `4`의 기능 선택도 답변과 대조한다. 이전 버전 `1`~`3`의 파일은 해당 버전의 규칙으로 검증하며 선택하지 않은 새 기능을 추가하지 않는다.
 
 1. 파일을 `.local/reviewed-layout.json`에 보관하고 `python -m teacher_planner verify-preview --bundle .local/reviewed-layout.json`으로 현재 원본 명세·버전·선택·네 페이지 배치·보기·체크섬을 검증한다. 일치하지 않으면 다른 배치를 적용하기 전에 차이를 해결한다.
 2. 생성 전에 기존 질문의 답과 설계의 추가 기능·양식·담임·학교 바로가기·교시 수가 맞는지 대조한다. 로컬 설정이 있으면 `plan --config .local/config.json --reviewed-bundle .local/reviewed-layout.json`으로 검사할 수 있다. 학교·반·생성 위치는 같은 AI 대화의 설치 답변을 재사용한다. 미리보기 파일은 그 개인 설정을 포함하지 않는다.
 3. 아래 생성 순서에서 실제 원본과 네이티브 섹션이 준비되면, 새로 조회한 조각을 `{"pages":{"home":{},"classroom":{},"teaching":{},"planning":{}}}`의 각 페이지에 필요한 섹션별로 채운다. `compile-preview --bundle .local/reviewed-layout.json --sections .local/sections.json --output-dir .local/reviewed-layout`으로 확인한 설계의 반영안을 만든다. CLI 명령 앞에는 `python -m teacher_planner`를 붙인다.
 4. 반영안의 실제 URL·ID와 대상 페이지의 현재 내용을 대조한 뒤 지원되는 MCP/UI로 배치한다. 기존 수첩에는 필요한 구역만 이동·수정하며 기록·추가 본문·동기화 원본·연동 ID를 보존한다. 미선택 기능의 기존 기록을 지우지 않는다.
 5. 실제 네 페이지를 다시 읽고 확인한 설계의 행·열·폭, 전체 너비·닫힌 접기와 보기·필터를 확인한다. [설치 검사](ACCEPTANCE.md)의 실제 화면 증거를 남기고 `verify-layout --snapshot ... --reviewed-bundle .local/reviewed-layout.json`으로 같은 설계와 대조한다. Python의 최종 `verify --layout-snapshot`에도 같은 `--reviewed-bundle`을 전달한다. HTML 미리보기나 컴파일 파일은 이 증거를 대신하지 않으며, 검증·컴파일 자체는 Notion에 쓰지 않는다.
+
+## 선택한 기능의 관계와 상세 보기
+
+Q05W나 `/features`에서 기능을 선택했다면 [WORKFLOWS.md](WORKFLOWS.md)를 읽고 `python -m teacher_planner workflow-plan --config .local/config.json`의 스키마·상세 보기 계획을 추가로 확인한다. 이 명령은 읽기 전용 계획이며 실제 Notion 생성이나 확인을 수행하지 않는다. `workflows`가 없는 이전 설정에는 기능을 자동 추가하지 않는다.
+
+1. 선택 기능과 필요한 모듈을 대조한다. 기본 설정은 첫 세 기능, 추천 설정은 첫 일곱 기능과 출결·제출물/평가·채점/학부모 연락/회의록이다. 커스텀은 명시한 기능만 사용한다. 선택 목록의 기능 수와 실제 설치된 모듈 수를 혼동하지 않는다.
+2. 기존 원본과 정확한 속성 ID·대상을 확인한 뒤 계획의 관계를 재사용하거나 누락분만 추가한다. 새 제출 항목은 `submission_items`, 학생별 평가 결과는 `assessment_results` 원본이며 관련 기능을 선택한 경우에만 만든다. 학생별 제출 기록과 기존 평가·채점 총괄 DB를 새 DB로 대체하지 않는다.
+3. 학생·학급·진도·프로젝트·평가·교직원의 **공통 상세 페이지**에 계획의 `record_views`를 구성한다. 필터는 현재 페이지와 연결된 원본 기록, 정렬·표시 열은 해당 보기 계획을 따른다. 특정 가상 학생/학급/프로젝트 ID를 템플릿에 고정하지 않는다. 지원되는 공통 페이지 레이아웃이나 관계 보기·연결 보기·DB 템플릿 중 실제 동작을 확인한 방법을 사용한다.
+4. 한 행은 제출 항목 DB에서는 항목 하나, 제출 체크에서는 학생×항목 하나, 평가 결과에서는 학생×평가 하나다. 기존 기록은 제목만으로 병합하지 않는다. 같은 이름의 별도 관계 생성이나 두 번 입력하는 복사 DB로 해결하지 않는다.
+5. 도구가 상세 보기·현재 페이지 필터를 만들지 못하면 관계 속성까지의 결과와 **상세 보기 구성 대기**를 구분하고 지원되는 UI에서 이어서 완료한다. Python 새 설치의 스키마 성공이나 `workflow-plan` 출력만으로 상세 보기를 설치했다고 보고하지 않는다.
+6. 서로 다른 학생 2명, 학급 2개, 프로젝트 2개처럼 선택 기능의 서로 다른 대상 페이지를 열어 해당 대상의 원본만 보이는지 확인한다. 기록이 없는 페이지에서는 다른 대상의 기록이 나타나지 않아야 한다. 실제 기록이 부족하면 확인한 범위와 남은 검증을 명시하며, 실데이터에 가상 기록을 몰래 추가하지 않는다.
+7. 새 연결 기록과 기존 연결 기록을 조회하고 원본 수·관계 ID 배열·현재 페이지 필터·정렬을 대조한다. 결과를 **스키마 확인 / 상세 보기 확인 / 미완료**로 나눠 비공개 설치 기록에 남긴다. [상세 보기 증거 형식](WORKFLOWS.md#실제-상세-보기의-증거-검사)으로 `verify-workflows`를 실행해 계획과 실제 관찰 결과를 대조한다. 이 명령은 Notion을 직접 조회하거나 수정하지 않는다. 입력 양식과 실제 관계 선택도 함께 인계한다.
+
+기존 수첩의 확장은 [수정 안내](ITERATIVE_EDITING.md)를 따르며 원래 config·state를 바꾸어 `install`을 다시 실행하지 않는다. 단방향 관계의 변경이 필요하면 [관계 백업·보존 절차](UPDATES.md)를 사용하고 이미 작성한 본문·수동 열·보기·연동 ID를 유지한다. 공개된 다른 교사의 후기는 구조 참고 자료이며 복제·수정 대상으로 자동 선택하지 않는다.
 
 ## 생성 순서
 

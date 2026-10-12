@@ -1,3 +1,5 @@
+import {requiredWorkflowModules, workflowSummary} from './workflow-model.mjs';
+import {readWorkflowDraft, mountWorkflowPicker, saveWorkflowDraft} from './workflow-picker.mjs';
 import {MODULES, FORMS} from './setup-model.mjs';
 import {createSelection, selectionFromSetupAnswers, resolvePreview, buildReviewedBundle, verifyReviewedBundle, buildPreviewPrompt, movePreviewSection, setPreviewRowRatio, setPreviewRowColumns, resizePreviewColumn, reconcilePreviewOverrides} from './preview-model.mjs';
 
@@ -27,8 +29,8 @@ function setupSelection() {
   const raw = sessionStorage.getItem('teacher-planner-setup-v1');
   if (!raw || raw.length > 40000) return null;
   const saved = JSON.parse(raw);
-  if (![1,2].includes(saved.version) || !saved.answers) return null;
-  return selectionFromSetupAnswers(saved.answers);
+  if (![1,2,3].includes(saved.version) || !saved.answers) return null;
+  return selectionFromSetupAnswers(saved.answers, catalog.workflows);
 }
 
 function formAvailable(form) {
@@ -36,7 +38,7 @@ function formAvailable(form) {
 }
 
 function controls() {
-  for (const item of MODULES) $('preview-module-' + item.key).checked = selection.modules.includes(item.key);
+  for (const item of MODULES) { const input = $('preview-module-' + item.key); input.checked = selection.modules.includes(item.key); input.disabled = Boolean(selection.workflows && requiredWorkflowModules(catalog.workflows, selection.workflows).includes(item.key)); }
   for (const form of FORMS) {
     const input = $('preview-form-' + form.key);
     input.checked = selection.forms.includes(form.key); input.disabled = !formAvailable(form);
@@ -44,6 +46,11 @@ function controls() {
   $('preview-homeroom').checked = selection.homeroom;
   $('preview-school-links').checked = selection.school_links;
   $('preview-periods').value = selection.periods;
+  mountWorkflowPicker($('preview-workflow-picker'), catalog.workflows, selection.workflows, value => {
+    checkpoint(); selection.workflows = value; selection.modules = [...new Set([...selection.modules, ...requiredWorkflowModules(catalog.workflows, value)])].sort();
+    saveWorkflowDraft(value); changed();
+  }, {compact:true, examples:true});
+  $('preview-workflow-summary').textContent = selection.workflows ? `${workflowSummary(catalog.workflows, selection.workflows).title} · 연결 ${selection.workflows.features.length}개. 학생·학급 등 기록 내부의 보기로 구성하며, 아래 배치 파일에도 포함됩니다.` : '관계·보기 연결은 위 기능 구성에서 선택할 수 있어요.';
 }
 
 function rowClass(ratios) {
@@ -61,7 +68,7 @@ function sourceList(sources) {
   return wrap;
 }
 
-function selectedDatabases() { return catalog.databases.filter(db => db.module === 'core' || selection.modules.includes(db.module)); }
+function selectedDatabases() { return [...catalog.databases.filter(db => db.module === 'core' || selection.modules.includes(db.module)), ...(plan?.workflow_databases || [])]; }
 
 function nativeTable(headers, rows = []) {
   const wrap = node('div', undefined, 'native-table-wrap');
@@ -215,7 +222,7 @@ function updateReview() {
   $('download-preview-html').disabled=!reviewedBundle || !htmlStyles;
   $('review-progress').textContent=visited.size===4?'네 화면을 살펴봤습니다. 구성이 맞으면 위 항목을 체크해 주세요.':`아직 ${4-visited.size}개 화면이 남았어요. 위쪽 화면 탭을 눌러 확인해 주세요.`;
   if(!ready){$('preview-prompt-output').value='';$('handoff-status').textContent='';}
-  else $('preview-prompt-output').value=buildPreviewPrompt(reviewedBundle);
+  else $('preview-prompt-output').value=buildPreviewPrompt(reviewedBundle, catalog.workflows);
 }
 
 async function refresh() {
@@ -247,7 +254,7 @@ function download(content,type,name) {
 
 function readyPrompt() {
   if(!reviewedBundle || visited.size!==4 || !$('review-confirm').checked)return null;
-  const prompt=buildPreviewPrompt(reviewedBundle);$('preview-prompt-output').value=prompt;return prompt;
+  const prompt=buildPreviewPrompt(reviewedBundle, catalog.workflows);$('preview-prompt-output').value=prompt;return prompt;
 }
 
 function checkpoint() {
@@ -487,9 +494,13 @@ async function init() {
     const fromSetup=new URLSearchParams(location.search).get('from')==='setup' ? setupSelection() : null;
     const stored=sessionStorage.getItem(STORAGE_KEY);
     if(fromSetup){selection=fromSetup;save();$('selection-origin').textContent='방금 작성한 설치 설정으로 미리 봅니다.';}
-    else if(stored && stored.length<200000){const saved=JSON.parse(stored);if([1,2].includes(saved.version)){selection=createSelection(saved.selection);layoutOverrides=saved.version===2?(saved.layout_overrides||{}):{};resolvePreview(catalog,selection,layoutOverrides);$('selection-origin').textContent='이 탭에서 살펴보던 구성입니다.';}}
+    else if(stored && stored.length<200000){const saved=JSON.parse(stored);if([1,2].includes(saved.version)){selection=createSelection(saved.selection, catalog.workflows);layoutOverrides=saved.version===2?(saved.layout_overrides||{}):{};resolvePreview(catalog,selection,layoutOverrides);$('selection-origin').textContent='이 탭에서 살펴보던 구성입니다.';}}
     else {const loaded=setupSelection();if(loaded){selection=loaded;$('selection-origin').textContent='같은 탭에서 작성한 설치 설정을 사용합니다.';}}
   }catch{selection=createSelection();layoutOverrides={};message('저장된 설정을 읽지 못해 기본 구성으로 시작합니다.');}
+  if (new URLSearchParams(location.search).get('from') === 'features') {
+    const picked = readWorkflowDraft(catalog.workflows);
+    if (picked) { selection.workflows = picked; selection.modules = [...new Set([...selection.modules, ...requiredWorkflowModules(catalog.workflows, picked)])].sort(); save(); $('selection-origin').textContent = '기능·예시에서 고른 연결 구성을 사용합니다.'; }
+  }
   for(const item of MODULES){const label=node('label',undefined,'preview-check'),input=node('input');input.type='checkbox';input.id='preview-module-'+item.key;label.append(input,node('span',item.label));input.addEventListener('change',()=>{checkpoint();selection.modules=input.checked?[...selection.modules,item.key].sort():selection.modules.filter(key=>key!==item.key);changed();});$('module-options').append(label);}
   for(const form of FORMS){const label=node('label',undefined,'preview-check'),input=node('input');input.type='checkbox';input.id='preview-form-'+form.key;label.append(input,node('span',form.label));input.addEventListener('change',()=>{checkpoint();selection.forms=input.checked?[...selection.forms,form.key].sort():selection.forms.filter(key=>key!==form.key);changed();});$('form-options').append(label);}
   for(const [id,key] of [['preview-homeroom','homeroom'],['preview-school-links','school_links']])$(id).addEventListener('change',()=>{checkpoint();selection[key]=$(id).checked;changed();});
@@ -504,10 +515,10 @@ async function init() {
   $('load-setup').addEventListener('click',()=>{try{const loaded=setupSelection();if(!loaded){message('이 탭에 설치 답변이 없어요. 상단의 설치 정보 입력에서 먼저 작성할 수 있습니다.');return;}checkpoint();selection=loaded;layoutOverrides={};message('기능·양식·교시 설정만 불러왔습니다. 학교·개인 정보는 이 미리보기에 가져오지 않습니다.');save();void refresh();}catch{message('설치 답변을 읽지 못했습니다. 설정을 확인해 주세요.');}});
   $('load-bundle').addEventListener('change',async()=>{
     const file=$('load-bundle').files[0];if(!file)return;
-    try{if(file.size>2*1024*1024)throw new Error('2MB 이하의 배치 JSON 파일을 선택해 주세요.');const bundle=JSON.parse(await file.text()),report=await verifyReviewedBundle(catalog,bundle);if(!report.valid)throw new Error('현재 공통 배치와 맞지 않거나 변경된 파일입니다. 새로 미리 보고 저장해 주세요.');checkpoint();selection=createSelection(bundle.selection);layoutOverrides=copy(bundle.layout_overrides||{});message('저장한 배치를 불러왔습니다. 적용 요청 전에 네 화면을 다시 확인해 주세요.');save();await refresh();}catch(error){message(error.message || '배치 파일을 읽지 못했습니다.');}finally{$('load-bundle').value='';}
+    try{if(file.size>2*1024*1024)throw new Error('2MB 이하의 배치 JSON 파일을 선택해 주세요.');const bundle=JSON.parse(await file.text()),report=await verifyReviewedBundle(catalog,bundle);if(!report.valid)throw new Error('현재 공통 배치와 맞지 않거나 변경된 파일입니다. 새로 미리 보고 저장해 주세요.');checkpoint();selection=createSelection(bundle.selection, catalog.workflows);layoutOverrides=copy(bundle.layout_overrides||{});message('저장한 배치를 불러왔습니다. 적용 요청 전에 네 화면을 다시 확인해 주세요.');save();await refresh();}catch(error){message(error.message || '배치 파일을 읽지 못했습니다.');}finally{$('load-bundle').value='';}
   });
   $('download-bundle').addEventListener('click',()=>{if(!readyPrompt())return;download(JSON.stringify(reviewedBundle,null,2)+'\n','application/json;charset=utf-8','reviewed-layout.json');$('handoff-status').textContent='배치 파일 저장을 요청했습니다. 이어서 요청문을 복사하고, AI에게 파일도 함께 첨부해 주세요.';});
-  $('copy-preview-prompt').addEventListener('click',async()=>{const prompt=readyPrompt();if(!prompt)return;try{await navigator.clipboard.writeText(prompt);if(prompt!==buildPreviewPrompt(reviewedBundle))return;$('handoff-status').textContent='요청문을 복사했습니다. reviewed-layout.json 파일을 함께 첨부해 AI에게 전달하세요.';}catch{if(!reviewedBundle)return;$('preview-prompt-details').open=true;$('preview-prompt-output').focus();$('preview-prompt-output').select();$('handoff-status').textContent='자동 복사가 되지 않아 요청문을 선택했습니다. Ctrl+C 또는 ⌘C로 복사해 주세요.';}});
+  $('copy-preview-prompt').addEventListener('click',async()=>{const prompt=readyPrompt();if(!prompt)return;try{await navigator.clipboard.writeText(prompt);if(prompt!==buildPreviewPrompt(reviewedBundle, catalog.workflows))return;$('handoff-status').textContent='요청문을 복사했습니다. reviewed-layout.json 파일을 함께 첨부해 AI에게 전달하세요.';}catch{if(!reviewedBundle)return;$('preview-prompt-details').open=true;$('preview-prompt-output').focus();$('preview-prompt-output').select();$('handoff-status').textContent='자동 복사가 되지 않아 요청문을 선택했습니다. Ctrl+C 또는 ⌘C로 복사해 주세요.';}});
   $('download-preview-html').addEventListener('click',()=>{
     if(!reviewedBundle||!htmlStyles)return;
     const container=node('div');

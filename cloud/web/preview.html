@@ -5,12 +5,13 @@
   <meta name="description" content="Notion 교무수첩의 네 화면을 미리 보고, 확인한 배치 파일로 AI에게 설치를 요청하세요.">
   <title>수첩 전체 미리보기 · 교무수첩 데스크</title>
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="/setup.css"><link rel="stylesheet" href="/preview.css">
+  <link rel="stylesheet" href="/setup.css">
+  <link rel="stylesheet" href="/workflows.css"><link rel="stylesheet" href="/preview.css">
   <script type="module" src="/preview.js"></script>
 </head>
 <body>
   <a class="skip-link" href="#preview-frame">수첩 미리보기로 이동</a>
-  <header class="site-header"><a class="brand" href="/setup"><span class="brand-mark" aria-hidden="true">▤</span> 교무수첩 데스크</a><nav aria-label="사이트 메뉴"><a href="/setup">설치 정보 입력</a><a href="/edit">내 수첩 수정하기</a><a href="/guide">사용 안내서</a></nav></header>
+  <header class="site-header"><a class="brand" href="/setup"><span class="brand-mark" aria-hidden="true">▤</span> 교무수첩 데스크</a><nav aria-label="사이트 메뉴"><a href="/features">기능 · 예시</a><a href="/setup">설치 정보 입력</a><a href="/edit">내 수첩 수정하기</a><a href="/guide">사용 안내서</a></nav></header>
   <main class="preview-workspace">
     <div class="preview-intro"><div><span class="eyebrow">먼저 살펴보고, 같은 배치로 시작하세요</span><h1>내 수첩, 만들기 전에 한눈에.</h1><p>홈부터 학사 캘린더까지 네 화면을 둘러보세요.<br>확인한 배치를 파일로 담아 사용하는 AI에게 전달할 수 있어요.</p></div><a class="preview-help" href="https://github.com/RuneDaeg/notion-teacher-planner/blob/main/docs/PREVIEW.md" target="_blank" rel="noopener noreferrer">미리보기와 실제 적용 안내 ↗</a></div>
     <p id="preview-loading" class="callout" role="status">수첩의 공통 배치를 불러오는 중입니다.</p>
@@ -20,6 +21,7 @@
         <span class="step-count">01 · 수첩 구성</span><h2 id="options-title">필요한 기능만</h2>
         <p class="options-intro">기본 기록은 함께 준비됩니다. 추가 기능을 선택하면 네 화면에 반영돼요.</p>
         <p id="selection-origin" class="field-help"></p>
+        <details class="more-options"><summary>기본 · 추천 · 커스텀 연결 구성</summary><div id="preview-workflow-picker"></div></details><p id="preview-workflow-summary" class="field-help"></p>
         <fieldset id="module-options"><legend>추가 기능</legend></fieldset>
         <details class="more-options"><summary>양식 · 시간표 설정</summary><label class="preview-check"><input type="checkbox" id="preview-homeroom"><span>담임 수첩으로 살펴보기</span></label><fieldset id="form-options"><legend>빈 기록 양식</legend></fieldset><div class="field"><label for="preview-periods">하루에 표시할 교시</label><input type="number" id="preview-periods" min="1" max="20" value="7"></div><label class="preview-check"><input id="preview-school-links" type="checkbox"><span>학교 업무 바로가기 공간</span></label><p class="field-help">담임 학급과 실제 교시 시각·링크는 설치할 때 확인합니다.</p></details>
         <div class="options-footer"><button type="button" id="load-setup">작성한 설치 설정 불러오기</button><label class="import-label" for="load-bundle">저장한 배치 파일 열기<input id="load-bundle" type="file" accept="application/json,.json"></label><p id="options-status" role="status" aria-live="polite"></p></div>

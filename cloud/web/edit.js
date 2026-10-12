@@ -1,9 +1,14 @@
+import {validateWorkflowSelection, workflowSummary} from './workflow-model.mjs';
+import {loadWorkflowCatalog, readWorkflowDraft, saveWorkflowDraft, mountWorkflowPicker} from './workflow-picker.mjs';
 import {FEATURE_CATALOG, LOCATIONS, VIEWS, createEditAnswers, applyFeature, validateEditAnswers, buildEditPrompt} from './edit-model.mjs';
 
 const $ = id => document.getElementById(id);
 const STORAGE_KEY = 'teacher-planner-edit-v1';
 const limits = {notebookUrl:2000, goal:1500, fields:2000, details:4000};
 const fields = ['notebookUrl', 'goal', 'location', 'view', 'fields', 'details'];
+const workflowFeature = {id:'workflows',title:'연결 기능 묶음 추가',icon:'↔',description:'기본·추천·커스텀 구성으로 관계와 보기를 함께 연결해요.',summary:['선택한 기능만 기존 원본에 연결합니다.','학생·학급·프로젝트별 관련 기록 보기를 구성합니다.','실제 관계와 필터를 적용 후 확인합니다.']};
+const UI_FEATURES = [...FEATURE_CATALOG.slice(0,-1), workflowFeature, FEATURE_CATALOG.at(-1)];
+let workflowCatalog;
 let answers = createEditAnswers(), drafts = {}, generatedPrompt = '';
 
 function el(tag, text, className) {
@@ -20,6 +25,7 @@ function validDraft(id, raw) {
   }
   if (LOCATIONS.some(item => item.id === raw?.location)) clean.location = raw.location;
   if (VIEWS.some(item => item.id === raw?.view)) clean.view = raw.view;
+  if (raw?.workflows && !validateWorkflowSelection(workflowCatalog, raw.workflows).length) clean.workflows = raw.workflows;
   return clean;
 }
 
@@ -29,10 +35,10 @@ function restore() {
     if (!raw || raw.length > 100000) return;
     const saved = JSON.parse(raw);
     if (saved?.version !== 1) return;
-    for (const feature of FEATURE_CATALOG) {
+    for (const feature of UI_FEATURES) {
       if (saved.drafts?.[feature.id]) drafts[feature.id] = validDraft(feature.id, saved.drafts[feature.id]);
     }
-    if (FEATURE_CATALOG.some(item => item.id === saved.answers?.featureId)) answers = validDraft(saved.answers.featureId, saved.answers);
+    if (UI_FEATURES.some(item => item.id === saved.answers?.featureId)) answers = validDraft(saved.answers.featureId, saved.answers);
     $('edit-draft-status').textContent = '이 탭에 저장된 초안을 불러왔습니다.';
   } catch { $('edit-draft-status').textContent = '임시 저장을 사용할 수 없습니다. 떠나기 전에 요청문을 저장해 주세요.'; }
 }
@@ -56,9 +62,10 @@ function invalidate() {
 }
 
 function renderSummary() {
-  const feature = FEATURE_CATALOG.find(item => item.id === answers.featureId);
+  const feature = UI_FEATURES.find(item => item.id === answers.featureId);
   $('request-heading').textContent = feature.title;
   $('request-description').textContent = feature.description;
+  if (answers.featureId === 'workflows' && answers.workflows) $('request-description').textContent += ` ${workflowSummary(workflowCatalog, answers.workflows).title} · ${answers.workflows.features.length}개 선택`;
   $('summary-location').textContent = LOCATIONS.find(item => item.id === answers.location)?.label;
   $('summary-view').textContent = VIEWS.find(item => item.id === answers.view)?.label;
   $('behavior-summary').replaceChildren(...feature.summary.map(text => el('li', text)));
@@ -80,11 +87,13 @@ function renderAnswers() {
     'meeting-actions': '예: 학년 협의회에서 나온 할 일을 회의록 아래에서 담당자별로 보고 싶어요.',
     'reusable-form': '예: 학생 상담일지 양식에 상담 목적, 관찰 내용, 합의 사항, 다음 확인일을 넣어 주세요.',
     'dashboard-layout': '예: 홈에서 이번 주 업무를 먼저 보이게 하고, 관리용 목록은 접어 주세요.',
+    workflows: '예: 학생 상세 페이지에 미완료 후속 업무를 함께 보이게 해 주세요.',
     'lesson-progress': '예: 2학년 문학의 반별 완료 차시와 다음에 진행할 단원을 비교하고 싶어요.',
   };
   $('goal').placeholder = examples[answers.featureId];
   $('goal-help').textContent = custom ? '어떤 일을 기록하고, 무엇을 확인하고 싶은지 적어 주세요. 실제 학생 정보는 필요하지 않습니다.' : '기본 기능에 덧붙일 내용만 적어도 됩니다. 실제 학생 이름·상담 내용 대신 필요한 기능을 적어 주세요.';
   renderSummary();
+  renderWorkflows();
 }
 
 function selectFeature(id) {
@@ -98,7 +107,7 @@ function selectFeature(id) {
 }
 
 function renderCatalog() {
-  for (const feature of FEATURE_CATALOG) {
+  for (const feature of UI_FEATURES) {
     const label = el('label', undefined, 'feature-choice');
     const radio = el('input'); radio.type = 'radio'; radio.name = 'featureId'; radio.value = feature.id; radio.id = `feature-${feature.id}`;
     const icon = el('span', feature.icon, 'feature-icon'); icon.setAttribute('aria-hidden', 'true');
@@ -132,9 +141,9 @@ function showErrors(errors) {
 }
 
 function generate() {
-  const errors = validateEditAnswers(answers);
+  const errors = validateEditAnswers(answers, workflowCatalog);
   if (errors.length) { showErrors(errors); return; }
-  generatedPrompt = buildEditPrompt(answers);
+  generatedPrompt = buildEditPrompt(answers, workflowCatalog);
   $('edit-prompt-output').value = generatedPrompt;
   $('prompt-result').hidden = false;
   $('ready-hint').hidden = true;
@@ -179,11 +188,26 @@ $('edit-reset-yes').addEventListener('click', () => {
   let removed = true;
   try { sessionStorage.removeItem(STORAGE_KEY); } catch { removed = false; }
   answers = createEditAnswers(); drafts = {}; invalidate(); renderAnswers();
+  saveWorkflowDraft(null);
   $('edit-reset-confirm').hidden = true;
   $('fine-tune').open = false;
   $('edit-draft-status').textContent = removed ? '초안을 모두 지웠습니다.' : '화면을 초기화했습니다. 브라우저의 임시 저장은 지우지 못했으므로 공용 기기라면 탭을 닫아 주세요.';
   $('feature-options').querySelector('input').focus();
 });
-renderCatalog(); restore(); renderAnswers();
+function renderWorkflows() {
+  const host = $('edit-workflow-picker'); host.hidden = answers.featureId !== 'workflows';
+  if (host.hidden) return;
+  if (!workflowCatalog) {host.replaceChildren(el('p','기능 목록을 불러오지 못했어요. 새로고침해 주세요.')); return;}
+  mountWorkflowPicker(host, workflowCatalog, answers.workflows, value => {
+    answers.workflows = value; saveWorkflowDraft(value); invalidate(); save(); renderSummary(); renderWorkflows();
+  }, {compact:true, examples:true});
+}
+try { workflowCatalog = await loadWorkflowCatalog(); } catch { /* Other edit requests remain usable. */ }
+renderCatalog(); restore();
+if (workflowCatalog && new URLSearchParams(location.search).get('from') === 'features') {
+  const chosen = readWorkflowDraft(workflowCatalog);
+  if (chosen) { answers = {...applyFeature('workflows'), notebookUrl:answers.notebookUrl, workflows:chosen}; save(); }
+}
+renderAnswers();
 $('edit-loading').hidden = true;
 $('editor-fields').disabled = false;

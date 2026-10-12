@@ -133,3 +133,19 @@ test('Firebase setup rewrites precede the connection fallback while keeping the 
   assert.equal(resolve('/').destination, '/index.html');
   assert.equal(resolve('/api/status').function.functionId, 'planner_api');
 });
+
+test('feature gallery routes are public static assets without installation state', async () => {
+  for (const path of ['/features', '/features/', '/features?from=setup']) {
+    let assetRequest;
+    const response = await worker.fetch(new Request(base + path), {
+      get DB() {assert.fail('Feature examples must not access private installation state');},
+      ASSETS: {async fetch(request) {assetRequest=request; return new Response('features');}}
+    });
+    assert.equal(response.status, 200);
+    assert.equal(new URL(assetRequest.url).pathname, '/features.html');
+    assert.equal(new URL(assetRequest.url).search, new URL(base + path).search);
+    assert.equal(response.headers.get('Set-Cookie'), null);
+  }
+  const {hosting}=JSON.parse(await readFile(new URL('../../firebase.json', import.meta.url),'utf8'));
+  assert.equal(hosting.rewrites.find(rule=>rule.source==='/features').destination,'/features.html');
+});

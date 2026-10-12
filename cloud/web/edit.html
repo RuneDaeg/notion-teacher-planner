@@ -7,6 +7,7 @@
   <title>내 수첩에 기능 더하기 · 교무수첩 데스크</title>
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/setup.css">
+  <link rel="stylesheet" href="/workflows.css">
   <link rel="stylesheet" href="/edit.css">
   <script type="module" src="/edit.js"></script>
 </head>
@@ -14,7 +15,7 @@
   <a href="#edit-form" class="skip-link">기능 선택으로 이동</a>
   <header class="site-header">
     <a class="brand" href="/setup"><span class="brand-mark" aria-hidden="true">▤</span> 교무수첩 데스크 <span class="brand-tag">FOR TEACHERS</span></a>
-    <nav aria-label="사이트 메뉴"><a href="/setup">새 수첩 만들기</a><a href="/guide">사용 안내서</a><a href="/connect">연결 · 업데이트</a></nav>
+    <nav aria-label="사이트 메뉴"><a href="/features">기능 · 예시</a><a href="/setup">새 수첩 만들기</a><a href="/guide">사용 안내서</a><a href="/connect">연결 · 업데이트</a></nav>
   </header>
   <main class="edit-workspace">
     <div class="page-trail"><a href="/setup">교무수첩 데스크</a><span aria-hidden="true">/</span><span>기존 수첩 수정하기</span></div>
@@ -35,6 +36,7 @@
             <div class="section-title"><span class="step-count">01</span><h2 id="feature-heading">어떤 일을 더 편하게 하고 싶나요?</h2></div>
             <p class="section-note">가까운 기능 하나를 고른 뒤, 필요한 내용을 바꿔 보세요.</p>
             <fieldset class="feature-grid" id="feature-options"><legend class="sr-only">추가하거나 바꾸고 싶은 기능</legend></fieldset>
+            <div id="edit-workflow-picker" hidden></div>
           </section>
           <section class="edit-card settings-card" aria-labelledby="settings-heading">
             <div class="section-title"><span class="step-count">02</span><h2 id="settings-heading">내 수첩에 맞게 조정해요.</h2></div>

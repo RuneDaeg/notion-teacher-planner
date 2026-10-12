@@ -95,7 +95,7 @@ class PreviewBundleTests(unittest.TestCase):
         catalog = build_catalog()
         self.assertEqual(64, len(catalog['source_digest']))
         self.assertEqual(catalog['source_digest'], create_bundle()['source_digest'])
-        self.assertEqual({'format', 'version', 'source_digest', 'contract', 'databases', 'views', 'workspace'}, set(catalog))
+        self.assertEqual({'format', 'version', 'source_digest', 'contract', 'databases', 'views', 'workspace', 'workflows', 'legacy_source_digest', 'workflow_schema_digest', 'workflow_databases'}, set(catalog))
 
     def test_reference_views_are_exact_not_every_original_database_view(self):
         bundle = create_bundle()

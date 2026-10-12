@@ -14,7 +14,7 @@ from teacher_planner.layout_contract import load_contract, render_page
 from teacher_planner.layout_verify import required_visual_checks, verify_layout_snapshot
 from teacher_planner.model import config
 from teacher_planner.preview_bundle import (compile_bundle, create_bundle, default_selection,
-                                           digest, selection_from_config, validate_bundle)
+                                           digest, selection_from_config, validate_bundle, build_catalog)
 from test_layout_verify import NOW, PAGE_IDS, STAMP, fragments, png_fixture
 from test_planner import FakeNotion
 
@@ -22,6 +22,7 @@ from test_planner import FakeNotion
 def legacy(bundle):
     result = copy.deepcopy(bundle)
     result['version'] = 1
+    result['source_digest'] = build_catalog()['legacy_source_digest']
     del result['layout_overrides']
     del result['bundle_digest']
     result['bundle_digest'] = digest(result)
@@ -34,9 +35,9 @@ def reversed_body_rows(bundle, page='home'):
 
 
 class DragLayoutBundleTests(unittest.TestCase):
-    def test_version_three_contains_default_empty_overrides(self):
+    def test_current_version_contains_default_empty_overrides(self):
         bundle = create_bundle()
-        self.assertEqual(3, bundle['version'])
+        self.assertEqual(4, bundle['version'])
         self.assertEqual({}, bundle['layout_overrides'])
         self.assertEqual(bundle, validate_bundle(bundle))
 

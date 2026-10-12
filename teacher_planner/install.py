@@ -140,9 +140,14 @@ def install(client, c, parent, state_path):
     parent = page_id(parent)
     j = Journal(state_path, client)
     j.ready()
-    identity = client.request('GET', '/users/me')['id']
     from .dashboard import layout_spec
-    signature = fingerprint({'config': c, 'blueprint': blueprint(), 'dashboard': layout_spec()})
+    from .workflows import workflow_plan, workflow_selection
+    workflow = workflow_plan(c) if workflow_selection(c) is not None else None
+    signature_input = {'config': c, 'blueprint': blueprint(), 'dashboard': layout_spec()}
+    if workflow is not None:
+        signature_input['workflows'] = workflow
+    signature = fingerprint(signature_input)
+    identity = client.request('GET', '/users/me')['id']
     if j.data.get('identity') and (j.data['identity'] != identity or j.data['parent'] != parent or j.data['signature'] != signature):
         raise ValueError('기존 설치와 계정·상위 페이지·설정·설계가 다릅니다. 새 기본 템플릿은 별도 state 경로로 새 수첩을 만드세요. 기존 수첩은 자동 변경하지 않습니다.')
     client.request('GET', '/pages/' + parent)
@@ -257,6 +262,13 @@ def install(client, c, parent, state_path):
         'status': 'pending', 'layout_complete': False,
         'required_command': 'verify --layout-snapshot .local/layout-snapshot.json',
     })
+    if workflow is not None:
+        j.data['workflow_plan'] = workflow
+        j.data.setdefault('workflow_acceptance', {
+            'plan_digest': workflow['plan_digest'], 'record_views_installed': False,
+            'status': 'pending' if workflow['record_views'] else 'not_requested',
+            'required_command': 'verify-workflows --config CONFIG --snapshot SNAPSHOT',
+        })
     j.save()
     return root.get('url', 'https://www.notion.so/' + root['id'].replace('-', ''))
 

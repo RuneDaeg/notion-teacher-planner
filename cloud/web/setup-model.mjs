@@ -1,5 +1,6 @@
 // Browser-only questionnaire contract. No persistence, network, or install side effects.
-export const QUESTIONNAIRE_VERSION = 2;
+import {normalizeWorkflowSelection, validateWorkflowSelection, workflowPromptLines} from './workflow-model.mjs';
+export const QUESTIONNAIRE_VERSION = 3;
 const REPOSITORY = 'https://github.com/RuneDaeg/notion-teacher-planner';
 const DAILY_SERVICE = 'https://notion-teacher-planner.notion-teacher-planner-cloudflare.workers.dev';
 
@@ -28,6 +29,12 @@ export const QUESTIONS = Object.freeze({
   Q03: question('Q03', '담당 교과와 학년·반을 알려주세요. 담임이면 담임 학급도 함께 적어주세요. 예: 통합과학 / 1학년 1~3반 / 1학년 2반 담임. 담임이 아니면 ‘비담임’이라고 적어주세요.'),
   Q04: question('Q04', '새 교무수첩을 만들 상위 Notion 페이지 링크를 알려주세요. 개인용으로 쓸지, 지정한 교직원과 함께 쓸지도 알려주세요. 페이지를 아직 정하지 않았다면 ‘위치 선택 도움’이라고 답해주세요.'),
   Q05: question('Q05', '기본 구성은 학생 명단·상담 기록·업무/할 일·주간/월간 캘린더·시간표·수업 진도·PARA입니다. 추가할 기능의 번호를 골라주세요. 여러 개 또는 ‘모두’, ‘없음’, ‘나중에’로 답할 수 있습니다.', MODULES.map(({key, label}) => ({value: key, label}))),
+  Q05W: question('Q05W', '기록을 서로 연결해 학생·학급·수업 페이지에서 모아 볼까요? ① 기본 설정 ② 추천 설정 ③ 커스텀 ④ 나중에 중 골라주세요.', [
+    {value: 'basic', label: '① 기본 설정'}, {value: 'recommended', label: '② 추천 설정'}, {value: 'custom', label: '③ 커스텀'}, {value: 'later', label: '④ 나중에'},
+  ]),
+  Q05WD: question('Q05W-D', '선택하신 {기능 이름}에는 {필요한 모듈}이 필요합니다. ① 해당 모듈을 함께 추가하기 ② 이 기능은 나중에 준비하기 중 골라주세요.', [
+    {value: 'add', label: '① 해당 모듈을 함께 추가하기'}, {value: 'later', label: '② 이 기능은 나중에 준비하기'},
+  ]),
   Q06: question('Q06', '미리 준비할 빈 기록 양식을 골라주세요. 여러 개 또는 ‘사용 가능한 양식 모두’, ‘없음’, ‘나중에’로 답할 수 있습니다.', FORMS.map(({key, label}) => ({value: key, label}))),
   Q06D: question('Q06-D', '선택하신 {양식 이름}에는 {필요한 기능 또는 담임 학급}이 필요합니다. ① 해당 설정을 추가하기 ② 이 양식은 나중에 준비하기 중 골라주세요.', [
     {value: 'add', label: '① 해당 설정을 추가하기'}, {value: 'later', label: '② 이 양식은 나중에 준비하기'},
@@ -57,7 +64,7 @@ export function createAnswers() {
     academicYear: '', teacher: '교사', subjects: '', classes: '', homeroom: '', homeroomClass: '',
     notionUrl: '', notionLocation: '', sharing: '', modules: [], moduleChoice: '', forms: [], formChoice: '', formMode: '',
     timetable: '', comciganSchoolCode: '', comciganTeacherId: '', comciganHelp: false, periods: '7', periodTimes: '',
-    neis: '', demo: '', title: '교무수첩 데스크', bookmarks: '',
+    neis: '', demo: '', title: '교무수첩 데스크', bookmarks: '', workflows: null,
   };
 }
 
@@ -102,7 +109,7 @@ const TEXT_FIELDS = [
   ['title', 4, 100], ['bookmarks', 4, 6000],
 ];
 
-export function validateStep(answers, step) {
+export function validateStep(answers, step, workflowCatalog) {
   const a = normalizeAnswers(answers);
   const errors = [];
   const add = (field, message) => {if (!errors.some(error => error.field === field)) errors.push({field, message});};
@@ -135,6 +142,9 @@ export function validateStep(answers, step) {
     choice('sharing', ['private', 'staff'], '개인용 또는 지정한 교직원과 함께 사용을 선택해주세요.');
   }
   if (step === 2) {
+    if (a.workflows !== null && a.workflows !== undefined) {
+      errors.push(...validateWorkflowSelection(workflowCatalog, a.workflows, a.moduleChoice === 'select' ? a.modules : []));
+    }
     const selections = [['modules', 'moduleChoice', MODULES], ['forms', 'formChoice', FORMS]];
     for (const [field, decision, options] of selections) {
       choice(decision, ['select', 'none', 'later'], '항목 선택, 없음, 나중에 중 하나를 선택해주세요.');
@@ -173,7 +183,7 @@ export function validateStep(answers, step) {
   return errors;
 }
 
-function answerRecord(a) {
+function answerRecord(a, workflowCatalog) {
   return {
     questionnaire_version: QUESTIONNAIRE_VERSION,
     notebook_scope: 'academic_year',
@@ -183,6 +193,7 @@ function answerRecord(a) {
     Q03: {subjects_answer: a.subjects, classes_answer: a.classes, homeroom: a.homeroom === 'yes', homeroom_class: a.homeroom === 'yes' ? a.homeroomClass : ''},
     Q04: {location: a.notionLocation, parent_page_url: a.notionLocation === 'link' ? a.notionUrl : '', sharing_intent: a.sharing},
     Q05: {decision: a.moduleChoice, modules: Object.fromEntries(MODULES.map(module => [module.key, a.moduleChoice === 'select' && a.modules.includes(module.key)]))},
+    ...(a.workflows !== null && a.workflows !== undefined ? {Q05W: normalizeWorkflowSelection(workflowCatalog, a.workflows, a.moduleChoice === 'select' ? a.modules : [])} : {}),
     Q06: {decision: a.formChoice, forms: a.formChoice === 'select' ? FORMS.filter(form => a.forms.includes(form.key)).map(form => form.key) : [], mode: a.formChoice === 'select' ? a.formMode : '해당 없음'},
     Q07: {method: a.timetable, periods: Number(a.periods), period_times_answer: a.periodTimes || '나중에',
       ...(a.timetable === 'comcigan' ? {school_code: a.comciganHelp ? '' : a.comciganSchoolCode, teacher_id: a.comciganHelp ? '' : a.comciganTeacherId, needs_help: a.comciganHelp} : {}),
@@ -193,21 +204,21 @@ function answerRecord(a) {
   };
 }
 
-export function summarizeAnswers(answers) {
+export function summarizeAnswers(answers, workflowCatalog) {
   const a = normalizeAnswers(answers);
-  return answerRecord(a);
+  return answerRecord(a, workflowCatalog);
 }
 
-export function buildPrompt(answers) {
+export function buildPrompt(answers, workflowCatalog) {
   const a = normalizeAnswers(answers);
-  const errors = Array.from({length: 5}, (_, step) => validateStep(a, step)).flat();
+  const errors = Array.from({length: 5}, (_, step) => validateStep(a, step, workflowCatalog)).flat();
   if (errors.length) {
     const error = new Error('아직 확인할 설정이 있습니다. ' + errors.map(item => item.message).join(' '));
     error.errors = errors;
     throw error;
   }
   // Escaping markup delimiters keeps user text inside a single JSON code block.
-  const data = JSON.stringify(answerRecord(a), null, 2).replace(/[<>&`\u2028\u2029]/g, char => '\\u' + char.charCodeAt(0).toString(16).padStart(4, '0'));
+  const data = JSON.stringify(answerRecord(a, workflowCatalog), null, 2).replace(/[<>&`\u2028\u2029]/g, char => '\\u' + char.charCodeAt(0).toString(16).padStart(4, '0'));
   const tasks = [
     '아래에 답한 설정으로 내 Notion에 새 교무수첩을 만들어주세요.',
     '한 학년도에 수첩 하나를 사용합니다. 루트 제목은 “{학년도}학년도 · {수첩 제목}”으로 만들고 새 설치 config의 semester는 생략하세요. 설치 필수 질문으로 학기를 다시 묻거나 학기마다 수첩을 나누지 마세요. 학년도는 3월부터 다음 해 2월까지이며, 필요한 수업 진도 기록의 학기 속성과 1·2학기 보기는 같은 수첩 안에서 유지하세요.',
@@ -221,6 +232,7 @@ export function buildPrompt(answers) {
     'teacher_planner/layout_contract.json의 teacher-desk-layout-v1 / 버전 1과 docs/DEFAULT_TEMPLATE.md를 필수 공통 배치로 사용하세요. 네 핵심 페이지 모두 전체 너비 켜기·작은 텍스트 끄기로 만들고 실제 메뉴에서 확인하세요. 홈 빠른 실행 4열, 전폭 주간 시간표, 오늘 수업 관리용 목록 닫힌 접기, 중식/할 일·마감 40/60, 출결/상담 50/50, 진도/평가 55/45, 전폭 캘린더, 하단 문서 보관실과 원본 링크 닫힌 접기를 지키세요. 세 하위 업무 페이지도 계약의 행·열·폭·접기를 그대로 따르세요. 선택하지 않은 기능만 빼고 남은 열의 폭을 정규화하며 빈 열은 두지 마세요. 모든 DB를 세로로 나열하거나 제목만 열 안에 놓는 배치로 대체하지 마세요.',
     '도구 명세에 없는 full_width·열 비율·접기 API 필드를 추측하지 마세요. 지원되지 않는 배치는 실제 MCP/UI로 마무리하세요. docs/ACCEPTANCE.md에 따라 네 페이지의 실제 블록 트리·부모·순서·연결 DB·탭·필터를 생성 후 다시 조회하고, 네 화면·각 전체 너비 메뉴·열 폭·닫힌 접기를 실제 캡처로 확인하세요. 증거는 .local/에만 보관하고 실제 재조회 스냅샷을 verify-layout --snapshot .local/layout-snapshot.json --report .local/layout-report.json으로 대조하세요. 계획 JSON·생성된 ID 수·모의 화면을 실제 검증으로 대신하지 마세요. 기능 설치·배치 재현·선택 연동을 따로 보고하며 기능과 배치가 모두 확인되기 전에는 기본 템플릿 설치 완료라고 하지 마세요. 화면 접근이 없거나 증거가 부족하면 배치 확인 대기와 남은 차이를 알려주세요.',
   ];
+  if (a.workflows !== null && a.workflows !== undefined) tasks.push(...workflowPromptLines(workflowCatalog, a.workflows, {mode: 'install'}));
   if (a.formChoice === 'select') tasks.push(a.formMode === 'native'
     ? '양식은 docs/FORMS.md에 따라 실제 Notion UI의 ‘새로 만들기 → 새 템플릿’에 등록하고 드롭다운과 본문을 검증해주세요. UI 등록 도구가 없으면 가능한 복사용 양식을 준비하고 메뉴 등록이 남았다고 명시하세요. 특정 학생·날짜·기본/반복 템플릿을 임의로 지정하지 마세요.'
     : '양식은 선택한 빈 본문을 복사해서 쓰는 양식 모음으로 준비해주세요. Notion 새 템플릿 메뉴에 등록했다고 보고하지 마세요.');

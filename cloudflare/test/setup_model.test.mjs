@@ -14,7 +14,7 @@ const errorsFor = answers => Array.from({length: 5}, (_, step) => validateStep(a
 test('all question prompts and numbered options retain the common questionnaire source', async () => {
   const source = await readFile(new URL('../../docs/ONBOARDING.md', import.meta.url), 'utf8');
   assert.match(source, new RegExp('질문지 버전: `' + QUESTIONNAIRE_VERSION + '`'));
-  assert.deepEqual(Object.keys(QUESTIONS), ['Q01', 'Q02', 'Q03', 'Q04', 'Q05', 'Q06', 'Q06D', 'Q06N', 'Q07', 'Q07C', 'Q07F', 'Q07T', 'Q08', 'Q09', 'Q10']);
+  assert.deepEqual(Object.keys(QUESTIONS), ['Q01', 'Q02', 'Q03', 'Q04', 'Q05', 'Q05W', 'Q05WD', 'Q06', 'Q06D', 'Q06N', 'Q07', 'Q07C', 'Q07F', 'Q07T', 'Q08', 'Q09', 'Q10']);
   for (const item of Object.values(QUESTIONS)) {
     assert.ok(source.includes('> ' + item.prompt), `${item.id} question wording drifted`);
     for (const option of item.options) assert.ok(source.includes(option.label), `${item.id} choice wording drifted`);
@@ -72,7 +72,7 @@ test('annual onboarding needs no semester and discards the old answer in new pro
     const answers = complete({semester});
     assert.deepEqual(errorsFor(answers), []);
     const prompt = buildPrompt(answers), data = dataFrom(prompt);
-    assert.equal(data.questionnaire_version, 2);
+    assert.equal(data.questionnaire_version, 3);
     assert.equal(data.notebook_scope, 'academic_year');
     assert.deepEqual(data.Q02, {academic_year: 2026, teacher: '교사'});
     assert.equal(Object.hasOwn(normalizeAnswers(answers), 'semester'), false);

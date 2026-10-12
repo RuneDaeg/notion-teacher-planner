@@ -20,6 +20,7 @@ export default {
           clientFactory:createNotionClient,targetValidator:validateTargets})(request);
       } else {
         if (url.pathname === '/connect') url.pathname = '/index.html';
+        if (url.pathname === '/features' || url.pathname === '/features/') url.pathname = '/features.html';
         if (url.pathname === '/setup' || url.pathname === '/setup/') url.pathname = '/setup.html';
         if (url.pathname === '/edit' || url.pathname === '/edit/') url.pathname = '/edit.html';
         if (url.pathname === '/preview' || url.pathname === '/preview/') url.pathname = '/preview.html';

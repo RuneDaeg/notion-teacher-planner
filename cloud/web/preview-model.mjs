@@ -1,7 +1,8 @@
+import {normalizeWorkflowSelection, workflowSummary, workflowPromptLines} from './workflow-model.mjs';
 // Shared, pure preview resolver. Only layout choices enter the reviewed bundle.
 // Browser rendering and Notion application consume the same checked-in catalog.
 export const PREVIEW_FORMAT = 'teacher-planner-reviewed-layout';
-export const PREVIEW_VERSION = 3;
+export const PREVIEW_VERSION = 4;
 const CATALOG_VERSION = 1;
 const CATALOG_FORMAT = 'teacher-planner-preview-catalog';
 const REPOSITORY = 'https://github.com/RuneDaeg/notion-teacher-planner';
@@ -22,8 +23,8 @@ function chosenKeys(value, allowed, field) {
   return [...value].sort();
 }
 
-function normalizeSelection(value) {
-  if (!isRecord(value) || Object.keys(value).sort().join(',') !== SELECTION_KEYS.join(',')) {
+function normalizeSelection(value, workflowCatalog, version = PREVIEW_VERSION) {
+  if (!isRecord(value) || Object.keys(value).sort().join(',') !== [...SELECTION_KEYS, ...(Object.hasOwn(value, 'workflows') && version >= 4 ? ['workflows'] : [])].join(',')) {
     throw new Error('selection: 배치 선택 항목이 올바르지 않습니다.');
   }
   const modules = chosenKeys(value.modules, MODULE_KEYS, 'modules');
@@ -42,17 +43,18 @@ function normalizeSelection(value) {
       throw new Error('forms: homeroom 양식에는 담임 설정이 필요합니다.');
     }
   }
-  return {modules, forms, homeroom: value.homeroom, school_links: value.school_links, periods: value.periods};
+  return {modules, forms, homeroom: value.homeroom, school_links: value.school_links, periods: value.periods,
+    ...(Object.hasOwn(value, 'workflows') ? {workflows: normalizeWorkflowSelection(workflowCatalog, value.workflows, modules)} : {})};
 }
 
-export function createSelection(overrides = {}) {
+export function createSelection(overrides = {}, workflowCatalog) {
   if (!isRecord(overrides)) throw new Error('selection: 배치 선택 항목이 올바르지 않습니다.');
-  return normalizeSelection({modules: [], forms: [], homeroom: false, school_links: false, periods: 7, ...overrides});
+  return normalizeSelection({modules: [], forms: [], homeroom: false, school_links: false, periods: 7, ...overrides}, workflowCatalog);
 }
 
 // The setup form carries personal details; transfer only the five layout choices.
 // Stale form choices are omitted, never used to turn on an unselected module.
-export function selectionFromSetupAnswers(answers) {
+export function selectionFromSetupAnswers(answers, workflowCatalog) {
   const input = isRecord(answers) ? answers : {};
   const selected = (value, allowed) => Array.isArray(value)
     ? [...new Set(value.filter(key => typeof key === 'string' && allowed.includes(key)))].sort() : [];
@@ -65,7 +67,8 @@ export function selectionFromSetupAnswers(answers) {
   const periods = Number.isInteger(numericPeriods) && numericPeriods >= 1 && numericPeriods <= 20 ? numericPeriods : 7;
   // Raw bookmark URLs, school names, people, and credentials never enter the bundle.
   const school_links = false;
-  return createSelection({modules, forms, homeroom, school_links, periods});
+  return createSelection({modules, forms, homeroom, school_links, periods,
+    ...(input.workflows !== undefined && input.workflows !== null ? {workflows: input.workflows} : {})}, workflowCatalog);
 }
 
 function checkCatalog(catalog) {
@@ -146,8 +149,8 @@ function validateOverrides(pages, overrides, version = PREVIEW_VERSION) {
 
 export function resolvePreview(catalog, selection = createSelection(), layoutOverrides = {}, version = PREVIEW_VERSION) {
   checkCatalog(catalog);
-  if (![1, 2, PREVIEW_VERSION].includes(version)) throw new Error('지원하지 않는 설계 버전입니다.');
-  const chosen = normalizeSelection(selection);
+  if (![1, 2, 3, PREVIEW_VERSION].includes(version)) throw new Error('지원하지 않는 설계 버전입니다.');
+  const chosen = normalizeSelection(selection, catalog.workflows, version);
   const sources = new Set(catalog.databases.filter(source => source.module === 'core' || chosen.modules.includes(source.module)).map(source => source.key));
   const availableViews = new Map(catalog.views.filter(view => sources.has(view.source)).map(view => [view.key, view]));
   const pages = {};
@@ -183,7 +186,9 @@ export function resolvePreview(catalog, selection = createSelection(), layoutOve
   const overrides = validateOverrides(pages, layoutOverrides, version);
   for (const [key, rows] of Object.entries(overrides)) pages[key].rows = clone(rows);
   const views = Object.fromEntries([...viewKeys].sort().map(key => [key, clone(availableViews.get(key))]));
-  return {format: PREVIEW_FORMAT, version, source_digest: catalog.source_digest, selection: chosen,
+  return {format: PREVIEW_FORMAT, version, source_digest: version >= 4 ? catalog.source_digest : (catalog.legacy_source_digest ?? catalog.source_digest), selection: chosen,
+    ...(chosen.workflows ? {workflow_summary: workflowSummary(catalog.workflows, chosen.workflows),
+      workflow_databases: clone(catalog.workflow_databases.filter(item => chosen.workflows.features.includes(item.workflow)))} : {}),
     page_settings: clone(catalog.contract.page_settings), pages, views, layout_overrides: overrides, applied: false};
 }
 
@@ -375,8 +380,8 @@ export async function buildReviewedBundle(catalog, selection = createSelection()
 export async function verifyReviewedBundle(catalog, bundle) {
   try {
     if (!isRecord(bundle) || !HEX_DIGEST.test(bundle.bundle_digest ?? '')) throw new Error('검토한 설계의 확인 번호가 없습니다.');
-    if (bundle.source_digest !== catalog?.source_digest) throw new Error('공통 명세가 바뀌었습니다. 최신 미리보기를 다시 확인해주세요.');
-    if (![1, 2, PREVIEW_VERSION].includes(bundle.version)) throw new Error('지원하지 않는 설계 버전입니다.');
+    if (bundle.source_digest !== (bundle.version >= 4 ? catalog?.source_digest : (catalog?.legacy_source_digest ?? catalog?.source_digest))) throw new Error('공통 명세가 바뀌었습니다. 최신 미리보기를 다시 확인해주세요.');
+    if (![1, 2, 3, PREVIEW_VERSION].includes(bundle.version)) throw new Error('지원하지 않는 설계 버전입니다.');
     const contents = resolvePreview(catalog, bundle.selection, bundle.version === 1 ? {} : bundle.layout_overrides, bundle.version);
     if (bundle.version === 1) { contents.version = 1; delete contents.layout_overrides; }
     const expected = {...contents, bundle_digest: await digest(contents)};
@@ -397,12 +402,12 @@ export function getPreviewStats(bundle) {
   };
 }
 
-export function buildPreviewPrompt(bundle) {
-  if (!isRecord(bundle) || bundle.format !== PREVIEW_FORMAT || ![1, 2, PREVIEW_VERSION].includes(bundle.version) ||
+export function buildPreviewPrompt(bundle, workflowCatalog) {
+  if (!isRecord(bundle) || bundle.format !== PREVIEW_FORMAT || ![1, 2, 3, PREVIEW_VERSION].includes(bundle.version) ||
       !HEX_DIGEST.test(bundle.bundle_digest ?? '') || !HEX_DIGEST.test(bundle.source_digest ?? '') || bundle.applied !== false) {
     throw new Error('먼저 검토한 설계 JSON을 준비해주세요.');
   }
-  const selection = normalizeSelection(bundle.selection);
+  const selection = normalizeSelection(bundle.selection, workflowCatalog, bundle.version);
   const choiceText = canonicalJSON(selection);
   return [
     `${REPOSITORY} 저장소를 기준으로 첨부한 reviewed-layout.json의 전체 수첩 배치를 Notion에 적용해주세요.`,
@@ -413,10 +418,11 @@ export function buildPreviewPrompt(bundle) {
     '대화에 있는 Q01~Q10 답변과 현재 수첩 설정을 재사용하세요. 실제 설치 위치·학년도·담당 수업 등 필요한 값이 없을 때만 docs/ONBOARDING.md의 해당 질문을 이어서 하세요. 미리보기에는 이름·학교·Notion 페이지 ID·연동 코드가 없으므로 임의로 만들어 넣지 마세요. 검토한 배치 선택과 이미 확인된 설정이 충돌하면 그 항목만 확인하고 적용을 기다리세요.',
     '새 수첩은 확정한 부모 페이지에 만들고 기존 수첩은 현재 블록·원본 DB·보기·기록·연동 ID를 먼저 조회해 차이와 수정 대상을 정리하세요. 기존 페이지 전체 교체·초기화·DB 재생성·기록 삭제·보관을 하지 마세요. 기존 내용과 사용자 추가 영역을 유지하며 필요한 부분만 이동·수정하세요. 현재 없는 선택 기능만 승인된 범위에서 추가하세요.',
     '실제 조회한 구역 본문을 {pages:{home:{구역키:본문},classroom:{...},teaching:{...},planning:{...}} 형식의 .local/preview-sections.json으로 준비하세요. python -m teacher_planner compile-preview --bundle .local/reviewed-layout.json --sections .local/preview-sections.json --output-dir .local/preview-apply 로 같은 설계의 네이티브 반영안을 만드세요. 이 명령은 Notion에 쓰지 않습니다. 반영안 전체를 기존 페이지에 덮어쓰지 말고 현재 상태와 대조하여 필요한 구역만 MCP/UI로 적용하세요.',
-    '검증된 버전 2·3 설계의 layout_overrides는 교사가 직접 검토한 행·열 변경입니다. 버전 3은 최대 네 열과 사용자 지정 열 너비를 지원합니다. 지정한 페이지는 기본 행 순서보다 이 배치를 우선하고, 나머지 기본 명세와 데이터·보기·접기 조건은 유지하세요. 버전 1 설계는 기존 기본 배치를 유지합니다.',
+    '검증된 버전 2·3·4 설계의 layout_overrides는 교사가 직접 검토한 행·열 변경입니다. 버전 3·4는 최대 네 열과 사용자 지정 열 너비를 지원합니다. 지정한 페이지는 기본 행 순서보다 이 배치를 우선하고, 나머지 기본 명세와 데이터·보기·접기 조건은 유지하세요. 버전 1 설계는 기존 기본 배치를 유지합니다.',
     '검증된 설계의 pages와 views를 그대로 적용 기준으로 쓰세요. 홈·학급·교과·학사/PARA 네 페이지 모두 전체 너비 켜기·작은 텍스트 끄기를 실제 메뉴에서 확인하세요. 행 순서, 상대 열 비율, 닫힌 접기, 연결 DB 한 개 안의 보기 탭을 유지하세요. 지원되지 않은 API 필드를 추정하지 말고 실제 MCP/UI로 마무리하세요.',
     '주간 시간표는 교과 페이지의 동기화 원본과 홈의 참조가 같은 표를 사용하고 업무·일정·To-Do에 수업을 복사하지 않게 하세요. 주간·월간 학사 캘린더는 같은 업무·일정 원본의 보기입니다. 중식 영역만 표시하며 컴시간·NEIS·일일 자동 갱신은 이 배치 선택으로 활성화하지 마세요. 연동은 이미 확인된 요청 범위만 따르고 미확인 시각·학교·교사 번호를 추정하지 마세요.',
     '적용 후 실제 네 페이지를 다시 읽어 구조·순서·열·원본 관계·보기 필터를 대조하고 전체 너비 메뉴·열 배치·닫힌 접기의 실제 캡처를 비공개로 남기세요. python -m teacher_planner verify-layout --snapshot .local/layout-snapshot.json --reviewed-bundle .local/reviewed-layout.json --report .local/layout-report.json으로 검증하세요. 이 HTML 미리보기나 설계 JSON을 실제 Notion 화면 증거로 제출하지 마세요. 기능 설치·배치 재현·연동 상태를 나누어 보고하고 부족한 도구·증거가 있으면 해당 항목은 적용 또는 확인 대기로 남기세요.',
+    ...(selection.workflows ? workflowPromptLines(workflowCatalog, selection.workflows) : []),
     `검토한 배치 선택(설정 자료):\n${choiceText}`,
   ].join('\n\n');
 }

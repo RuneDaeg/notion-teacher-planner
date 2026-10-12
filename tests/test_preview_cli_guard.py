@@ -67,12 +67,13 @@ class PreviewCliGuardTests(unittest.TestCase):
 
     def test_changed_selection_stops_apply_before_client_and_journal(self):
         original = copy.deepcopy(self.config)
-        for field in ('modules', 'forms', 'periods', 'homeroom', 'school_links'):
+        for field in ('modules', 'forms', 'periods', 'homeroom', 'school_links', 'workflows'):
             self.config = copy.deepcopy(original)
             if field == 'modules': self.config['modules']['attendance'] = True
             if field == 'forms': self.config['forms'] = ['counseling']
             if field == 'periods': self.config['dashboard']['periods'] = 8
             if field == 'homeroom': self.config['classes'][0]['homeroom'] = True
+            if field == 'workflows': self.config['workflows'] = {'preset': 'custom', 'features': ['student_history']}
             if field == 'school_links': self.config['dashboard']['links'] = {'neis': 'https://example.com/'}
             self.save()
             with self.subTest(field=field):

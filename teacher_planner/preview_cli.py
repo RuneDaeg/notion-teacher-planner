@@ -55,6 +55,12 @@ def run(args):
             'verify-layout --snapshot 실제증거.json --reviewed-bundle plan.json으로 검사하세요. 로컬 검사는 실제 설치 완료를 뜻하지 않습니다.\n'
             '자세한 절차: START_HERE.md, docs/PREVIEW.md, docs/ITERATIVE_EDITING.md, docs/ACCEPTANCE.md\n'
         )
+        if 'workflows' in bundle['selection']:
+            instructions += (
+                '\n이 설계에는 선택한 관계형·기록별 보기가 포함되어 있습니다. plan.json의 selection.workflows는 새 설치 config에 사용하세요. 기존 수첩은 원래 config/state를 보존하고 별도 변경 계획에 기록하세요.\n'
+                '새 설치는 workflow-plan --config .local/config.json, 기존 수첩은 현재 설정의 별도 사본과 선택 값을 담은 .local/workflow-change-config.json으로 관계·기록별 보기·집계를 확인하고, docs/WORKFLOWS.md에 따라 실제 연결과 현재 페이지 필터를 적용·검증하세요.\n'
+                '변경한 설정으로 기존 수첩에 install을 다시 실행하지 마세요. 이 Markdown은 네 핵심 페이지 배치만 변환합니다. 개별 학생·학급·프로젝트 페이지 보기나 관계를 설치한 결과가 아닙니다.\n'
+            )
         _write_private(target / 'apply-instructions.txt', instructions)
         report['compiled_pages'] = list(rendered)
         report['message'] = '반영안 파일을 저장했습니다. 실제 Notion 적용·검증 전입니다.'

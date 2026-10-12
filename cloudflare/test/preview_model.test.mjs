@@ -12,8 +12,9 @@ const catalog = JSON.parse(await readFile(new URL('../../cloud/web/preview-catal
 const repository = fileURLToPath(new URL('../../', import.meta.url));
 const modules = ['accounts', 'assessment', 'attendance', 'contact', 'meeting', 'staff'];
 const allForms = ['assessment', 'counseling', 'guardian', 'homeroom', 'lesson', 'meeting'];
-const baseDigest = 'c83b626d0e68c54974e168e9490020e7f6bcddc20c605a2f62757997b786a97c';
+const version3Digest = 'c83b626d0e68c54974e168e9490020e7f6bcddc20c605a2f62757997b786a97c';
 const version2Digest = 'd802313b15a775c72181b79c43ca5610d9a6643365ebd4cf09bc1b212a95daa5';
+const baseDigest = createHash('sha256').update(canonicalJSON(resolvePreview(catalog))).digest('hex');
 const legacyDigest = 'df636473880331d93c25c82d85d61a583a6ceea58638ad182c88a14af7f290ce';
 function eligibleForms(selected, homeroom) {
   return allForms.filter(key => !({assessment: 'assessment', guardian: 'contact', meeting: 'meeting'}[key]) ||
@@ -51,6 +52,7 @@ test('version 1 reviewed bundles remain strict imports and can be upgraded witho
   const bundle = await buildReviewedBundle(catalog);
   const legacy = structuredClone(bundle);
   legacy.version = 1;
+  legacy.source_digest = catalog.legacy_source_digest;
   delete legacy.layout_overrides;
   const signed = rehash(legacy);
   assert.equal(signed.bundle_digest, legacyDigest);
@@ -68,14 +70,20 @@ test('version 1 reviewed bundles remain strict imports and can be upgraded witho
   assert.deepEqual((await buildReviewedBundle(catalog, signed.selection)).pages, signed.pages);
 });
 
+test('version 3 preserves its reviewed fingerprint', async () => {
+  const bundle = rehash(resolvePreview(catalog, createSelection(), {}, 3));
+  assert.equal(bundle.bundle_digest, version3Digest);
+  assert.deepEqual(await verifyReviewedBundle(catalog, bundle), {valid:true, errors:[]});
+});
+
 test('version 2 imports keep their original hash and reject newly allowed v3 widths and column counts', async () => {
   const bundle = await buildReviewedBundle(catalog);
-  const legacy = rehash({...bundle, version: 2});
+  const legacy = rehash({...bundle, version: 2, source_digest: catalog.legacy_source_digest});
   assert.equal(legacy.bundle_digest, version2Digest);
   assert.deepEqual(await verifyReviewedBundle(catalog, legacy), {valid: true, errors: []});
   assert.match(buildPreviewPrompt(legacy), /버전 2/);
   const original = setPreviewRowRatio(catalog, createSelection(), {}, 'home', 'work', [45, 55]);
-  const legacyCustom = rehash({...await buildReviewedBundle(catalog, createSelection(), original), version: 2});
+  const legacyCustom = rehash({...await buildReviewedBundle(catalog, createSelection(), original), version: 2, source_digest: catalog.legacy_source_digest});
   assert.equal((await verifyReviewedBundle(catalog, legacyCustom)).valid, true);
   for (const overrides of [
     setPreviewRowRatio(catalog, createSelection(), {}, 'home', 'work', [30, 70]),

@@ -114,7 +114,7 @@ class CustomColumnBundleTests(unittest.TestCase):
             create_bundle(layout_overrides={}, bundle_version=1)
 
     def test_unsupported_versions_fail_before_layout_processing(self):
-        for version in (True, 0, 4, '3'):
+        for version in (True, 0, 5, '3'):
             with self.subTest(version=version):
                 with self.assertRaises(ValueError):
                     create_bundle(bundle_version=version)
