@@ -1,0 +1,4 @@
+interface:
+  display_name: "교무수첩 웹 개발"
+  short_description: "교무수첩 웹 화면을 검토하고 수정 사항을 브라우저로 검증해 배포합니다"
+  default_prompt: "$notion-teacher-planner-dev 배치 미리보기의 열 편집 동작을 검토하고 브라우저에서 확인해 줘."

@@ -14,6 +14,24 @@ made by 여광재(온양고) · made with [DoRms](https://dorms.school)
 
 > 오늘의 수업과 꼭 해야 할 일을 한곳에. 작은 기록으로 가볍게 시작합니다.
 
+## Codex 스킬 다운로드
+
+이 저장소를 Codex 프로젝트로 열면 두 스킬이 함께 들어 있습니다. 다른 프로젝트에서 사용하려면 원하는 ZIP을 내려받아 프로젝트의 `.agents/skills/` 아래에 압축을 풀고 새 채팅을 여세요.
+
+### 교사용 · 내 Notion 수첩 만들기와 수정
+
+학년도별 수첩을 새로 만들거나 이미 쓰는 수첩의 보기와 배치를 바꿀 때 사용하세요. 실제 수첩에 적용하려면 AI에 대상 Notion 페이지의 쓰기 권한이 필요합니다. [교사용 스킬 ZIP 다운로드](https://raw.githubusercontent.com/RuneDaeg/notion-teacher-planner/main/output/skills/notion-teacher-planner.zip) · [스킬 내용 보기](.agents/skills/notion-teacher-planner/SKILL.md)
+
+- **새 수첩 만들기** — `$notion-teacher-planner 내 Notion에 이번 학년도 교무수첩을 만들어 줘. 웹 설문에서 답한 내용은 그대로 써 줘.`
+- **기존 수첩 수정** — `$notion-teacher-planner 학생 페이지를 열면 그 학생의 상담만 최근순으로 보이게 해 줘.`
+
+### 개발자용 · 교무수첩 웹 검토와 배포
+
+교무수첩 웹 소스에서 설문이나 미리보기의 동작을 점검하고, 수정 후 브라우저 테스트를 실행할 때 사용하세요. 공개 배포까지 원하면 요청에 포함하세요. [개발자용 스킬 ZIP 다운로드](https://raw.githubusercontent.com/RuneDaeg/notion-teacher-planner/main/output/skills/notion-teacher-planner-dev.zip) · [스킬 내용 보기](.agents/skills/notion-teacher-planner-dev/SKILL.md)
+
+- **로컬 검토** — `$notion-teacher-planner-dev 미리보기에서 바꾼 열 너비가 새로고침 후에도 유지되는지 로컬 브라우저로 확인해 줘.`
+- **수정·테스트·배포** — `$notion-teacher-planner-dev 미리보기의 ‘너비 같게’ 버튼을 ‘열 너비 균등하게’로 바꿔 줘. 키보드로도 동작하는지 테스트하고 Cloudflare에 배포한 뒤 공개 화면에서 확인해 줘.`
+
 ## 웹에서 설치 설정 준비하기
 
 [교무수첩 시작하기](https://notion-teacher-planner.notion-teacher-planner-cloudflare.workers.dev/setup)에서 공통 질문을 **5단계**로 답하고, 내 설정이 담긴 AI 설치 요청문을 복사할 수 있습니다. Q01·Q02 → Q03·Q04 → Q05W·Q05·Q06 → Q07·Q08 → Q09·Q10 순서이며 필요한 추가 질문만 표시합니다.
@@ -47,6 +65,8 @@ made by 여광재(온양고) · made with [DoRms](https://dorms.school)
 미리보기는 빈 표와 구역으로 배치를 보여 줍니다. 실제 학생 기록을 불러오거나 웹에서 바로 Notion을 수정하지 않습니다. HTML을 Notion으로 가져오는 방식이 아니라 **검증한 설계를 실제 Notion 블록과 연결 DB로 구성하는 방식**입니다. AI가 기존 기록과 ID를 유지하며 적용한 뒤 실제 네 화면을 검증합니다. [미리보기·적용 안내](docs/PREVIEW.md)를 참고하세요.
 
 ## AI에게 이렇게 말하세요
+
+스킬 없이 시작하려면 아래 요청문과 저장소 주소를 AI에 함께 전달하세요.
 
 ```text
 https://github.com/RuneDaeg/notion-teacher-planner 를 읽고

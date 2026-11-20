@@ -1,0 +1,4 @@
+interface:
+  display_name: "노션 교무수첩"
+  short_description: "공통 질문으로 학년도별 교무수첩을 만들고 기존 수첩의 배치와 보기를 수정합니다"
+  default_prompt: "$notion-teacher-planner 내 Notion에 이번 학년도 교무수첩을 만들어 줘."
