@@ -37,6 +37,9 @@ function tabDemo(host, {title, choices, tabs, rows, headers, note}) {
   if (choices) host.append(select(`${title} 예시 선택`,choices,v=>{choice=v;draw();}));
   for (const tab of tabs) {const b=button(tab,()=>{active=tab;draw();});tabbar.append(b);}
   host.append(tabbar,content,el('p',note,'demo-foot'));draw();
+  return function refreshVisibleRecord(tab, student) {
+    if (active === tab && choice === student) draw();
+  };
 }
 function taskDemo(host, project=false) {
   host.append(el('h4',project?'학부모 총회 · 프로젝트':'학년 협의회 · 후속 업무','demo-title'));
@@ -48,15 +51,84 @@ function taskDemo(host, project=false) {
   if(project)host.append(el('p','담당 영역: 학급 경영   ↔   자료: 총회 안내문 · 회의록','demo-note'));
   host.append(el('p','체크해 보세요. 같은 업무의 상태를 원본 기록에서 함께 확인하는 예시입니다.','demo-foot'));refresh();
 }
+const pendingTab = '미제출·보완 요청';
+const sampleSubmission = {
+  title: '체험학습 동의서',
+  due: '10/20',
+  statuses: new Map([
+    ['가상학생 A', '제출'],
+    ['가상학생 B', '미제출'],
+    ['가상학생 C', '보완 요청'],
+  ]),
+};
+const submissionChanges = new EventTarget();
+
+function studentHistoryRows(tab, student) {
+  if (tab === pendingTab) {
+    const status = sampleSubmission.statuses.get(student);
+    return ['미제출', '보완 요청'].includes(status)
+      ? [[sampleSubmission.due, sampleSubmission.title, badge(status)]]
+      : [];
+  }
+  if (student === '가상학생 C') return [];
+  const firstStudent = student === '가상학생 A';
+  if (tab === '상담 이력') {
+    return firstStudent
+      ? [['10/12', '학습 계획 상담', badge('후속 확인')], ['9/24', '새 학기 목표', badge('완료')]]
+      : [['10/7', '학교생활 상담', badge('완료')]];
+  }
+  if (tab === '연락 이력') return [[firstStudent ? '10/12' : '10/7', '상담 시간 안내', badge('연락 완료')]];
+  return [['10/8', firstStudent ? '지각' : '정상 출석', badge('확인')]];
+}
+
+function studentHistoryDemo(host) {
+  const refresh = tabDemo(host, {
+    title: '학생 페이지 · 관련 기록',
+    choices: [...sampleSubmission.statuses.keys()],
+    tabs: ['상담 이력', '연락 이력', '출결', pendingTab],
+    headers: {default: ['날짜', '기록', '상태'], [pendingTab]: ['마감', '제출 항목', '상태']},
+    rows: studentHistoryRows,
+    note: '선택한 학생의 기록을 보여요. 연락·출결·제출물 보기는 해당 모듈을 선택했을 때 구성합니다.',
+  });
+  submissionChanges.addEventListener('change', event => refresh(pendingTab, event.detail));
+}
+
 function submissionsDemo(host) {
-  host.append(el('h4','체험학습 동의서 · 수합 현황','demo-title'));
-  const states=['제출','미제출','보완 요청'], meter=el('div',undefined,'demo-meter'), progress=el('progress'), value=el('span');progress.max=3;meter.append(progress,value);
-  const update=()=>{progress.value=states.filter(s=>s==='제출').length;value.textContent=`${progress.value} / 3명 제출 · ${Math.round(progress.value/3*100)}%`;};
-  const rows=states.map((state,i)=>{const input=el('select');input.setAttribute('aria-label',`가상학생 ${String.fromCharCode(65+i)} 제출 상태`);for(const s of ['미제출','제출','보완 요청']){const o=el('option',s);input.append(o);}input.value=state;input.addEventListener('change',()=>{states[i]=input.value;update();});return[`가상학생 ${String.fromCharCode(65+i)}`,input,'10/20'];});
-  host.append(meter,table(['대상 학생','제출 상태','마감'],rows),el('p','상태를 바꿔 보세요. 대상 3명의 개별 기록을 모두 준비한 예시입니다. 기록이 없는 학생을 제출한 것으로 계산하지 않습니다.','demo-foot'));update();
+  const {title, due, statuses} = sampleSubmission;
+  host.append(el('h4', `${title} · 수합 현황`, 'demo-title'));
+  const meter = el('div', undefined, 'demo-meter');
+  const progress = el('progress');
+  progress.max = statuses.size;
+  progress.setAttribute('aria-label', `${title} 제출 인원`);
+  const summary = el('span');
+  summary.setAttribute('role', 'status');
+  meter.append(progress, summary);
+
+  function updateSummary() {
+    const total = statuses.size;
+    const completed = [...statuses.values()].filter(status => status === '제출' || status === '확인 완료').length;
+    progress.value = completed;
+    summary.textContent = `${completed} / ${total}명 제출 · ${(completed / total * 100).toFixed(1)}%`;
+  }
+
+  const rows = [...statuses].map(([student, status]) => {
+    const input = el('select');
+    input.setAttribute('aria-label', `${student} 제출 상태`);
+    for (const option of ['미제출', '제출', '보완 요청', '확인 완료']) input.append(el('option', option));
+    input.value = status;
+    input.addEventListener('change', () => {
+      statuses.set(student, input.value);
+      updateSummary();
+      submissionChanges.dispatchEvent(new CustomEvent('change', {detail: student}));
+    });
+    return [student, input, due];
+  });
+  host.append(meter, table(['대상 학생', '제출 상태', '마감'], rows),
+    el('p', '상태를 바꾸면 학생별 기록에도 반영돼요. 미제출과 보완 요청은 학생별 목록에 남고, 제출과 확인 완료는 제출 인원에 포함됩니다.', 'demo-foot'));
+  updateSummary();
 }
 function demo(key, host) {
-  if(key==='student_history')tabDemo(host,{title:'학생 페이지 · 관련 기록',choices:['가상학생 A','가상학생 B'],tabs:['상담 이력','연락 이력','출결','미제출'],headers:{default:['날짜','기록','상태']},rows:(tab,student)=>tab==='상담 이력'?(student==='가상학생 A'?[['10/12','학습 계획 상담',badge('후속 확인')],['9/24','새 학기 목표',badge('완료')]]:[['10/7','학교생활 상담',badge('완료')]]):tab==='연락 이력'?[[student==='가상학생 A'?'10/12':'10/7','상담 시간 안내',badge('연락 완료')]]:tab==='출결'?[['10/8',student==='가상학생 A'?'지각':'정상 출석',badge('확인')]]:student==='가상학생 A'?[['10/20','체험학습 동의서',badge('미제출')]]:[],note:'학생을 바꾸면 그 학생과 연결된 기록만 보여요. 연락·출결·제출물 보기는 해당 모듈을 선택했을 때 구성합니다.'});
+  if(key==='student_history')studentHistoryDemo(host);
   else if(key==='class_hub')tabDemo(host,{title:'학급 페이지 · 우리 반 한눈에',choices:['2학년 1반','2학년 2반'],tabs:['학생','수업 진도','예정 평가'],headers:{default:['항목','내용','상태']},rows:(tab,c)=>tab==='학생'?[[c==='2학년 1반'?'가상학생 A':'가상학생 B','학급 명단',badge('재학')]]:tab==='수업 진도'?[['과학 · 힘과 운동',c==='2학년 1반'?'4 / 6차시':'3 / 6차시',badge('진행 중')]]:[['탐구 보고서','10/23',badge('예정')]],note:'학급을 바꿔 보세요. 시간표는 수업 화면에서 확인하고 수업을 업무 일정에 복사하지 않습니다.'});
   else if(key==='lesson_links')tabDemo(host,{title:'힘과 운동 · 수업 준비',tabs:['수업 시간표','수업 자료'],headers:{default:['연결 기록','반 / 내용']},rows:tab=>tab==='수업 시간표'?[['10/12 · 3교시','2학년 1반'],['10/13 · 2교시','2학년 2반']]:[['활동지 01','힘의 합력 탐구'],['수업 성찰','다음 차시 도입 보완']],note:'시간표와 자료를 오가며 확인해 보세요. 수업 완료는 교사가 직접 기록합니다.'});
   else if(key==='followups')taskDemo(host);

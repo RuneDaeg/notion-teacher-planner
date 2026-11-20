@@ -1,6 +1,7 @@
 import {requiredWorkflowModules, workflowSummary} from './workflow-model.mjs';
 import {readWorkflowDraft, mountWorkflowPicker, saveWorkflowDraft} from './workflow-picker.mjs';
 import {MODULES, FORMS} from './setup-model.mjs';
+import {consumeHandoffSource} from './handoff.mjs';
 import {createSelection, selectionFromSetupAnswers, resolvePreview, buildReviewedBundle, verifyReviewedBundle, buildPreviewPrompt, movePreviewSection, setPreviewRowRatio, setPreviewRowColumns, resizePreviewColumn, reconcilePreviewOverrides} from './preview-model.mjs';
 
 const $ = id => document.getElementById(id);
@@ -21,8 +22,13 @@ const node = (tag, text, className) => {
 function message(text) { $('options-status').textContent = text; }
 function issue(text) { $('preview-error').textContent = text; $('preview-error').hidden = false; }
 function save() {
-  try { sessionStorage.setItem(STORAGE_KEY, JSON.stringify({version:2,selection,layout_overrides:layoutOverrides})); }
-  catch { message('이 브라우저에서는 임시 저장이 되지 않습니다. 배치 파일로 보관해 주세요.'); }
+  try {
+    sessionStorage.setItem(STORAGE_KEY, JSON.stringify({version:2, selection, layout_overrides:layoutOverrides}));
+    return true;
+  } catch {
+    message('이 브라우저에서는 임시 저장이 되지 않습니다. 배치 파일로 보관해 주세요.');
+    return false;
+  }
 }
 
 function setupSelection() {
@@ -31,6 +37,57 @@ function setupSelection() {
   const saved = JSON.parse(raw);
   if (![1,2,3].includes(saved.version) || !saved.answers) return null;
   return selectionFromSetupAnswers(saved.answers, catalog.workflows);
+}
+
+function applySelection(nextSelection, previousLayout = layoutOverrides) {
+  const nextLayout = reconcilePreviewOverrides(catalog, nextSelection, previousLayout);
+  selection = nextSelection;
+  layoutOverrides = nextLayout;
+}
+
+function restorePreviewDraft() {
+  try {
+    const raw = sessionStorage.getItem(STORAGE_KEY);
+    if (!raw || raw.length > 200000) return false;
+    const saved = JSON.parse(raw);
+    if (![1, 2].includes(saved.version)) return false;
+    // Older feature handoffs could save the new modules alongside the previous sections.
+    applySelection(createSelection(saved.selection, catalog.workflows), saved.version === 2 ? saved.layout_overrides ?? {} : {});
+    $('selection-origin').textContent = '이 탭에서 살펴보던 구성입니다.';
+    return true;
+  } catch {
+    message('저장된 미리보기를 읽지 못했습니다. 설치 설정이나 기본 구성으로 시작합니다.');
+    return false;
+  }
+}
+
+function loadInitialSelection() {
+  const restored = restorePreviewDraft();
+  const source = new URLSearchParams(location.search).get('from');
+  if (source === 'setup' || !restored) {
+    try {
+      const fromSetup = setupSelection();
+      if (fromSetup) {
+        applySelection(fromSetup);
+        $('selection-origin').textContent = '같은 탭에서 작성한 설치 설정을 사용합니다.';
+        if (source === 'setup' && save()) consumeHandoffSource(source);
+      }
+    } catch {
+      message('설치 답변을 읽지 못했습니다. 설치 설정을 확인해 주세요.');
+    }
+  }
+  if (source === 'features') {
+    const workflows = readWorkflowDraft(catalog.workflows);
+    if (!workflows) return;
+    applySelection(selectionWithWorkflows(workflows));
+    $('selection-origin').textContent = '기능·예시에서 고른 연결 구성을 사용합니다.';
+    if (save()) consumeHandoffSource(source);
+  }
+}
+
+function selectionWithWorkflows(workflows) {
+  const required = requiredWorkflowModules(catalog.workflows, workflows);
+  return {...selection, workflows, modules: [...new Set([...selection.modules, ...required])].sort()};
 }
 
 function formAvailable(form) {
@@ -47,7 +104,7 @@ function controls() {
   $('preview-school-links').checked = selection.school_links;
   $('preview-periods').value = selection.periods;
   mountWorkflowPicker($('preview-workflow-picker'), catalog.workflows, selection.workflows, value => {
-    checkpoint(); selection.workflows = value; selection.modules = [...new Set([...selection.modules, ...requiredWorkflowModules(catalog.workflows, value)])].sort();
+    checkpoint(); selection = selectionWithWorkflows(value);
     saveWorkflowDraft(value); changed();
   }, {compact:true, examples:true});
   $('preview-workflow-summary').textContent = selection.workflows ? `${workflowSummary(catalog.workflows, selection.workflows).title} · 연결 ${selection.workflows.features.length}개. 학생·학급 등 기록 내부의 보기로 구성하며, 아래 배치 파일에도 포함됩니다.` : '관계·보기 연결은 위 기능 구성에서 선택할 수 있어요.';
@@ -244,7 +301,7 @@ function changed() {
   const removed=selection.forms.filter(key=>!allowed.has(key));selection.forms=selection.forms.filter(key=>allowed.has(key));
   if(removed.length)message('사용할 수 없는 양식을 제외했습니다. 필요한 기능이나 담임 설정을 먼저 선택해 주세요.');
   else message('구성을 바꾸면 네 화면의 확인 상태가 초기화됩니다.');
-  layoutOverrides=reconcilePreviewOverrides(catalog,selection,layoutOverrides);
+  applySelection(selection);
   save();void refresh();
 }
 
@@ -270,10 +327,10 @@ function commitLayout(next,announcement,focusKey) {
   void refresh().then(()=>{if(focusKey)document.getElementById('move-handle-'+activePage+'-'+focusKey)?.focus({preventScroll:true});});
 }
 
-function moveSection(operation) {
+function moveSection(operation, focusSection = operation.section) {
   try {
     const next=movePreviewSection(catalog,selection,layoutOverrides,operation);
-    commitLayout(next,'구역을 옮겼습니다. 바뀐 배치는 저장 파일에도 반영됩니다.',operation.section);
+    commitLayout(next,'구역을 옮겼습니다. 바뀐 배치는 저장 파일에도 반영됩니다.',focusSection);
   }catch(error){editorMessage(error.message);clearDrag();}
 }
 
@@ -319,9 +376,28 @@ function rowDrop(page,target,position) {
 
 function ratioControl(page,row) {
   const button=node('button','⊞ '+row.columns.length+'열 · 편집','ratio-control');button.type='button';
+  button.id = rowEditorButtonId(page, row.id);
+  button.setAttribute('aria-controls', 'columns-panel');
+  button.setAttribute('aria-expanded', String(editingRow?.page === page && editingRow.id === row.id));
   button.setAttribute('aria-label',plan.pages[page].sections[row.columns[0].sections[0]].title+' 행 열 편집');
-  button.addEventListener('click',()=>{editingRow={page,id:row.id};picked=null;updateEditor();$('columns-panel').scrollIntoView({block:'nearest',behavior:'smooth'});});
+  button.addEventListener('click', () => {
+    editingRow = {page, id: row.id};
+    picked = null;
+    updateEditor();
+    $('column-counts').querySelector('button:not(:disabled)').focus();
+  });
   return button;
+}
+
+function rowEditorButtonId(page, rowId) {
+  return 'row-editor-' + page + '-' + rowId;
+}
+
+function closeColumnEditor() {
+  const opener = editingRow && $(rowEditorButtonId(editingRow.page, editingRow.id));
+  editingRow = null;
+  updateEditor();
+  opener?.focus();
 }
 
 function editableRow() {
@@ -338,7 +414,9 @@ function updateColumnEditor() {
   const row=editableRow();
   if(!row)editingRow=null;
   $('columns-panel').hidden=!row || !editMode;
+  for (const opener of document.querySelectorAll('.ratio-control[aria-expanded="true"]')) opener.setAttribute('aria-expanded', 'false');
   if(!row || !editMode)return;
+  $(rowEditorButtonId(activePage, row.id))?.setAttribute('aria-expanded', 'true');
   const keys=row.columns.flatMap(column=>column.sections),page=plan.pages[activePage];
   $('columns-title').textContent=page.sections[keys[0]].title+' 행';
   $('columns-summary').textContent=keys.length+'개 구역 · '+row.columns.length+'열';
@@ -356,18 +434,43 @@ function updateColumnEditor() {
   if([...select.options].some(option=>option.value===old))select.value=old;
   select.disabled=row.columns.length===4 || !select.options.length;
   $('add-column').disabled=select.disabled;
-  $('column-widths').replaceChildren();
-  row.columns.forEach((column,index)=>{
-    const label=node('label',undefined,'column-width'),input=node('input');
-    input.type='number';input.min=row.columns.length===1?'100':'10';input.max=String(100-10*(row.columns.length-1));input.step='any';input.value=column.ratio;input.disabled=row.columns.length===1;
-    input.setAttribute('aria-label',(index+1)+'열 너비 퍼센트');
-    input.addEventListener('change',()=>{try{commitLayout(resizePreviewColumn(catalog,selection,layoutOverrides,activePage,row.id,index,Number(input.value)),'열 너비를 변경했습니다. 나머지 열은 비율에 맞춰 조정했습니다.');}catch(error){editorMessage(error.message);input.value=column.ratio;}});
-    label.append(node('span',(index+1)+'열'),input,node('span','%'));$('column-widths').append(label);
+  const widths = $('column-widths');
+  // Keep the number fields mounted when a width change redraws the notebook.
+  if (widths.childElementCount !== row.columns.length) {
+    widths.replaceChildren(...row.columns.map((_, index) => columnWidthField(index)));
+  }
+  row.columns.forEach((column, index) => {
+    const input = widths.children[index].querySelector('input');
+    input.min = row.columns.length === 1 ? '100' : '10';
+    input.max = String(100 - 10 * (row.columns.length - 1));
+    input.value = column.ratio;
+    input.disabled = row.columns.length === 1;
   });
 }
 
+function columnWidthField(index) {
+  const label = node('label', undefined, 'column-width');
+  const input = node('input');
+  input.type = 'number';
+  input.step = 'any';
+  input.setAttribute('aria-label', (index + 1) + '열 너비 퍼센트');
+  input.addEventListener('change', () => {
+    const row = editableRow();
+    if (!row) return;
+    try {
+      const layout = resizePreviewColumn(catalog, selection, layoutOverrides, activePage, row.id, index, Number(input.value));
+      commitLayout(layout, '열 너비를 변경했습니다. 나머지 열은 비율에 맞춰 조정했습니다.');
+    } catch (error) {
+      editorMessage(error.message);
+      input.value = row.columns[index].ratio;
+    }
+  });
+  label.append(node('span', (index + 1) + '열'), input, node('span', '%'));
+  return label;
+}
+
 function initColumnEditor() {
-  $('close-columns').addEventListener('click',()=>{editingRow=null;updateEditor();});
+  $('close-columns').addEventListener('click', closeColumnEditor);
   for(const button of $('column-counts').querySelectorAll('button'))button.addEventListener('click',()=>{
     const row=editableRow();if(!row)return;
     try{const count=Number(button.dataset.count);commitLayout(setPreviewRowColumns(catalog,selection,layoutOverrides,activePage,row.id,count),count===1?'한 열로 합쳤습니다. 구역은 순서대로 유지됩니다.':count+'열로 나눴습니다.');}catch(error){editorMessage(error.message);}
@@ -375,7 +478,8 @@ function initColumnEditor() {
   $('equal-columns').addEventListener('click',()=>{const row=editableRow();if(row)commitLayout(setPreviewRowRatio(catalog,selection,layoutOverrides,activePage,row.id,equalWidths(row.columns.length)),'열 너비를 같게 맞췄습니다.');});
   $('add-column').addEventListener('click',()=>{
     const row=editableRow();if(!row || !$('add-column-section').value)return;
-    moveSection({page:activePage,section:$('add-column-section').value,target:row.columns.at(-1).sections.at(-1),position:'right'});
+    moveSection({page:activePage,section:$('add-column-section').value,target:row.columns.at(-1).sections.at(-1),position:'right'}, null);
+    if ($('add-column').disabled) $('close-columns').focus();
   });
 }
 
@@ -484,23 +588,23 @@ function initEditor() {
   frame.addEventListener('drop',event=>{if(!dragState)return;event.preventDefault();const candidate=dragOperation(event);const operation=candidate?(({element,...op})=>op)(candidate):dragTarget;clearDrag();ignoreClickUntil=Date.now()+250;if(operation)moveSection(operation);});
   frame.addEventListener('dragleave',event=>{const next=event.relatedTarget || document.elementFromPoint(event.clientX,event.clientY);if(!frame.contains(next)){dragTarget=null;for(const item of frame.querySelectorAll('[data-drop]'))delete item.dataset.drop;hideDropPreview();}});
   window.addEventListener('blur',()=>{if(dragState)hideDropPreview();});
-  document.addEventListener('keydown',event=>{if(event.key==='Escape'){picked=null;editingRow=null;clearDrag();updateEditor();}});
+  document.addEventListener('keydown', event => {
+    if (event.key !== 'Escape') return;
+    picked = null;
+    clearDrag();
+    if (editingRow && $('columns-panel').contains(event.target)) {
+      closeColumnEditor();
+    } else {
+      editingRow = null;
+      updateEditor();
+    }
+  });
 }
 
 async function init() {
   const response=await fetch('/preview-catalog.json');if(!response.ok)throw new Error('공통 배치 파일을 불러오지 못했습니다. 새로고침해 주세요.');
   catalog=await response.json();
-  try {
-    const fromSetup=new URLSearchParams(location.search).get('from')==='setup' ? setupSelection() : null;
-    const stored=sessionStorage.getItem(STORAGE_KEY);
-    if(fromSetup){selection=fromSetup;save();$('selection-origin').textContent='방금 작성한 설치 설정으로 미리 봅니다.';}
-    else if(stored && stored.length<200000){const saved=JSON.parse(stored);if([1,2].includes(saved.version)){selection=createSelection(saved.selection, catalog.workflows);layoutOverrides=saved.version===2?(saved.layout_overrides||{}):{};resolvePreview(catalog,selection,layoutOverrides);$('selection-origin').textContent='이 탭에서 살펴보던 구성입니다.';}}
-    else {const loaded=setupSelection();if(loaded){selection=loaded;$('selection-origin').textContent='같은 탭에서 작성한 설치 설정을 사용합니다.';}}
-  }catch{selection=createSelection();layoutOverrides={};message('저장된 설정을 읽지 못해 기본 구성으로 시작합니다.');}
-  if (new URLSearchParams(location.search).get('from') === 'features') {
-    const picked = readWorkflowDraft(catalog.workflows);
-    if (picked) { selection.workflows = picked; selection.modules = [...new Set([...selection.modules, ...requiredWorkflowModules(catalog.workflows, picked)])].sort(); save(); $('selection-origin').textContent = '기능·예시에서 고른 연결 구성을 사용합니다.'; }
-  }
+  loadInitialSelection();
   for(const item of MODULES){const label=node('label',undefined,'preview-check'),input=node('input');input.type='checkbox';input.id='preview-module-'+item.key;label.append(input,node('span',item.label));input.addEventListener('change',()=>{checkpoint();selection.modules=input.checked?[...selection.modules,item.key].sort():selection.modules.filter(key=>key!==item.key);changed();});$('module-options').append(label);}
   for(const form of FORMS){const label=node('label',undefined,'preview-check'),input=node('input');input.type='checkbox';input.id='preview-form-'+form.key;label.append(input,node('span',form.label));input.addEventListener('change',()=>{checkpoint();selection.forms=input.checked?[...selection.forms,form.key].sort():selection.forms.filter(key=>key!==form.key);changed();});$('form-options').append(label);}
   for(const [id,key] of [['preview-homeroom','homeroom'],['preview-school-links','school_links']])$(id).addEventListener('change',()=>{checkpoint();selection[key]=$(id).checked;changed();});
@@ -512,7 +616,22 @@ async function init() {
     button.addEventListener('keydown',event=>{if(!['ArrowLeft','ArrowRight','Home','End'].includes(event.key))return;event.preventDefault();const index=pageKeys.indexOf(key),next=event.key==='Home'?0:event.key==='End'?3:(index+(event.key==='ArrowRight'?1:-1)+4)%4;showPage(pageKeys[next]);$('page-tab-'+pageKeys[next]).focus();});$('preview-tabs').append(button);
   }
   $('review-confirm').addEventListener('change',updateReview);
-  $('load-setup').addEventListener('click',()=>{try{const loaded=setupSelection();if(!loaded){message('이 탭에 설치 답변이 없어요. 상단의 설치 정보 입력에서 먼저 작성할 수 있습니다.');return;}checkpoint();selection=loaded;layoutOverrides={};message('기능·양식·교시 설정만 불러왔습니다. 학교·개인 정보는 이 미리보기에 가져오지 않습니다.');save();void refresh();}catch{message('설치 답변을 읽지 못했습니다. 설정을 확인해 주세요.');}});
+  $('load-setup').addEventListener('click', () => {
+    try {
+      const loaded = setupSelection();
+      if (!loaded) {
+        message('이 탭에 설치 답변이 없어요. 상단의 설치 정보 입력에서 먼저 작성할 수 있습니다.');
+        return;
+      }
+      checkpoint();
+      applySelection(loaded);
+      message('설치 설정을 불러왔습니다. 함께 쓰는 구역의 배치와 열 너비를 유지했습니다.');
+      save();
+      void refresh();
+    } catch {
+      message('설치 답변을 읽지 못했습니다. 설정을 확인해 주세요.');
+    }
+  });
   $('load-bundle').addEventListener('change',async()=>{
     const file=$('load-bundle').files[0];if(!file)return;
     try{if(file.size>2*1024*1024)throw new Error('2MB 이하의 배치 JSON 파일을 선택해 주세요.');const bundle=JSON.parse(await file.text()),report=await verifyReviewedBundle(catalog,bundle);if(!report.valid)throw new Error('현재 공통 배치와 맞지 않거나 변경된 파일입니다. 새로 미리 보고 저장해 주세요.');checkpoint();selection=createSelection(bundle.selection, catalog.workflows);layoutOverrides=copy(bundle.layout_overrides||{});message('저장한 배치를 불러왔습니다. 적용 요청 전에 네 화면을 다시 확인해 주세요.');save();await refresh();}catch(error){message(error.message || '배치 파일을 읽지 못했습니다.');}finally{$('load-bundle').value='';}

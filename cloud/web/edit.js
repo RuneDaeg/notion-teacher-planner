@@ -1,6 +1,7 @@
 import {validateWorkflowSelection, workflowSummary} from './workflow-model.mjs';
 import {loadWorkflowCatalog, readWorkflowDraft, saveWorkflowDraft, mountWorkflowPicker} from './workflow-picker.mjs';
 import {FEATURE_CATALOG, LOCATIONS, VIEWS, createEditAnswers, applyFeature, validateEditAnswers, buildEditPrompt} from './edit-model.mjs';
+import {consumeHandoffSource} from './handoff.mjs';
 
 const $ = id => document.getElementById(id);
 const STORAGE_KEY = 'teacher-planner-edit-v1';
@@ -48,7 +49,11 @@ function save() {
   try {
     sessionStorage.setItem(STORAGE_KEY, JSON.stringify({version:1, answers, drafts}));
     $('edit-draft-status').textContent = '이 탭에 임시 저장됨 · 입력 내용은 서버로 보내지 않습니다.';
-  } catch { $('edit-draft-status').textContent = '임시 저장을 사용할 수 없습니다. 떠나기 전에 요청문을 저장해 주세요.'; }
+    return true;
+  } catch {
+    $('edit-draft-status').textContent = '임시 저장을 사용할 수 없습니다. 떠나기 전에 요청문을 저장해 주세요.';
+    return false;
+  }
 }
 
 function invalidate() {
@@ -96,11 +101,14 @@ function renderAnswers() {
   renderWorkflows();
 }
 
-function selectFeature(id) {
+function activateFeatureDraft(id) {
   if (id === answers.featureId) return;
   drafts[answers.featureId] = {...answers};
-  const notebookUrl = answers.notebookUrl;
-  answers = {...(drafts[id] || applyFeature(id)), notebookUrl};
+  answers = {...(drafts[id] || applyFeature(id)), notebookUrl: answers.notebookUrl};
+}
+
+function selectFeature(id) {
+  activateFeatureDraft(id);
   invalidate();
   renderAnswers();
   save();
@@ -206,7 +214,11 @@ try { workflowCatalog = await loadWorkflowCatalog(); } catch { /* Other edit req
 renderCatalog(); restore();
 if (workflowCatalog && new URLSearchParams(location.search).get('from') === 'features') {
   const chosen = readWorkflowDraft(workflowCatalog);
-  if (chosen) { answers = {...applyFeature('workflows'), notebookUrl:answers.notebookUrl, workflows:chosen}; save(); }
+  if (chosen) {
+    activateFeatureDraft('workflows');
+    answers.workflows = chosen;
+    if (save()) consumeHandoffSource('features');
+  }
 }
 renderAnswers();
 $('edit-loading').hidden = true;
